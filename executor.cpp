@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "colors.h"
 #include "commands.h"
 #include "config.h"
 #include "executor.h"
@@ -47,6 +48,14 @@ void CommandExecutor::executeNextCommand() {
     case CMD_NOP:             /* Do nothing */
       break;
 
+    case CMD_SLEEP:           /* Sleeps for a given duration */
+      handleSleepCommand();
+      break;
+
+    case CMD_WAIT_UNTIL:      /* Waits until the internal clock of the executor reaches a given value */
+      handleWaitUntilCommand();
+      break;
+      
     case CMD_SET_COLOR:       /* Set the color of the LED strip and wait */
       handleSetColorCommand();
       break;
@@ -63,14 +72,22 @@ void CommandExecutor::executeNextCommand() {
       handleSetWhiteCommand();
       break;
 
-    case CMD_SLEEP:           /* Sleeps for a given duration */
-      handleSleepCommand();
-      break;
-
-    case CMD_WAIT_UNTIL:      /* Waits until the internal clock of the executor reaches a given value */
-      handleWaitUntilCommand();
+    case CMD_FADE_TO_COLOR:   /* Fades the color of the LED strip */
+      handleFadeToColorCommand();
       break;
       
+    case CMD_FADE_TO_GRAY:    /* Fades the color of the LED strip to a shade of gray */
+      handleFadeToGrayCommand();
+      break;
+      
+    case CMD_FADE_TO_BLACK:   /* Fades the color of the LED strip to black */
+      handleFadeToBlackCommand();
+      break;
+      
+    case CMD_FADE_TO_WHITE:   /* Fades the color of the LED strip to white */
+      handleFadeToWhiteCommand();
+      break;
+
     case CMD_LOOP_BEGIN:      /* Marks the beginning of a loop */
       handleLoopBeginCommand();
       break;
@@ -86,12 +103,54 @@ void CommandExecutor::executeNextCommand() {
   }
 }
 
-void CommandExecutor::handleDelayByte() {
-  u8 encodedDuration;
+void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
+  unsigned long duration = handleDelayByte();
+  EasingMode easingMode = handleEasingModeByte();
+  
+  m_ledStripFader.endColor = color;
+  m_transition.setEasingMode(easingMode);
+  m_transition.start(duration, m_currentCommandStartTime);
+  m_transition.step(m_ledStripFader);
+}
+
+unsigned long CommandExecutor::handleDelayByte() {
+  unsigned long duration = nextDuration();
+  
+#ifdef DEBUG
+  Serial.print("Delay: ");
+  Serial.print(duration);
+  Serial.println(" msec");
+#endif
+
+  delayExecutionFor(duration);
+  return duration;
+}
+
+EasingMode CommandExecutor::handleEasingModeByte() {
+  u8 easingModeByte = nextByte();
+  
+#ifdef DEBUG
+  Serial.print("Easing mode: ");
+  Serial.println(easingModeByte);
+#endif
+
+  return static_cast<EasingMode>(easingModeByte);
+}
+
+void CommandExecutor::load(const u8* bytecode) {
+  m_bytecode = bytecode;
+  rewind();
+}
+
+u8 CommandExecutor::nextByte() {
+  assert(m_pNextCommand != 0);
+  return *(m_pNextCommand++);
+}
+
+unsigned long CommandExecutor::nextDuration() {
+  u8 encodedDuration = nextByte();
   unsigned long duration;
   
-  encodedDuration = nextByte();
-
   /* If the two most significant bits are 1, the remaining six bits
    * denote units of 1/32-th of a second.
    */
@@ -108,23 +167,7 @@ void CommandExecutor::handleDelayByte() {
     duration = encodedDuration * 1000;
   }
 
-#ifdef DEBUG
-  Serial.print("Delay: ");
-  Serial.print(duration);
-  Serial.println(" msec");
-#endif
-
-  delayExecutionFor(duration);
-}
-
-void CommandExecutor::load(const u8* bytecode) {
-  m_bytecode = bytecode;
-  rewind();
-}
-
-u8 CommandExecutor::nextByte() {
-  assert(m_pNextCommand != 0);
-  return *(m_pNextCommand++);
+  return duration;
 }
 
 unsigned long CommandExecutor::nextVarint() {
@@ -149,12 +192,30 @@ void CommandExecutor::rewind() {
   delayExecutionFor(0);
 }
 
+void CommandExecutor::setColorOfLEDStrip(rgb_color_t color) {
+  handleDelayByte();
+  
+  assert(m_pLEDStrip != 0);
+  m_pLEDStrip->setColor(color);
+  m_ledStripFader.startColor = color;
+}
+
 unsigned long CommandExecutor::step() {
   unsigned long now = millis();
+  
+  if (m_transition.active()) {
+    if (!m_transition.step(m_ledStripFader, now)) {
+      // Transition not active any more; make sure that the next
+      // transition starts from the current end color
+      m_ledStripFader.startColor = m_ledStripFader.endColor;
+    }
+  }
+  
   if (now >= m_nextWakeupTime) {
     m_currentCommandStartTime = now;
     executeNextCommand();
   }
+  
   return m_nextWakeupTime;
 }
 
@@ -165,6 +226,46 @@ void CommandExecutor::stop() {
 /********************/
 /* Command handlers */
 /********************/
+
+void CommandExecutor::handleFadeToBlackCommand() {
+  fadeColorOfLEDStrip(COLOR_BLACK);
+}
+
+void CommandExecutor::handleFadeToColorCommand() {
+  rgb_color_t color;
+  
+  color.red = nextByte();
+  color.green = nextByte();
+  color.blue = nextByte();
+  
+#ifdef DEBUG
+  Serial.print("Arguments: ");
+  Serial.print(color.red);
+  Serial.print(' ');
+  Serial.print(color.green);
+  Serial.print(' ');
+  Serial.println(color.blue);
+#endif
+
+  fadeColorOfLEDStrip(color);
+}
+
+void CommandExecutor::handleFadeToGrayCommand() {
+  rgb_color_t color;
+  
+  color.red = color.green = color.blue = nextByte();
+  
+#ifdef DEBUG
+  Serial.print("Arguments: ");
+  Serial.println(color.red);
+#endif
+
+  fadeColorOfLEDStrip(color);
+}
+
+void CommandExecutor::handleFadeToWhiteCommand() {
+  fadeColorOfLEDStrip(COLOR_WHITE);
+}
 
 void CommandExecutor::handleLoopBeginCommand() {
   u8 iterations = nextByte();
@@ -204,47 +305,43 @@ void CommandExecutor::handleResetClockCommand() {
 }
 
 void CommandExecutor::handleSetBlackCommand() {
-  assert(m_pLEDStrip != 0);
-  m_pLEDStrip->off();
-  handleDelayByte();
+  setColorOfLEDStrip(COLOR_BLACK);
 }
 
 void CommandExecutor::handleSetColorCommand() {
-  u8 red = nextByte();
-  u8 green = nextByte();
-  u8 blue = nextByte();
+  rgb_color_t color;
+  
+  color.red = nextByte();
+  color.green = nextByte();
+  color.blue = nextByte();
   
 #ifdef DEBUG
   Serial.print("Arguments: ");
-  Serial.print(red);
+  Serial.print(color.red);
   Serial.print(' ');
-  Serial.print(green);
+  Serial.print(color.green);
   Serial.print(' ');
-  Serial.println(blue);
+  Serial.println(color.blue);
 #endif
 
-  assert(m_pLEDStrip != 0);
-  m_pLEDStrip->setColor(red, green, blue);
-  handleDelayByte();
+  setColorOfLEDStrip(color);
 }
 
 void CommandExecutor::handleSetGrayCommand() {
-  u8 gray = nextByte();
+  rgb_color_t color;
+  
+  color.red = color.green = color.blue = nextByte();
   
 #ifdef DEBUG
   Serial.print("Arguments: ");
-  Serial.println(gray);
+  Serial.println(color.red);
 #endif
 
-  assert(m_pLEDStrip != 0);
-  m_pLEDStrip->setGray(gray);
-  handleDelayByte();
+  setColorOfLEDStrip(color);
 }
 
 void CommandExecutor::handleSetWhiteCommand() {
-  assert(m_pLEDStrip != 0);
-  m_pLEDStrip->on();
-  handleDelayByte();
+  setColorOfLEDStrip(COLOR_WHITE);
 }
 
 void CommandExecutor::handleSleepCommand() {

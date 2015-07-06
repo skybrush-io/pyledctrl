@@ -7,11 +7,12 @@
 #define EXECUTOR_H
 
 #include "errors.h"
+#include "led_strip.h"
 #include "loop_stack.h"
+#include "transition.h"
 #include "types.h"
 
 class LED;
-class LEDStrip;
 
 /**
  * Executes commands that control the attached LED strip.
@@ -75,6 +76,18 @@ private:
    * Time when the executor is supposed to execute the next command.
    */
   unsigned long m_nextWakeupTime;
+
+  /**
+   * Auxiliary structure for handling color transitions on the LED strip.
+   * Maintains the color-related state variables of the current transition.
+   */
+  LEDStripColorFader m_ledStripFader;
+  
+  /**
+   * Auxiliary structure for handling color transitions on the LED strip.
+   * Maintains the time-related state variables of the current transition.
+   */
+  Transition<LEDStripColorFader> m_transition;
   
 public:
   /**
@@ -86,7 +99,7 @@ public:
    */
   explicit CommandExecutor(LEDStrip* pLEDStrip=0, LED* pErrorLED=0)
     : m_pLEDStrip(pLEDStrip), m_pErrorLED(pErrorLED), m_ended(true),
-      m_error(ERR_SUCCESS) {
+      m_error(ERR_SUCCESS), m_ledStripFader(pLEDStrip) {
     rewind();
   };
 
@@ -174,10 +187,47 @@ protected:
   void executeNextCommand();
 
   /**
+   * \brief Fades the color of the LED strip to the given color.
+   * Common code segment for the different \c "handleFadeTo..." commands.
+   * 
+   * \param  color       the target color
+   */
+  void fadeColorOfLEDStrip(rgb_color_t color);
+
+  /**
    * \brief Interprets the next byte from the bytecode as a duration and
    *        sets the next wakeup time of the executor appropriately. 
+   *        
+   * \return  the parsed duration
    */
-  void handleDelayByte();
+  unsigned long handleDelayByte();
+
+  /**
+   * \brief Interprets the next byte from the bytecode as an easing mode.
+   *        
+   * \return  the parsed easing mode
+   */
+  EasingMode handleEasingModeByte();
+  
+  /**
+   * \brief Handles the execution of \c CMD_FADE_TO_BLACK commands.
+   */
+  void handleFadeToBlackCommand();
+        
+  /**
+   * \brief Handles the execution of \c CMD_FADE_TO_COLOR commands.
+   */
+  void handleFadeToColorCommand();
+
+  /**
+   * \brief Handles the execution of \c CMD_FADE_TO_GRAY commands.
+   */
+  void handleFadeToGrayCommand();
+
+  /**
+   * \brief Handles the execution of \c CMD_FADE_TO_WHITE commands.
+   */
+  void handleFadeToWhiteCommand();
 
   /**
    * \brief Handles the execution of \c CMD_LOOP_BEGIN commands.
@@ -231,10 +281,23 @@ protected:
   u8 nextByte();
 
   /**
+   * \brief Reads the next byte from the bytecode, interprets it as a 
+   *        duration and advances the execution pointer.
+   */
+  unsigned long nextDuration();
+  
+  /**
    * \brief Reads the next varint from the bytecode and advances the
    *        execution pointer.
    */
   unsigned long nextVarint();
+
+  /**
+   * \brief Sets the color of the LED strip to the given color.
+   * Contains common code for the different \c "handleSetColor..."
+   * functions.
+   */
+  void setColorOfLEDStrip(rgb_color_t color);
 };
 
 #endif

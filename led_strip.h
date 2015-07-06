@@ -11,6 +11,8 @@
 #define LED_STRIP_H
 
 #include <Arduino.h>
+#include <assert.h>
+#include "colors.h"
 #include "types.h"
 
 /**
@@ -82,12 +84,78 @@ public:
   }
   
   /**
+   * \brief Sets the color of the LED strip.
+   * 
+   * \param  color    the desired color of the strip.
+   */
+  void setColor(rgb_color_t color) const {
+    setColor(color.red, color.green, color.blue);
+  }
+  
+  /**
    * \brief Sets the color of the LED strip to a gray shade.
    * 
    * \param  gray   the shade of gray (0=black, 255=white).
    */
   void setGray(u8 gray) const {
     setColor(gray, gray, gray);
+  }
+};
+
+/**
+ * \brief Color fader for a LED strip.
+ * 
+ * This object provides a function-like interface that accepts a
+ * single floating-point number between 0 and 1 and sets the color
+ * of the LED strip to a linearly interpolated one between a given
+ * start and end color.
+ */
+class LEDStripColorFader {
+private:
+  /**
+   * The LED strip that the fader controls.
+   */
+  const LEDStrip* m_pLEDStrip;
+
+public:
+  /**
+   * The start color.
+   */
+  rgb_color_t startColor;
+
+  /**
+   * The end color.
+   */
+  rgb_color_t endColor;
+
+public:
+  /**
+   * Constructor.
+   * 
+   * \param  ledStrip  the LED strip that the fader will control
+   */
+  explicit LEDStripColorFader(const LEDStrip* ledStrip=0) : m_pLEDStrip(ledStrip) {}
+
+  /**
+   * Returns the LED strip that the fader will control.
+   */
+  const LEDStrip* ledStrip() const {
+    return m_pLEDStrip;
+  }
+
+  /**
+   * Sets the LED strip that the fader will control.
+   */
+  void setLEDStrip(const LEDStrip* value) {
+    m_pLEDStrip = value;
+  }
+
+  /**
+   * Fades the LED strip to the given interpolation value.
+   */
+  void operator()(float value) const {
+    assert(m_pLEDStrip != 0);
+    m_pLEDStrip->setColor(rgb_color_linear_interpolation(startColor, endColor, value));
   }
 };
 
