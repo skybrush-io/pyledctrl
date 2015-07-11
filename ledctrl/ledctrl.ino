@@ -27,7 +27,8 @@ static const u8 bytecode[] = {
 };
 
 void setup() {
-  // Configure the serial port where we will listen for commands
+  // Configure the serial port where we will listen for commands and
+  // send debug output
   Serial.begin(SERIAL_BAUD_RATE);
 
   // Load the bytecode into the executor
@@ -47,14 +48,20 @@ void loop() {
   executor.step();
 }
 
+#ifdef ENABLE_SERIAL_INPUT
+void serialEvent() {
+
+}
+#endif
+
 /**
  * \brief Forwards assertion error messages to the serial link.
  */
 void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
-    Serial.println(__func);
-    Serial.println(__file);
-    Serial.println(__lineno, DEC);
-    Serial.println(__sexp);
-    Serial.flush();
-    abort();
+  Serial.println(__func);
+  Serial.println(__file);
+  Serial.println(__lineno, DEC);
+  Serial.println(__sexp);
+  Serial.flush();
+  abort();
 }

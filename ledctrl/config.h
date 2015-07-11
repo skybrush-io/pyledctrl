@@ -48,11 +48,20 @@ extern "C" {
 #define MAIN_SWITCH_PIN A5
 
 /**
+ * \def ENABLE_SERIAL_INPUT
+ * 
+ * Whether the LED controller should listen for incoming commands on the
+ * serial port.
+ */
+// #define ENABLE_SERIAL_INPUT 1
+
+/**
  * \def SERIAL_BAUD_RATE
  * 
- * Baud rate of the serial port where we will listen for incoming commands.
+ * Baud rate of the serial port where we will listen for incoming commands
+ * and where we will send debug messages.
  */
-#define SERIAL_BAUD_RATE 9600
+#define SERIAL_BAUD_RATE 115200
 
 /**
  * \def MAX_LOOP_DEPTH
