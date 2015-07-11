@@ -1,0 +1,17 @@
+#!/bin/sh
+# Launches the serial console on which one can watch the
+# messages written by ledctrl to the serial port of the
+# Arduino. Can also be used to send messages.
+
+if [ x$1 = x ]; then
+    echo "Usage: $0 port"
+	exit 1
+fi
+
+cd "`dirname $0`"/..
+
+PORT="$1"
+BAUD_RATE=`cat ledctrl/config.h | grep '#define SERIAL_BAUD_RATE' | cut -d ' ' -f 3`
+
+# Invoke screen
+screen "$1" "$BAUD_RATE"
