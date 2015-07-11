@@ -1,6 +1,6 @@
 #include "loop_stack.h"
 
-bool LoopStack::begin(const u8* location, u8 iterations) {
+bool LoopStack::begin(bytecode_location_t location, u8 iterations) {
   if (m_pTopItem >= m_items + MAX_LOOP_DEPTH) {
     return false;
   }
@@ -18,7 +18,7 @@ bool LoopStack::begin(const u8* location, u8 iterations) {
   return true;
 }
 
-const u8* LoopStack::end() {
+const bytecode_location_t LoopStack::end() {
   u8 iterationsLeftPlusOne;
   
   if (m_pTopItem != 0) {

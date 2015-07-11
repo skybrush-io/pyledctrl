@@ -7,13 +7,14 @@
 #ifndef LOOP_STACK_H
 #define LOOP_STACK_H
 
+#include "bytecode_store.h"
 #include "config.h"
 
 /**
  * \brief Holds information about a single loop in a loop stack.
  */
 typedef struct {
-  const u8* start;  /**< Pointer to the first instruction of the body of the loop */
+  bytecode_location_t start;  /**< Pointer to the first instruction of the body of the loop */
 
   /**
    * Number of iterations left for the current loop plus one, or zero of the loop
@@ -61,13 +62,18 @@ public:
    * \return \c true if the operation was successful, \c false if the loop stack
    *         is full
    */
-  bool begin(const u8* location, u8 iterations);
+  bool begin(bytecode_location_t location, u8 iterations);
   
   /**
    * Asks the loop stack to start an infinite loop at the given location.
+   * 
+   * \param  location    the first instruction of the loop
+   * 
+   * \return \c true if the operation was successful, \c false if the loop stack
+   *         is full
    */
-  void beginInfinite(const u8* location) {
-    begin(location, 0);
+  bool beginInfinite(bytecode_location_t location) {
+    return begin(location, 0);
   }
 
   /**
@@ -85,9 +91,9 @@ public:
    * indicate that the execution can proceed as normal.
    * 
    * \return  the starting address of the innermost loop if it has any
-   *          iterations left, null otherwise
+   *          iterations left, \c BYTECODE_LOCATION_NOWHERE otherwise
    */
-  const u8* end();
+  const bytecode_location_t end();
 
   /**
    * Returns the number of active loops in the stack.

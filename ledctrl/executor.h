@@ -13,6 +13,7 @@
 #include "types.h"
 
 class LED;
+class BytecodeStore;
 
 /**
  * Executes commands that control the attached LED strip.
@@ -30,9 +31,9 @@ private:
   LED* m_pErrorLED;
 
   /**
-   * Memory block holding the bytecode being executed.
+   * Object managing access to the bytecode being executed.
    */
-  const u8* m_bytecode;
+  BytecodeStore* m_pBytecodeStore;
 
   /**
    * Pointer to the current location within the bytecode.
@@ -98,11 +99,19 @@ public:
    *                    error conditions
    */
   explicit CommandExecutor(LEDStrip* pLEDStrip=0, LED* pErrorLED=0)
-    : m_pLEDStrip(pLEDStrip), m_pErrorLED(pErrorLED), m_ended(true),
+    : m_pLEDStrip(pLEDStrip), m_pErrorLED(pErrorLED),
+      m_pBytecodeStore(0), m_ended(true),
       m_error(ERR_SUCCESS), m_ledStripFader(pLEDStrip) {
     rewind();
   };
 
+  /**
+   * \brief Returns the bytecode store that the executor will use.
+   */
+  BytecodeStore* bytecodeStore() const {
+    return m_pBytecodeStore;
+  }
+  
   /**
    * \brief Returns the value of the internal clock of the executor.
    * 
@@ -115,20 +124,18 @@ public:
   }
   
   /**
-   * \brief Loads the given bytecode into the executor.
-   * 
-   * Note that the memory area holding the bytecode is \em not copied into
-   * the executor; it is the responsibility of the caller to manage the
-   * memory occupied by the bytecode and free it when it is not needed
-   * any more.
-   */
-  void load(const u8* bytecode);
-
-  /**
    * \brief Rewinds the execution to the start of the current bytecode.
    */
   void rewind();
 
+  /**
+   * \brief Sets the bytecode store that the executor will use.
+   */
+  void setBytecodeStore(BytecodeStore* pBytecodeStore) {
+    m_pBytecodeStore = pBytecodeStore;
+    rewind();
+  }
+  
   /**
    * \brief This function must be called repeatedly from the main loop
    *        of the sketch to keep the execution flowing.

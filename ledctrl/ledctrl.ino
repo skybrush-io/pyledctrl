@@ -26,18 +26,23 @@ static const u8 bytecode[] = {
 #endif
 };
 
+SRAMBytecodeStore bytecodeStore(bytecode);
+
 void setup() {
   // Configure the serial port where we will listen for commands and
   // send debug output
   Serial.begin(SERIAL_BAUD_RATE);
 
   // Load the bytecode into the executor
-  executor.load(bytecode);
+  executor.setBytecodeStore(&bytecodeStore);
+
+  // Print the banner to the serial port to indicate that we are ready
+  Serial.println(F("+OK"));
 }
 
 void loop() {
   // Check the main switch
-  if (!mainSwitch.on()) {
+  if (false && !mainSwitch.on()) {
     // Turn off the LEDs
     builtinLed.off();
     ledStrip.off();

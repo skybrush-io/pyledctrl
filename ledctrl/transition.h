@@ -234,7 +234,7 @@ public:
 struct DebugTransitionHandler {
   void operator()(transition_progress_t progress) const {
 #ifdef DEBUG
-    Serial.print("[");
+    Serial.print(" [");
     Serial.print(millis());
     Serial.print(" ms] transition progress: ");
     Serial.println(progress);

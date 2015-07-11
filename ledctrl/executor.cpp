@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "bytecode_store.h"
 #include "colors.h"
 #include "commands.h"
 #include "config.h"
@@ -34,9 +35,9 @@ void CommandExecutor::executeNextCommand() {
 
   commandCode = nextByte();
 #ifdef DEBUG
-  Serial.print("[");
+  Serial.print(F(" ["));
   Serial.print(clock());
-  Serial.print(" ms] Command: ");
+  Serial.print(F(" ms] Command: "));
   Serial.println(commandCode);
 #endif
 
@@ -117,9 +118,9 @@ unsigned long CommandExecutor::handleDelayByte() {
   unsigned long duration = nextDuration();
   
 #ifdef DEBUG
-  Serial.print("Delay: ");
+  Serial.print(F(" Delay: "));
   Serial.print(duration);
-  Serial.println(" msec");
+  Serial.println(F(" msec"));
 #endif
 
   delayExecutionFor(duration);
@@ -130,21 +131,16 @@ EasingMode CommandExecutor::handleEasingModeByte() {
   u8 easingModeByte = nextByte();
   
 #ifdef DEBUG
-  Serial.print("Easing mode: ");
+  Serial.print(F(" Easing mode: "));
   Serial.println(easingModeByte);
 #endif
 
   return static_cast<EasingMode>(easingModeByte);
 }
 
-void CommandExecutor::load(const u8* bytecode) {
-  m_bytecode = bytecode;
-  rewind();
-}
-
 u8 CommandExecutor::nextByte() {
-  assert(m_pNextCommand != 0);
-  return *(m_pNextCommand++);
+  assert(m_pBytecodeStore != 0);
+  return m_pBytecodeStore->next();
 }
 
 unsigned long CommandExecutor::nextDuration() {
@@ -185,8 +181,12 @@ unsigned long CommandExecutor::nextVarint() {
 }
 
 void CommandExecutor::rewind() {
-  m_pNextCommand = m_bytecode;
-  m_ended = (m_bytecode == 0);
+  if (m_pBytecodeStore) {
+    m_pBytecodeStore->rewind();
+    m_ended = m_pBytecodeStore->empty();
+  } else {
+    m_ended = true;
+  }
   m_loopStack.clear();
   error(ERR_SUCCESS);
   delayExecutionFor(0);
@@ -239,7 +239,7 @@ void CommandExecutor::handleFadeToColorCommand() {
   color.blue = nextByte();
   
 #ifdef DEBUG
-  Serial.print("Arguments: ");
+  Serial.print(F(" Arguments: "));
   Serial.print(color.red);
   Serial.print(' ');
   Serial.print(color.green);
@@ -256,7 +256,7 @@ void CommandExecutor::handleFadeToGrayCommand() {
   color.red = color.green = color.blue = nextByte();
   
 #ifdef DEBUG
-  Serial.print("Arguments: ");
+  Serial.print(F(" Arguments: "));
   Serial.println(color.red);
 #endif
 
@@ -269,34 +269,41 @@ void CommandExecutor::handleFadeToWhiteCommand() {
 
 void CommandExecutor::handleLoopBeginCommand() {
   u8 iterations = nextByte();
+  bytecode_location_t location = m_pBytecodeStore->tell();
 
+  if (location == BYTECODE_LOCATION_NOWHERE) {
+    error(ERR_SEEKING_NOT_SUPPORTED);
+    stop();
+    return;
+  }
+  
 #ifdef DEBUG
-  Serial.print("Starting loop #");
+  Serial.print(F(" Starting loop #"));
   Serial.print(m_loopStack.size());
-  Serial.print(" with ");
+  Serial.print(F(" with "));
   Serial.print(iterations);
-  Serial.println(" iteration(s)");
+  Serial.println(F(" iteration(s)"));
 #endif
 
-  m_loopStack.begin(m_pNextCommand, iterations);
+  m_loopStack.begin(location, iterations);
 }
 
 void CommandExecutor::handleLoopEndCommand() {
-  const u8* jumpTo = m_loopStack.end();
+  bytecode_location_t jumpTo = m_loopStack.end();
   
 #ifdef DEBUG
-  if (jumpTo == 0) {
-    Serial.print("Loop #");
+  if (jumpTo == BYTECODE_LOCATION_NOWHERE) {
+    Serial.print(F(" Loop #"));
     Serial.print(m_loopStack.size());
-    Serial.println(" terminated");
+    Serial.println(F(" terminated"));
   } else {
-    Serial.print("Restarting loop #");
+    Serial.print(F(" Restarting loop #"));
     Serial.println(m_loopStack.size());
   }
 #endif
 
-  if (jumpTo != 0) {
-    m_pNextCommand = jumpTo;
+  if (jumpTo != BYTECODE_LOCATION_NOWHERE) {
+    m_pBytecodeStore->seek(jumpTo);
   }
 }
 
@@ -316,7 +323,7 @@ void CommandExecutor::handleSetColorCommand() {
   color.blue = nextByte();
   
 #ifdef DEBUG
-  Serial.print("Arguments: ");
+  Serial.print(F(" Arguments: "));
   Serial.print(color.red);
   Serial.print(' ');
   Serial.print(color.green);
@@ -333,7 +340,7 @@ void CommandExecutor::handleSetGrayCommand() {
   color.red = color.green = color.blue = nextByte();
   
 #ifdef DEBUG
-  Serial.print("Arguments: ");
+  Serial.print(F(" Arguments: "));
   Serial.println(color.red);
 #endif
 
@@ -352,7 +359,7 @@ void CommandExecutor::handleWaitUntilCommand() {
   unsigned long deadline = nextVarint();
   
 #ifdef DEBUG
-  Serial.print("Arguments: ");
+  Serial.print(F(" Arguments: "));
   Serial.println(deadline);
 #endif
 
