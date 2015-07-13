@@ -6,4 +6,5 @@ void LEDStrip::initialize() const {
   pinMode(m_greenPin, OUTPUT);
   pinMode(m_bluePin, OUTPUT);
   setGray(0);
+
 }

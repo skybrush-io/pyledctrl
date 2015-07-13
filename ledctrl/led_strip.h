@@ -14,6 +14,9 @@
 #include <assert.h>
 #include "colors.h"
 #include "types.h"
+#include "config.h"
+#include "voltmeter.h"
+
 
 /**
  * \brief Represents an RGB LED strip attached to the Arduino on three pins,
@@ -35,8 +38,21 @@ private:
    * Index of the blue pin of the LED strip.
    */
   u8 m_bluePin;
-
+  
+  
+  
 public:
+
+	float voltagecompensator;
+	VoltMeter voltmeter;
+
+	void modification()
+	{
+		voltagecompensator = voltmeter.measure();
+
+	}
+
+	colorPWMintervals intervals;
   /**
    * Constructs a LED strip that uses the given pins.
    * 
@@ -77,10 +93,36 @@ public:
    * \param  green  the green component of the strip.
    * \param  blue   the blue component of the strip.
    */
+  
+
+  byte normPWM(float ColorVoltage)
+  {
+	  byte duty = (byte)(254 * ColorVoltage / MAXVOLTAGE);
+
+	  return duty;
+  }
+  
+
+  /* initialize pwm duty values by minimum and maximum voltages*/
+  void initIntervals()
+  {
+	  intervals.R_duty_min = normPWM((float)(MINVOLTAGE_RED));
+	  intervals.R_duty_max = normPWM((float)(MAXVOLTAGE_RED));
+	  intervals.G_duty_min = normPWM((float)(MINVOLTAGE_GREEN));
+	  intervals.G_duty_max = normPWM((float)(MAXVOLTAGE_GREEN));
+	  intervals.B_duty_min = normPWM((float)(MINVOLTAGE_BLUE));
+	  intervals.B_duty_max = normPWM((float)(MAXVOLTAGE_BLUE));
+  }
+
+  /* function for setting colors and compensate the LED non-linearity*/
   void setColor(u8 red, u8 green, u8 blue) const {
-    analogWrite(m_redPin, red);
-    analogWrite(m_greenPin, green);
-    analogWrite(m_bluePin, blue);
+	  Serial.println(voltagecompensator);
+	  byte PWMduty = (byte)(intervals.R_duty_min + voltagecompensator * pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min));
+	  analogWrite(m_redPin, PWMduty);
+	  PWMduty = (byte)(intervals.G_duty_min + voltagecompensator * pow((float)(green) / 255, 3) * (float)(intervals.G_duty_max - intervals.B_duty_min));
+	  analogWrite(m_greenPin, PWMduty);
+	  PWMduty = (byte)(intervals.B_duty_min + voltagecompensator * pow((float)(blue) / 255, 3) * (float)(intervals.B_duty_max - intervals.B_duty_min));
+	  analogWrite(m_bluePin, PWMduty);
   }
   
   /**
@@ -160,3 +202,18 @@ public:
 };
 
 #endif
+
+
+/*
+Serial.println("0");
+Serial.println((float)(red));
+Serial.println("a");
+Serial.println((float)(red) / 255);
+Serial.println("b");
+Serial.println((float)(intervals.R_duty_max - intervals.R_duty_min));
+Serial.println("c");
+Serial.println(pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min));
+Serial.println("d");
+Serial.println((intervals.R_duty_min + pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min)));
+Serial.println("e");
+Serial.println(PWMduty);*/
