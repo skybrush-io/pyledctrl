@@ -5,25 +5,53 @@
 #include "executor.h"
 #include "led.h"
 #include "led_strip.h"
+#include "serial_protocol.h"
 #include "switch.h"
 #include "SignalDecoders.h"
 
 
-
+/**
+ * The built-in LED of the board.
+ */
 LED builtinLed;
+
+/**
+ * The LED strip attached to the board.
+ */
 LEDStrip ledStrip(RED_PWM_PIN, GREEN_PWM_PIN, BLUE_PWM_PIN);
+
+#ifdef HAS_MAIN_SWITCH
+/**
+ * An optional main switch that can be used to turn off the LED strip and
+ * suspend execution.
+ */
 Switch mainSwitch(MAIN_SWITCH_PIN);
+#endif
 
 #ifdef HAS_VOLTMETER
+/**
+ * A voltmeter.
+ */
 VoltMeter voltmeter(VOLTMETER_PIN, LIGHT_COEFF);
 #endif
 
+#ifdef ENABLE_SERIAL_INPUT
+/**
+ * Parser for the messages coming on the serial port if we handle serial input.
+ */
+SerialProtocolParser serialProtocolParser;
+#endif
+
+/**
+ * Command executor that is responsible for executing the scheduled bytecode
+ * commands.
+ */
 CommandExecutor executor(&ledStrip, &builtinLed);
 
 // Set the following macro to the number of the test sequence that you want to start
 // 0 = simple test sequence
 // 1 = testing transition types and easing functions
-#define BYTECODE_INDEX 2
+#define BYTECODE_INDEX 1
 
 static const u8 bytecode[] = {
 #if BYTECODE_INDEX == 0
@@ -35,8 +63,15 @@ static const u8 bytecode[] = {
 #endif
 };
 
+/**
+ * The bytecode store that the command executor will use to read the bytecode
+ * from SRAM or EEPROM.
+ */
 SRAMBytecodeStore bytecodeStore(bytecode);
 
+/**
+ * Setup function; called once after a reset.
+ */
 void setup() {
   // Wait 100 milliseconds
   // TODO: Arpi, why is this necessary?
@@ -72,6 +107,9 @@ void setup() {
   Serial.println(F("+OK"));
 }
 
+/**
+ * The body of the main loop of the application, executed in an infinite loop.
+ */
 void loop() {
 #ifdef HAS_MAIN_SWITCH
 	// Check the main switch
@@ -99,8 +137,14 @@ void loop() {
 }
 
 #ifdef ENABLE_SERIAL_INPUT
+/**
+ * Handler function that is called between iterations of the main loop if 
+ * there is data to be read from the serial port.
+ */
 void serialEvent() {
-
+  while (Serial.available()) {
+    serialProtocolParser.feed(Serial.read());
+  }
 }
 #endif
 
