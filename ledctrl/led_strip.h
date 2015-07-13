@@ -38,21 +38,21 @@ private:
    * Index of the blue pin of the LED strip.
    */
   u8 m_bluePin;
+
+  /**
+   * Pointer to an optional voltage meter that the LED strip may use for non-linear
+   * brightness compensation.
+   */
+  VoltMeter* m_pVoltmeter;
   
-  
+  /**
+   * Structure that stores voltage limits for the PWM pins so we could compensate
+   * non-linearly to make the LED brightness change in a linear manner.
+   */
+  color_pwm_intervals_t m_pwmIntervals;
   
 public:
 
-	float voltagecompensator;
-	VoltMeter voltmeter;
-
-	void modification()
-	{
-		voltagecompensator = voltmeter.measure();
-
-	}
-
-	colorPWMintervals intervals;
   /**
    * Constructs a LED strip that uses the given pins.
    * 
@@ -70,7 +70,7 @@ public:
    * 
    * Called automatically by the constructor; no need to call it explicitly.
    */
-  void initialize() const;
+  void initialize();
 
   /**
    * \brief Turns the LED strip off.
@@ -93,38 +93,26 @@ public:
    * \param  green  the green component of the strip.
    * \param  blue   the blue component of the strip.
    */
-  
-
-  byte normPWM(float ColorVoltage)
-  {
-	  byte duty = (byte)(254 * ColorVoltage / MAXVOLTAGE);
-
-	  return duty;
-  }
-  
-
-  /* initialize pwm duty values by minimum and maximum voltages*/
-  void initIntervals()
-  {
-	  intervals.R_duty_min = normPWM((float)(MINVOLTAGE_RED));
-	  intervals.R_duty_max = normPWM((float)(MAXVOLTAGE_RED));
-	  intervals.G_duty_min = normPWM((float)(MINVOLTAGE_GREEN));
-	  intervals.G_duty_max = normPWM((float)(MAXVOLTAGE_GREEN));
-	  intervals.B_duty_min = normPWM((float)(MINVOLTAGE_BLUE));
-	  intervals.B_duty_max = normPWM((float)(MAXVOLTAGE_BLUE));
-  }
-
-  /* function for setting colors and compensate the LED non-linearity*/
   void setColor(u8 red, u8 green, u8 blue) const {
-	  Serial.println(voltagecompensator);
-	  byte PWMduty = (byte)(intervals.R_duty_min + voltagecompensator * pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min));
-	  analogWrite(m_redPin, PWMduty);
-	  PWMduty = (byte)(intervals.G_duty_min + voltagecompensator * pow((float)(green) / 255, 3) * (float)(intervals.G_duty_max - intervals.B_duty_min));
-	  analogWrite(m_greenPin, PWMduty);
-	  PWMduty = (byte)(intervals.B_duty_min + voltagecompensator * pow((float)(blue) / 255, 3) * (float)(intervals.B_duty_max - intervals.B_duty_min));
-	  analogWrite(m_bluePin, PWMduty);
+    byte value;
+    
+    if (m_pVoltmeter != 0) {
+      // Use non-linear compensation based on the voltage meter
+      float voltage = m_pVoltmeter->lastReading();
+#ifdef DEBUG
+      Serial.print("  Voltage reading: ");
+      Serial.println(voltage);
+#endif
+      analogWrite(m_redPin, calculateVoltageCompensatedValue(red, m_pwmIntervals.red_duty_range, voltage));
+      analogWrite(m_greenPin, calculateVoltageCompensatedValue(green, m_pwmIntervals.green_duty_range, voltage));
+      analogWrite(m_bluePin, calculateVoltageCompensatedValue(blue, m_pwmIntervals.blue_duty_range, voltage));
+    } else {
+      analogWrite(m_redPin, red);
+      analogWrite(m_greenPin, green);
+      analogWrite(m_bluePin, blue);
+    }
   }
-  
+
   /**
    * \brief Sets the color of the LED strip.
    * 
@@ -142,6 +130,32 @@ public:
   void setGray(u8 gray) const {
     setColor(gray, gray, gray);
   }
+
+  /**
+   * \brief Attaches a voltage meter to the LED strip for brightness compensation.
+   */
+  void setVoltmeter(VoltMeter* voltmeter) {
+    m_pVoltmeter = voltmeter;
+  }
+  
+private:
+  /**
+   * Calculates a compensated PWM value for a LED given a voltage range and a voltage reading.
+   * 
+   * \param  value    the RGB component to compensate
+   * \param  range    range specifying the minimum and maximum voltages after normalization
+   * \param  voltage  the actual voltage to compensate with
+   */
+  u8 calculateVoltageCompensatedValue(u8 value, byte_range_t range, float voltage) const {
+    float cubedValue = pow(static_cast<float>(value) / 255, 3);
+    return static_cast<byte>(range.min + voltage * cubedValue * (range.max - range.min));
+  }
+  
+  /**
+   * Normalizes a voltage given as a floating point number between zero and the board's
+   * maximum input voltage to the range 0-254.
+   */
+  byte normalizeVoltage(float voltage) const;
 };
 
 /**
@@ -202,18 +216,3 @@ public:
 };
 
 #endif
-
-
-/*
-Serial.println("0");
-Serial.println((float)(red));
-Serial.println("a");
-Serial.println((float)(red) / 255);
-Serial.println("b");
-Serial.println((float)(intervals.R_duty_max - intervals.R_duty_min));
-Serial.println("c");
-Serial.println(pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min));
-Serial.println("d");
-Serial.println((intervals.R_duty_min + pow((float)(red) / 255, 3) * (float)(intervals.R_duty_max - intervals.R_duty_min)));
-Serial.println("e");
-Serial.println(PWMduty);*/

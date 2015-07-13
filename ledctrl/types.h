@@ -14,20 +14,26 @@ extern "C" {
 
 typedef uint8_t u8;
 
+/**
+ * Structure for storing a byte range.
+ */
+typedef struct {
+  byte min;
+  byte max;
+} byte_range_t;
+
+/**
+ * Structure storing PWM limit voltages corresponding to the R, G and B pins of
+ * a LED strip.
+ */
+typedef struct {
+  byte_range_t red_duty_range;
+  byte_range_t green_duty_range;
+  byte_range_t blue_duty_range;
+} color_pwm_intervals_t;
 
 #ifdef __cplusplus
-
-typedef struct
-{
-	byte R_duty_min;
-	byte G_duty_min;
-	byte B_duty_min;
-	byte R_duty_max;
-	byte G_duty_max;
-	byte B_duty_max;
-} colorPWMintervals;
 }
-
 #endif
 
 #endif

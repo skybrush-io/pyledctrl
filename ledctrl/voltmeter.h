@@ -1,30 +1,73 @@
+/**
+ * \file voltmeter.h
+ * \brief Voltage meter class.
+ */
+
+#ifndef VOLTMETER_H
+#define VOLTMETER_H
+
 #include <Arduino.h>
 #include <math.h>
-#include "config.h"
 
+/**
+ * Class that represents a voltage meter.
+ */
 class VoltMeter {
-//private:
+
+private:
+  /**
+   * Index of the pin on which the voltmeter measurement can be read.
+   */
+  u8 m_pin;
+
+  /**
+   * Correction coefficient to use on the voltmeter readings.
+   */
+  float m_coefficient;
+  
+  /**
+   * Storage for the last measured value to implement a simple noise filtering.
+   */
+	float m_lastReading;
+
 public:
-	int readedvalue;
+  /**
+   * Constructor.
+   * 
+   * \param  pin  index of the pin on which the voltmeter measurement can be read.
+   * \param  coefficient  correction coefficient to use on the voltmeter readings
+   */
+  explicit VoltMeter(u8 pin, float coefficient)
+  : m_pin(pin), m_coefficient(coefficient), m_lastReading(0.0) {}
 
-
-	float mod_duty;
-	float mod_duty_last;
-
-
-
-	float measure()
-	{
-		readedvalue = analogRead(VOLTMETER_PIN);
-		Serial.println("readedvalue:");
-		Serial.println(readedvalue);
-		mod_duty = (LIGHT_COEFF / ((float)readedvalue / 1023));
-		if (mod_duty> 1) mod_duty = 1;
-		if (mod_duty < 0) mod_duty = 0;
-		if (abs(mod_duty - mod_duty_last) < 0.05)
-			mod_duty = mod_duty_last;
-		else
-			mod_duty_last = mod_duty;
-		return mod_duty;
+  /**
+   * Returns the last voltage reading of the voltage meter.
+   */
+  float lastReading() const {
+    return m_lastReading;
+  }
+  
+  /**
+   * Performs a measurement on the voltage meter and returns the measured value. 
+   */
+	float measure() {
+    int value;
+    float mod_duty;
+    
+    value = analogRead(m_pin);
+    
+#ifdef DEBUG
+		Serial.print(" Voltage meter read raw value:");
+		Serial.println(value);
+#endif
+    
+		mod_duty = constrain(m_coefficient / (static_cast<float>(value) / 1023), 0, 1);
+		if (fabs(mod_duty - m_lastReading) >= 0.05) {
+			m_lastReading = mod_duty;
+		}
+   
+		return m_lastReading;
 	}
 };
+
+#endif
