@@ -34,8 +34,23 @@ private:
    */
   SerialProtocolParserState::Enum m_state;
 
+  /**
+   * The code of the current command being parsed.
+   */
+  u8 m_commandCode;
+  
+  /**
+   * The length of the binary message being parsed. 
+   */
+  uint16_t m_nextMessageLength;
+  
+  /**
+   * The remaining length of the next binary message expected by the parser.
+   */
+  uint16_t m_remainingMessageLength;
+  
 public:
-  explicit SerialProtocolParser() : m_state(SerialProtocolParserState::START) {
+  explicit SerialProtocolParser() {
     reset();
   }
 

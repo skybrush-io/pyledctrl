@@ -77,6 +77,10 @@ void setup() {
   // TODO: Arpi, why is this necessary?
 	wait(100);
 
+  // Configure the serial port where we will listen for commands and
+  // send debug output
+  Serial.begin(SERIAL_BAUD_RATE);
+
   // Set up the error handler as early as possible
   ErrorHandler::instance().setErrorLED(&builtinLed);
   
@@ -84,10 +88,6 @@ void setup() {
   // Attach the voltage meter to the LED strip
   ledStrip.setVoltmeter(&voltmeter);
 #endif
-
-  // Configure the serial port where we will listen for commands and
-  // send debug output
-  Serial.begin(SERIAL_BAUD_RATE);
 
   // Attach to the PPM/PWM interrupts if needed
 	#if PPM_INTERRUPT

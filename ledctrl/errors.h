@@ -16,6 +16,7 @@ namespace Errors {
     SUCCESS,                           /**< No error */
     INVALID_COMMAND_CODE,              /**< Invalid command code found */
     SEEKING_NOT_SUPPORTED,             /**< Seeking not supported by the bytecode store */
+    SERIAL_PROTOCOL_INVALID_STATE,     /**< Serial protocol somehow managed to get into an invalid state */
     NUMBER_OF_ERRORS
   };
 }
