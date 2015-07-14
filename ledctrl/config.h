@@ -38,13 +38,13 @@ extern "C" {
  * 
  * Index of the PWM pin corresponding to the blue LEDs.
  */
-#define BLUE_PWM_PIN 9
+#define BLUE_PWM_PIN 3
 
 /**
  * \def HAS_MAIN_SWITCH
  * If you have a switch-button, you should define this; otherwise comment this out.
  */
-// #define HAS_MAIN_SWITCH 1
+#define HAS_MAIN_SWITCH 1
 
 /**
  * \def MAIN_SWITCH_PIN
@@ -59,7 +59,7 @@ extern "C" {
  * Whether the LED controller should listen for incoming commands on the
  * serial port.
  */
-// #define ENABLE_SERIAL_INPUT 1
+#define ENABLE_SERIAL_INPUT 1
 
 /**
  * \def HAS_VOLTMETER
@@ -67,7 +67,7 @@ extern "C" {
  * Define this if you have a voltage meter that can be used to compensate
  * the LED brightness. Otherwise comment this out.
  */
-#define HAS_VOLTMETER 1
+// #define HAS_VOLTMETER 1
 
 /**
  * \def VOLTMETER_PIN

@@ -46,7 +46,7 @@ SerialProtocolParser serialProtocolParser;
  * Command executor that is responsible for executing the scheduled bytecode
  * commands.
  */
-CommandExecutor executor(&ledStrip, &builtinLed);
+CommandExecutor executor(&ledStrip);
 
 // Set the following macro to the number of the test sequence that you want to start
 // 0 = simple test sequence
@@ -77,6 +77,9 @@ void setup() {
   // TODO: Arpi, why is this necessary?
 	wait(100);
 
+  // Set up the error handler as early as possible
+  ErrorHandler::instance().setErrorLED(&builtinLed);
+  
 #ifdef HAS_VOLTMETER
   // Attach the voltage meter to the LED strip
   ledStrip.setVoltmeter(&voltmeter);

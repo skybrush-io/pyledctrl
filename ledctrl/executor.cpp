@@ -15,17 +15,6 @@ void CommandExecutor::delayExecutionUntil(unsigned long ms) {
   m_nextWakeupTime = ms;
 }
 
-void CommandExecutor::error(command_executor_error_t code) {
-  m_error = code;
-  if (m_pErrorLED) {
-    if (m_error != ERR_SUCCESS) {
-      m_pErrorLED->on();
-    } else {
-      m_pErrorLED->off();
-    }
-  }
-}
-
 void CommandExecutor::executeNextCommand() {
   u8 commandCode;
   
@@ -99,7 +88,7 @@ void CommandExecutor::executeNextCommand() {
       
     default:
       /* Unknown command code, stop execution and set an error condition */
-      error(ERR_INVALID_COMMAND_CODE);
+      SET_ERROR(Errors::INVALID_COMMAND_CODE);
       stop();
   }
 }
@@ -188,7 +177,7 @@ void CommandExecutor::rewind() {
     m_ended = true;
   }
   m_loopStack.clear();
-  error(ERR_SUCCESS);
+  CLEAR_ERROR();
   delayExecutionFor(0);
 }
 
@@ -272,7 +261,7 @@ void CommandExecutor::handleLoopBeginCommand() {
   bytecode_location_t location = m_pBytecodeStore->tell();
 
   if (location == BYTECODE_LOCATION_NOWHERE) {
-    error(ERR_SEEKING_NOT_SUPPORTED);
+    SET_ERROR(Errors::SEEKING_NOT_SUPPORTED);
     stop();
     return;
   }

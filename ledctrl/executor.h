@@ -26,11 +26,6 @@ private:
   LEDStrip* m_pLEDStrip;
 
   /**
-   * Additional LED that is used to signal error conditions.
-   */
-  LED* m_pErrorLED;
-
-  /**
    * Object managing access to the bytecode being executed.
    */
   BytecodeStore* m_pBytecodeStore;
@@ -45,11 +40,6 @@ private:
    * program.
    */
   bool m_ended;
-
-  /**
-   * Code of the last error that happened during execution.
-   */
-  command_executor_error_t m_error;
 
   /**
    * Loop stack holding pointers to the beginnings of the active loops and
@@ -95,13 +85,10 @@ public:
    * \brief Constructor.
    * 
    * \param  pLEDStrip  the LED strip that the executor will control
-   * \param  pErrorLED  the error LED that the executor will use to signal
-   *                    error conditions
    */
-  explicit CommandExecutor(LEDStrip* pLEDStrip=0, LED* pErrorLED=0)
-    : m_pLEDStrip(pLEDStrip), m_pErrorLED(pErrorLED),
-      m_pBytecodeStore(0), m_ended(true),
-      m_error(ERR_SUCCESS), m_ledStripFader(pLEDStrip) {
+  explicit CommandExecutor(LEDStrip* pLEDStrip=0)
+    : m_pLEDStrip(pLEDStrip), m_pBytecodeStore(0), m_ended(true),
+      m_ledStripFader(pLEDStrip) {
     rewind();
   };
 
@@ -175,17 +162,6 @@ protected:
    */
   void delayExecutionUntil(unsigned long ms);
   
-  /**
-   * \brief Indicates that there was an error while executing the bytecode.
-   * 
-   * Note that this function does \em not terminate execution automatically;
-   * in some cases, the execution can go on, therefore it is always the
-   * responsibility of the caller to call \c stop() if the error was fatal.
-   * 
-   * \param  code  the code of the error
-   */
-  void error(command_executor_error_t code);
-
   /**
    * \brief Executes the next command from the bytecode.
    * 
