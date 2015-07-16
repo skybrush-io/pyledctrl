@@ -101,7 +101,7 @@ extern "C" {
 	/*
 	* define interrupts
 	*/
-#define PWM_INTERRUPT 1
+#define PWM_INTERRUPT 0
 #define PPM_INTERRUPT 0
 
 

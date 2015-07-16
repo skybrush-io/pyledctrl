@@ -261,7 +261,7 @@ void CommandExecutor::handleLoopBeginCommand() {
   bytecode_location_t location = m_pBytecodeStore->tell();
 
   if (location == BYTECODE_LOCATION_NOWHERE) {
-    SET_ERROR(Errors::SEEKING_NOT_SUPPORTED);
+    SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
     stop();
     return;
   }

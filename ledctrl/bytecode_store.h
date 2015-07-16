@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <avr/eeprom.h>
 #include <stdint.h>
+#include "errors.h"
 #include "types.h"
 
 /**
@@ -65,12 +66,18 @@ public:
    *          not support seeking
    */
   virtual bytecode_location_t tell() const = 0;
+
+  /**
+   * \brief Writes the given byte into the current location in the bytecode,
+   *        and advances the internal pointer.
+   */
+  virtual void write(u8 value) = 0;
 };
 
 /**
- * Provides access to bytecode stored in a variable or constant in SRAM.
+ * Provides access to bytecode stored in a constant in SRAM.
  */
-class SRAMBytecodeStore : public BytecodeStore {
+class ConstantSRAMBytecodeStore : public BytecodeStore {
 private:
   /** 
    * Pointer to the start of the memory block in SRAM where the bytecode
@@ -90,7 +97,7 @@ public:
    * \param  bytecode  pointer to the start of the memory block in SRAM where
    *                   the bytecode is stored.
    */
-  explicit SRAMBytecodeStore(const u8* bytecode=0) : BytecodeStore() {
+  explicit ConstantSRAMBytecodeStore(const u8* bytecode=0) : BytecodeStore() {
     load(bytecode);
   }
 
@@ -102,7 +109,7 @@ public:
     return m_bytecode;
   }
 
-  virtual bool empty() {
+  bool empty() {
     return m_bytecode == 0;
   }
   
@@ -137,6 +144,88 @@ public:
   
   bytecode_location_t tell() const {
     return (bytecode_location_t)m_pNextCommand;
+  }
+
+  void write(u8 value) {
+    SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
+  }
+};
+
+/**
+ * Provides access to bytecode stored in a constant in SRAM.
+ */
+class SRAMBytecodeStore : public BytecodeStore {
+private:
+  /** 
+   * Pointer to the start of the memory block in SRAM where the bytecode
+   * is stored.
+   */
+  u8* m_bytecode;
+  
+  /**
+   * Pointer to the current location within the bytecode.
+   */
+  u8* m_pNextCommand;
+
+public:
+  /**
+   * Constructor.
+   * 
+   * \param  bytecode  pointer to the start of the memory block in SRAM where
+   *                   the bytecode is stored.
+   */
+  explicit SRAMBytecodeStore(u8* bytecode=0) : BytecodeStore() {
+    load(bytecode);
+  }
+
+  /**
+   * Returns a pointer to the start of the memory block where the bytecode
+   * is stored.
+   */
+  u8* begin() const {
+    return m_bytecode;
+  }
+
+  bool empty() {
+    return m_bytecode == 0;
+  }
+  
+  /**
+   * \brief Loads the given bytecode into the store.
+   * 
+   * Note that the memory area holding the bytecode is \em not copied into
+   * the executor; it is the responsibility of the caller to manage the
+   * memory occupied by the bytecode and free it when it is not needed
+   * any more.
+   * 
+   * \param  bytecode  the bytecode to be loaded. \c NULL is supported; passing
+   *                   \c NULL here simply unloads the previous bytecode.
+   */
+  void load(u8* bytecode) {
+    m_bytecode = bytecode;
+    rewind();
+  }
+
+  u8 next() {
+    assert(m_pNextCommand != 0);
+    return *(m_pNextCommand++);
+  }
+
+  void rewind() {
+    m_pNextCommand = m_bytecode;
+  }
+
+  void seek(bytecode_location_t location) {
+    m_pNextCommand = (u8*)location;
+  }
+  
+  bytecode_location_t tell() const {
+    return (bytecode_location_t)m_pNextCommand;
+  }
+
+  void write(u8 value) {
+    assert(m_pNextCommand != 0);
+    *m_pNextCommand = value;
   }
 };
 

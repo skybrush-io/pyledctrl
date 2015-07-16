@@ -51,23 +51,19 @@ CommandExecutor executor(&ledStrip);
 // Set the following macro to the number of the test sequence that you want to start
 // 0 = simple test sequence
 // 1 = testing transition types and easing functions
-#define BYTECODE_INDEX 1
+// 2 = another simple test sequence
+// 3 = writable bytecode with no program loaded by default
+#define BYTECODE_INDEX 0
 
-static const u8 bytecode[] = {
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
 #elif BYTECODE_INDEX == 1
 #  include "bytecode_transition_test.h"
 #elif BYTECODE_INDEX == 2
-#include "bytecode_3_test.h"
+#  include "bytecode_3_test.h"
+#elif BYTECODE_INDEX == 3
+#  include "bytecode_empty_writable.h"
 #endif
-};
-
-/**
- * The bytecode store that the command executor will use to read the bytecode
- * from SRAM or EEPROM.
- */
-SRAMBytecodeStore bytecodeStore(bytecode);
 
 /**
  * Setup function; called once after a reset.
