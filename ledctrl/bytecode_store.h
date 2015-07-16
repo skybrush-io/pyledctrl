@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <avr/eeprom.h>
 #include <stdint.h>
+#include "commands.h"
 #include "errors.h"
 #include "types.h"
 
@@ -27,7 +28,20 @@ typedef uintptr_t bytecode_location_t;
  * Pure abstract class for bytecode store objects.
  */
 class BytecodeStore {
+private:
+  /**
+   * Internal counter that is increased whenever \c suspend() is called and
+   * decreased whenever \c release() is called. The bytestore should only
+   * return \c NOP bytes when it is suspended.
+   */
+  signed short int m_suspendCounter;
+  
 public:
+  /**
+   * Constructor.
+   */
+  BytecodeStore() : m_suspendCounter(0) {}
+  
   /**
    * \brief Returns whether the store is empty.
    * 
@@ -42,6 +56,16 @@ public:
    *        internal pointer.
    */
   virtual u8 next() = 0;
+
+  /**
+   * \brief Releases the bytecode store after a previous call to \c suspend().
+   *        
+   * This function can be invoked multiple times; it must be balanced
+   * with an equal number of calls to \c suspend() when used correctly.
+   */
+  void release() {
+    m_suspendCounter--;
+  }
   
   /**
    * \brief Rewinds the bytecode store to the start of the current bytecode.
@@ -52,6 +76,27 @@ public:
    * \brief Moves the internal pointer of the bytecode to the given location.
    */
   virtual void seek(bytecode_location_t location) = 0;
+
+  /**
+   * \brief Temporarily suspend the bytecode store so it will simply return
+   *        \c NOP until it is released.
+   *        
+   * This function can be invoked multiple times; it must be balanced
+   * with an equal number of calls to \c release() to restore the bytecode
+   * store to its original (unsuspended) state.
+   */
+  void suspend() {
+    m_suspendCounter++;
+  }
+
+  /**
+   * \brief Returns whether the bytecode store is currently suspended.
+   * \return \c true if the bytecode store is currently suspended, \c false
+   *         otherwise.
+   */
+  bool suspended() const {
+    return m_suspendCounter > 0;
+  }
   
   /**
    * \brief Returns the current location of the internal pointer of the
@@ -130,8 +175,12 @@ public:
   }
 
   u8 next() {
-    assert(m_pNextCommand != 0);
-    return *(m_pNextCommand++);
+    if (suspended()) {
+      return CMD_NOP;
+    } else {
+      assert(m_pNextCommand != 0);
+      return *(m_pNextCommand++);
+    }
   }
 
   void rewind() {
@@ -207,8 +256,12 @@ public:
   }
 
   u8 next() {
-    assert(m_pNextCommand != 0);
-    return *(m_pNextCommand++);
+    if (suspended()) {
+      return CMD_NOP;
+    } else {
+      assert(m_pNextCommand != 0);
+      return *(m_pNextCommand++);
+    }
   }
 
   void rewind() {
@@ -269,8 +322,12 @@ public:
   }
   
   u8 next() {
-    assert(m_nextIndex >= 0);
-    return eeprom_read_byte((unsigned char*)m_nextIndex);
+    if (suspended()) {
+      return CMD_NOP;
+    } else {
+      assert(m_nextIndex >= 0);
+      return eeprom_read_byte((unsigned char*)m_nextIndex);
+    }
   }
 
   void rewind() {
