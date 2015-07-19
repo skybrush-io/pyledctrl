@@ -5,6 +5,18 @@ void ErrorHandler::clearError() {
 }
 
 void ErrorHandler::error(Errors::Code code) {
+  if (code == m_error)
+    return;
+  
+  if (m_error == Errors::SUCCESS) {
+    // Moving from a non-error state to an error state,
+    // so let's report the error code on the serial line.
+    // Further error codes are suppressed to avoid flooding
+    // the serial line.
+    Serial.print("E");
+    Serial.println(code, DEC);
+  }
+  
   m_error = code;
   updateLEDStatus();
 }

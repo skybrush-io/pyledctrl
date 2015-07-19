@@ -31,7 +31,7 @@ class BytecodeStore {
 private:
   /**
    * Internal counter that is increased whenever \c suspend() is called and
-   * decreased whenever \c release() is called. The bytestore should only
+   * decreased whenever \c resume() is called. The bytestore should only
    * return \c NOP bytes when it is suspended.
    */
   signed short int m_suspendCounter;
@@ -58,12 +58,12 @@ public:
   virtual u8 next() = 0;
 
   /**
-   * \brief Releases the bytecode store after a previous call to \c suspend().
+   * \brief Resumes the bytecode store after a previous call to \c suspend().
    *        
    * This function can be invoked multiple times; it must be balanced
    * with an equal number of calls to \c suspend() when used correctly.
    */
-  void release() {
+  void resume() {
     m_suspendCounter--;
   }
   
@@ -79,10 +79,10 @@ public:
 
   /**
    * \brief Temporarily suspend the bytecode store so it will simply return
-   *        \c NOP until it is released.
+   *        \c NOP until it is resumed.
    *        
    * This function can be invoked multiple times; it must be balanced
-   * with an equal number of calls to \c release() to restore the bytecode
+   * with an equal number of calls to \c resume() to restore the bytecode
    * store to its original (unsuspended) state.
    */
   void suspend() {
@@ -304,8 +304,11 @@ private:
 public:
   /**
    * Constructor.
+   * 
+   * \param  Index of the byte in EEPROM where the bytecode starts, including
+   *         the magic byte sequence at the start.
    */
-  explicit EEPROMBytecodeStore() : BytecodeStore(), m_startIndex(0) {
+  explicit EEPROMBytecodeStore(int startIndex=0) : BytecodeStore(), m_startIndex(startIndex) {
     rewind();
   }
 
@@ -324,6 +327,11 @@ public:
   u8 next() {
     if (suspended()) {
       return CMD_NOP;
+    } else if (m_nextIndex == -1) {
+      // No bytecode in EEPROM yet, so pretend we have an infinite
+      // stream of CMD_END
+      SET_ERROR(Errors::NO_BYTECODE_IN_EEPROM);
+      return CMD_END;
     } else {
       assert(m_nextIndex >= 0);
       return eeprom_read_byte((unsigned char*)m_nextIndex);
@@ -334,6 +342,8 @@ public:
     m_nextIndex = m_startIndex;
     if (!validateMagicBytes()) {
       m_nextIndex = -1;
+    } else {
+      CLEAR_ERROR();
     }
   }
 
@@ -343,6 +353,22 @@ public:
   
   bytecode_location_t tell() const {
     return m_nextIndex >= 0 ? (bytecode_location_t)(m_nextIndex+1) : BYTECODE_LOCATION_NOWHERE;
+  }
+
+  void write(u8 value) {
+    if (m_nextIndex == -1) {
+      // We had no EEPROM bytecode but we have started writing something
+      // so let's add the magic marker first
+      m_nextIndex = m_startIndex;
+      eeprom_update_byte((unsigned char*)m_nextIndex, 0xCA);
+      m_nextIndex++;
+      eeprom_update_byte((unsigned char*)m_nextIndex, 0xFE);
+      rewind();    // to clear the error LED
+    }
+    
+    assert(m_nextIndex >= 0);
+    eeprom_update_byte((unsigned char*)m_nextIndex, value);
+    m_nextIndex++;
   }
 
 private:

@@ -15,8 +15,12 @@ namespace Errors {
   enum Code {
     SUCCESS,                           /**< No error */
     INVALID_COMMAND_CODE,              /**< Invalid command code found */
+    NO_BYTECODE_STORE,                 /**< No bytecode store is configured for the command executor */
     OPERATION_NOT_SUPPORTED,           /**< Operation not supported by the bytecode store */
+    OPERATION_NOT_IMPLEMENTED,         /**< Operation not implemented yet */
+    SERIAL_PROTOCOL_PARSE_ERROR,       /**< Serial protocol parse error */
     SERIAL_PROTOCOL_INVALID_STATE,     /**< Serial protocol somehow managed to get into an invalid state */
+    NO_BYTECODE_IN_EEPROM,             /**< No bytecode has been uploaded to the EEPROM yet */
     NUMBER_OF_ERRORS
   };
 }

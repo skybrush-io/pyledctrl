@@ -52,7 +52,8 @@ CommandExecutor executor(&ledStrip);
 // 0 = simple test sequence
 // 1 = testing transition types and easing functions
 // 2 = another simple test sequence
-// 3 = writable bytecode with no program loaded by default
+// 3 = writable bytecode in SRAM with no program loaded by default
+// 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
 #define BYTECODE_INDEX 0
 
 #if BYTECODE_INDEX == 0
@@ -63,6 +64,8 @@ CommandExecutor executor(&ledStrip);
 #  include "bytecode_3_test.h"
 #elif BYTECODE_INDEX == 3
 #  include "bytecode_empty_writable.h"
+#elif BYTECODE_INDEX == 4
+#  include "bytecode_eeprom.h"
 #endif
 
 /**
@@ -92,13 +95,27 @@ void setup() {
 	attachInterrupt(ITNUM, pwmIT, CHANGE);
 	#endif
   
-  // Load the bytecode into the executor
-  executor.setBytecodeStore(&bytecodeStore);
-
   // Wait 100 milliseconds
   // TODO: Arpi, why is this necessary?
   wait(100);
   
+  // Load the bytecode into the executor. We have to do it here and not
+  // before the +OK prompt because errors might already happen here
+  // (e.g., we are trying to load bytecode from the EEPROM but there is
+  // no bytecode there) and we don't want error messages to appear
+  // before the +OK prompt.
+  executor.setBytecodeStore(&bytecodeStore);
+
+#ifdef ENABLE_SERIAL_INPUT
+  // Inform the serial protocol parser about the executor so the parser
+  // can manipulate it. This is not really nice; a better solution would
+  // be to let the parser forward the information about the parsed 
+  // command to a callback function, and we could then provide a callback
+  // function here in the main file so the parser does not have to "know"
+  // about the executor directly.
+  serialProtocolParser.setCommandExecutor(&executor);
+#endif
+
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and
