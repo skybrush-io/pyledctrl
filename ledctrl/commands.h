@@ -42,6 +42,7 @@ typedef enum {
  */
 typedef struct {
   u8 arg_count;
+  u8 flags;
 } command_info_t;
 
 /**

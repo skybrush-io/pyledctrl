@@ -1,3 +1,4 @@
+#include "commands.h"
 #include "serial_protocol.h"
 
 using namespace SerialProtocolParserState;
@@ -55,6 +56,11 @@ const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
 };
 
 /**
+ * \def Macro that defines the separator characters between arguments in text mode.
+ */
+#define IS_TEXT_ARGUMENT_SEPARATOR(ch) ((ch) == ' ' || (ch) == '\t' || (ch) == ',' || (ch) == ';')
+
+/**
  * \brief Returns the info entry for the command with the given code.
  * 
  * \param  code  the code of the command
@@ -71,9 +77,38 @@ static const SerialCommandInfo* findInfoForCommandCode(SerialProtocolCommand::Co
   return 0;
 }
 
-void SerialProtocolParser::executeCurrentCommand() {
+BytecodeStore* SerialProtocolParser::bytecodeStore() const {
+  return m_pCommandExecutor ? m_pCommandExecutor->bytecodeStore() : 0;
+}
+
+void SerialProtocolParser::startExecutionOfCurrentCommand() {
   BytecodeStore* bytecodeStore;
-  Errors::Code errorCode = Errors::SUCCESS;
+  
+  if (m_pCommandInfo == 0)
+    return;
+  
+  assert(m_pCommandExecutor != 0);
+
+  m_currentErrorCode = Errors::SUCCESS;
+  
+  switch (m_pCommandInfo->commandCode) {
+    case EXECUTE:
+    case EXECUTE_BIN:
+    case UPLOAD:
+    case UPLOAD_BIN:
+      bytecodeStore = this->bytecodeStore();
+      if (bytecodeStore == 0) {
+        m_currentErrorCode = Errors::NO_BYTECODE_STORE;
+      } else {
+        m_pCommandExecutor->rewind();
+        bytecodeStore->suspend();
+      }
+      break;
+  }
+}
+
+void SerialProtocolParser::finishExecutionOfCurrentCommand() {
+  BytecodeStore* bytecodeStore;
   
   if (m_pCommandInfo == 0)
     return;
@@ -85,36 +120,83 @@ void SerialProtocolParser::executeCurrentCommand() {
       m_pCommandExecutor->rewind();
       break;
 
-    case RESUME:
-    case SUSPEND:
-      bytecodeStore = m_pCommandExecutor->bytecodeStore();
-      if (!bytecodeStore) {
-        errorCode = Errors::NO_BYTECODE_STORE;
-      }
-      if (m_pCommandInfo->commandCode == RESUME) {
-        if (bytecodeStore->suspended()) {
-          bytecodeStore->resume();
-        } else {
-          errorCode = Errors::OPERATION_NOT_SUPPORTED;
-        }
-      } else {
-        bytecodeStore->suspend();
-      }
-      break;
-      
     case TERMINATE:
       m_pCommandExecutor->stop();
       break;
       
+    case RESUME:
+    case SUSPEND:
+      bytecodeStore = this->bytecodeStore();
+      if (!bytecodeStore) {
+        m_currentErrorCode = Errors::NO_BYTECODE_STORE;
+      } else {
+        if (m_pCommandInfo->commandCode == RESUME) {
+          if (bytecodeStore->suspended()) {
+            bytecodeStore->resume();
+          } else {
+            m_currentErrorCode = Errors::OPERATION_NOT_SUPPORTED;
+          }
+        } else {
+          bytecodeStore->suspend();
+        }
+      }
+      break;
+      
+    case EXECUTE:
+    case EXECUTE_BIN:
+    case UPLOAD:
+    case UPLOAD_BIN:
+      bytecodeStore = this->bytecodeStore();
+      if (!bytecodeStore) {
+        m_currentErrorCode = Errors::NO_BYTECODE_STORE;
+      } else {
+        if (m_pCommandInfo->commandCode == EXECUTE || m_pCommandInfo->commandCode == EXECUTE_BIN) {
+          // TODO: syntax checking for the uploaded command to see if we have all the args?
+          // Add a terminating CMD_END to ensure that we do not accidentally read parts of the
+          // memory that we are not supposed to
+          if (bytecodeStore->write(CMD_END) == 0) {
+            m_currentErrorCode = Errors::OPERATION_NOT_SUPPORTED;
+          }
+        }
+        m_pCommandExecutor->rewind();
+        bytecodeStore->resume();
+      }
+      break;
+      
     default:
-      errorCode = Errors::OPERATION_NOT_IMPLEMENTED;
+      m_currentErrorCode = Errors::OPERATION_NOT_IMPLEMENTED;
       return;
   }
 
-  if (errorCode == Errors::SUCCESS) {
-    Serial.println("+OK");
+  if (m_currentErrorCode == Errors::SUCCESS) {
+    Serial.println(F("+OK"));
   } else {
-    writeErrorCode(errorCode);
+    writeErrorCode(m_currentErrorCode);
+  }
+}
+
+void SerialProtocolParser::handleCommandArgument(u8 value) {
+  BytecodeStore* bytecodeStore;
+  
+  if (m_pCommandInfo == 0)
+    return;
+  
+  assert(m_pCommandExecutor != 0);
+  
+  switch (m_pCommandInfo->commandCode) {
+    case EXECUTE:
+    case EXECUTE_BIN:
+    case UPLOAD:
+    case UPLOAD_BIN:
+      bytecodeStore = this->bytecodeStore();
+      if (bytecodeStore == 0) {
+        m_currentErrorCode = Errors::NO_BYTECODE_STORE;
+      } else {
+        if (bytecodeStore->write(value) == 0) {
+          m_currentErrorCode = Errors::OPERATION_NOT_SUPPORTED;
+        }
+      }
+      break;
   }
 }
 
@@ -166,8 +248,10 @@ void SerialProtocolParser::feed(int character) {
             m_state = BINARY_LENGTH_1;
           } else {
             // This will be a text message
+            m_currentArgument = -1;
             m_state = TEXT_ARGUMENTS;
           }
+          startExecutionOfCurrentCommand();
         }
       }
       break;
@@ -176,10 +260,29 @@ void SerialProtocolParser::feed(int character) {
       if (character == '\n' || character == '\r') {
         // Got a newline, so we can process this message and then start
         // parsing again.
-        executeCurrentCommand();
+        if (m_currentArgument >= 0) {
+          handleCommandArgument(m_currentArgument);
+          m_currentArgument = -1;
+        }
+        finishExecutionOfCurrentCommand();
         m_state = START;
+      } else if (IS_TEXT_ARGUMENT_SEPARATOR(character)) {
+        // Separator character between arguments
+        if (m_currentArgument >= 0) {
+          handleCommandArgument(m_currentArgument);
+          m_currentArgument = -1;
+        }
+      } else if (isdigit(character)) {
+        appendHexDigitToCurrentArgument(character - '0');
       } else {
-        // TODO
+        character = toupper(character);
+        if (character >= 'A' && character <= 'F') {
+          // Hexadecimal digit
+          appendHexDigitToCurrentArgument(character - 'A' + 10);
+        } else {
+          // Not a hexadecimal digit; the entire line is malformed
+          m_state = TRAP;
+        }
       }
       break;
     
@@ -196,10 +299,10 @@ void SerialProtocolParser::feed(int character) {
       break;
 
     case BINARY_DATA:
-      // TODO
+      handleCommandArgument(static_cast<u8>(character & 0xFF));
       m_remainingMessageLength--;
       if (m_remainingMessageLength == 0) {
-        executeCurrentCommand();
+        finishExecutionOfCurrentCommand();
         m_state = START;
       }
       break;
@@ -207,7 +310,7 @@ void SerialProtocolParser::feed(int character) {
     case COMMAND_WITH_NO_ARGS:
       if (character == '\n' || character == '\r') {
         // Got a newline, execute the command and start parsing the next command
-        executeCurrentCommand();
+        finishExecutionOfCurrentCommand();
         m_state = START;
       } else {
         // Move to the trap state since we should have not received anything
@@ -233,10 +336,20 @@ void SerialProtocolParser::feed(int character) {
   }
 }
 
+void SerialProtocolParser::appendHexDigitToCurrentArgument(u8 digit) {
+  assert(digit >= 0 && digit < 16);
+  if (m_currentArgument == -1) {
+    m_currentArgument = 0;
+  }
+  m_currentArgument = (m_currentArgument << 4) + digit;
+}
+
 void SerialProtocolParser::reset() {
   m_state = START;
   m_pCommandInfo = 0;
   m_nextMessageLength = 0;
   m_remainingMessageLength = 0;
+  m_currentArgument = -1;
+  m_currentErrorCode = Errors::SUCCESS;
 }
 

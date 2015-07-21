@@ -115,8 +115,11 @@ public:
   /**
    * \brief Writes the given byte into the current location in the bytecode,
    *        and advances the internal pointer.
+   *        
+   * \return  the number of bytes written, i.e. 1 if the write was successful 
+   *          and 0 if it failed
    */
-  virtual void write(u8 value) = 0;
+  virtual int write(u8 value) = 0;
 };
 
 /**
@@ -195,8 +198,8 @@ public:
     return (bytecode_location_t)m_pNextCommand;
   }
 
-  void write(u8 value) {
-    SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
+  int write(u8 value) {
+    return 0;
   }
 };
 
@@ -276,9 +279,10 @@ public:
     return (bytecode_location_t)m_pNextCommand;
   }
 
-  void write(u8 value) {
+  int write(u8 value) {
     assert(m_pNextCommand != 0);
     *m_pNextCommand = value;
+    return 1;
   }
 };
 
@@ -333,8 +337,7 @@ public:
       SET_ERROR(Errors::NO_BYTECODE_IN_EEPROM);
       return CMD_END;
     } else {
-      assert(m_nextIndex >= 0);
-      return eeprom_read_byte((unsigned char*)m_nextIndex);
+      return nextByte();
     }
   }
 
@@ -355,7 +358,7 @@ public:
     return m_nextIndex >= 0 ? (bytecode_location_t)(m_nextIndex+1) : BYTECODE_LOCATION_NOWHERE;
   }
 
-  void write(u8 value) {
+  int write(u8 value) {
     if (m_nextIndex == -1) {
       // We had no EEPROM bytecode but we have started writing something
       // so let's add the magic marker first
@@ -365,20 +368,38 @@ public:
       eeprom_update_byte((unsigned char*)m_nextIndex, 0xFE);
       rewind();    // to clear the error LED
     }
-    
+
     assert(m_nextIndex >= 0);
     eeprom_update_byte((unsigned char*)m_nextIndex, value);
     m_nextIndex++;
+    
+    return 1;
   }
 
 private:
   /**
+   * \brief Returns the next byte from the bytecode store (even if it is suspended)
+   *        and advances the internal pointer.
+   */
+  u8 nextByte() {
+    u8 result;
+    
+    assert(m_nextIndex >= 0);
+    result = eeprom_read_byte((unsigned char*)m_nextIndex);
+    m_nextIndex++;
+
+    return result;
+  }
+  
+  /**
    * \brief Checks whether the next four bytes are the magic bytes.
    */
   bool validateMagicBytes() {
-    if (next() != 0xCA)
+    // We cannot use next() here because it wouldn't work if the bytecode
+    // store is suspended (as we always return CMD_NOP)
+    if (nextByte() != 0xCA)
       return false;
-    return next() == 0xFE;
+    return nextByte() == 0xFE;
   }
 };
 

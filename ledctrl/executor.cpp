@@ -24,10 +24,12 @@ void CommandExecutor::executeNextCommand() {
 
   commandCode = nextByte();
 #ifdef DEBUG
-  Serial.print(F(" ["));
-  Serial.print(clock());
-  Serial.print(F(" ms] Command: "));
-  Serial.println(commandCode);
+  if (m_pBytecodeStore && !m_pBytecodeStore->suspended()) {
+    Serial.print(F(" ["));
+    Serial.print(clock());
+    Serial.print(F(" ms] Command: "));
+    Serial.println(commandCode);
+  }
 #endif
 
   switch (commandCode) {

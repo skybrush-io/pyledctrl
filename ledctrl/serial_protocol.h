@@ -72,13 +72,13 @@ extern const SerialCommandInfo SERIAL_COMMAND_INFO[];
  */
 namespace SerialProtocolParserState {
   enum Enum {
-    START,                 ///< Waiting for command code
-    TEXT_ARGUMENTS,        ///< Waiting for command arguments in text mode
-    BINARY_LENGTH_1,       ///< Waiting for first byte of message length in binary mode
-    BINARY_LENGTH_2,       ///< Waiting for second byte of message length in binary mode
-    BINARY_DATA,           ///< Waiting for command arguments in binary mode
-    COMMAND_WITH_NO_ARGS,  ///< Waiting for newline character at the end of a command with no args
-    TRAP                   ///< Error state; waits for the next newline
+    START,                   ///< Waiting for command code
+    TEXT_ARGUMENTS,          ///< Waiting for command arguments in text mode
+    BINARY_LENGTH_1,         ///< Waiting for first byte of message length in binary mode
+    BINARY_LENGTH_2,         ///< Waiting for second byte of message length in binary mode
+    BINARY_DATA,             ///< Waiting for command arguments in binary mode
+    COMMAND_WITH_NO_ARGS,    ///< Waiting for newline character at the end of a command with no args
+    TRAP                     ///< Error state; waits for the next newline
   };
 }
 
@@ -111,6 +111,18 @@ private:
    * Pointer to the bytecode executor that the parser will manipulate.
    */
   CommandExecutor* m_pCommandExecutor;
+
+  /**
+   * Stores the value of the current command line argument being parsed in text mode.
+   * -1 is a special value; it means that we have not received any character that 
+   * corresponds to a command line argument yet.
+   */
+  int m_currentArgument;
+
+  /**
+   * Stores the value of an error code during the execution of a command.
+   */
+  Errors::Code m_currentErrorCode;
   
 public:
   explicit SerialProtocolParser() : m_pCommandExecutor(0) {
@@ -137,10 +149,42 @@ public:
   
 private:
   /**
-   * Executes the currently parsed command.
+   * Appends the given hexadecimal digit to the value of the current command
+   * argument being parsed.
+   * 
+   * \param  digit  the digit to append
    */
-  void executeCurrentCommand();
+  void appendHexDigitToCurrentArgument(u8 digit);
   
+  /**
+   * Returns the bytecode store of the current command executor.
+   * 
+   * \return  the bytecode store or \c NULL if there is no bytecode store or
+   *          no command executor.
+   */
+  BytecodeStore* bytecodeStore() const;
+  
+  /**
+   * Hook function that is called when the execution of the currently parsed command 
+   * should finish. This happens after the terminating newline characters have been
+   * received and parsed.
+   */
+  void finishExecutionOfCurrentCommand();
+
+  /**
+   * Handles a single argument byte of the current command. This hook function is called
+   * every time a new byte is received and parsed for the current command.
+   * 
+   * \param  value  the value of the argument
+   */
+  void handleCommandArgument(u8 value);
+  
+  /**
+   * Hook function that is called when the execution of the currently parsed command 
+   * is about to start. This happens right after having received the command code. 
+   */
+  void startExecutionOfCurrentCommand();
+
   /**
    * Prints the given error code to the serial console.
    * 

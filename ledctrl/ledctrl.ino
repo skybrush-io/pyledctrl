@@ -54,7 +54,7 @@ CommandExecutor executor(&ledStrip);
 // 2 = another simple test sequence
 // 3 = writable bytecode in SRAM with no program loaded by default
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
-#define BYTECODE_INDEX 0
+#define BYTECODE_INDEX 4
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -119,8 +119,12 @@ void setup() {
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and
-  // we can upload new bytecode (if we start supporting that)
-  Serial.println(F("+OK"));
+  // we can upload new bytecode (if we start supporting that).
+  // Note that we add a leading newline to the banner to make it easier
+  // to find when the app sitting on the other side of the port is reading
+  // the serial port line by line and there is some junk left in the
+  // serial port buffer from an earlier run.
+  Serial.println(F("\n+OK"));
 }
 
 /**
