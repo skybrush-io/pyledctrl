@@ -1,10 +1,38 @@
 #define NUMBEROFEDGES 9
+/*
+* \def NUMBEROFEDGES
+* define how many edges are in  an PPM signal-period (8 channel: 8 rising edge and 1 rising edge in the next cycle,
+* which is ndicate the next period and end of current one.
+*/
+
 #define PACKETSIZE 22000
 
+/*
+* \def PACKETSIZE
+* define the comonly used PPM period  (represented in microseconds)
+*/
+
+/*
+* if we use manual controller, we can assing here PPM channels and colours
+*/
+#define PPMCHANNEL_R 1
+#define PPMCHANNEL_G 2
+#define PPMCHANNEL_B 3
+
+/*
+* define how many sample will bi used by calculating the aaccurate signals
+*/
+#define ACCURATE_CYC 10
+
+#include "config.h"
 
 #if PPM_INTERRUPT
 /**
 * PPM decoder header
+*/
+
+/*
+* Struct for timestamps in PPM signal decoding interrupt
 */
 typedef struct
 {
@@ -16,15 +44,31 @@ typedef struct
 	volatile long fullperiod_begin;
 	volatile long fullperiod_lastbegin;
 } PPMtime;
+
+
+/*
+* Values for readed timestamps
+*/
 volatile int CurrentChannel = 0;
 int ReadedChannel;
 long time_readed;
+long time_last = 125;
+
 
 void ppmIT();
 volatile void PPMsignalToSerial();
 PPMtime ppmtime;
 
 
+long verify[ACCURATE_CYC];
+long AccurateValue = 0;
+long time;
+
+/*
+* INTERRUPT FUNCTION
+* Catch and calculate elapsed time between two rising edges, and drop bad ones
+*
+*/
 void ppmIT()
 {
 
@@ -46,6 +90,7 @@ void ppmIT()
 	ppmtime.last = ppmtime.current;
 }
 
+
 /* function for senging signal values to serial port*/
 volatile void PPMsignalToSerial()
 {
@@ -59,6 +104,46 @@ volatile void PPMsignalToSerial()
 	Serial.println();
 	Serial.println(ppmtime.fullperiod);
 
+}
+
+
+/**
+* give an accurate PPM signal per channel
+* catch some sample and drop which is probaly not correct and calculate average from remainders
+* This function ask for some time, therefore use with watchfully
+*/
+volatile long accuratePPMsignals(byte ch)
+{
+	verify[0] = ppmtime.Periods[ch];
+	byte i = 1;
+	while (i < ACCURATE_CYC)
+	{
+		verify[i] = ppmtime.Periods[ch];
+		if (abs(verify[i] - verify[i - 1]) < 100)
+		{
+			AccurateValue += verify[i];
+		}
+		i++;
+		//delay(2);
+	}
+	AccurateValue /= ACCURATE_CYC;
+	return AccurateValue;
+}
+
+
+/**
+* Function for control the LED strip with RC controller (i.e. with PPM signals)
+*
+*/
+volatile byte LightController(byte ch)
+{
+	time = accuratePPMsignals(ch); //precision controlling
+	//time = ppmtime.Periods[ch]; //fastest, but without precision
+	if (time > 1900) time = 1900;
+	if (time < 1100) time = 1100;
+	time = (time - 1100) * 0.315; //254/800
+	byte x = static_cast<byte>(round(time / 10) * 10);
+	return x;
 }
 
 #endif

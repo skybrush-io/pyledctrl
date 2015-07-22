@@ -38,13 +38,13 @@ extern "C" {
  * 
  * Index of the PWM pin corresponding to the blue LEDs.
  */
-#define BLUE_PWM_PIN 3
+#define BLUE_PWM_PIN 9
 
 /**
  * \def HAS_MAIN_SWITCH
  * If you have a switch-button, you should define this; otherwise comment this out.
  */
-#define HAS_MAIN_SWITCH 1
+#define HAS_MAIN_SWITCH 0
 
 /**
  * \def MAIN_SWITCH_PIN
@@ -67,7 +67,7 @@ extern "C" {
  * Define this if you have a voltage meter that can be used to compensate
  * the LED brightness. Otherwise comment this out.
  */
-// #define HAS_VOLTMETER 1
+#define HAS_VOLTMETER 1
 
 /**
  * \def VOLTMETER_PIN
@@ -102,7 +102,7 @@ extern "C" {
 	* define interrupts
 	*/
 #define PWM_INTERRUPT 0
-#define PPM_INTERRUPT 0
+#define PPM_INTERRUPT 1
 
 
 #define ITNUM 1

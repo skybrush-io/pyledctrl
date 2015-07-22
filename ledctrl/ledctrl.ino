@@ -54,7 +54,7 @@ CommandExecutor executor(&ledStrip);
 // 2 = another simple test sequence
 // 3 = writable bytecode in SRAM with no program loaded by default
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
-#define BYTECODE_INDEX 4
+#define BYTECODE_INDEX 1
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -73,8 +73,11 @@ CommandExecutor executor(&ledStrip);
  */
 void setup() {
   // Wait 100 milliseconds
-  // TODO: Arpi, why is this necessary?
-	wait(100);
+  /* NOTE:	This is necessary, because we give some time to PCB's circuit, 
+  *			which is enough for prepare oneself (for example condensators need some time for dicharging)
+  */
+
+	delay(100);
 
   // Configure the serial port where we will listen for commands and
   // send debug output
@@ -94,10 +97,6 @@ void setup() {
 	#elif PWM_INTERRUPT
 	attachInterrupt(ITNUM, pwmIT, CHANGE);
 	#endif
-  
-  // Wait 100 milliseconds
-  // TODO: Arpi, why is this necessary?
-  wait(100);
   
   // Load the bytecode into the executor. We have to do it here and not
   // before the +OK prompt because errors might already happen here
@@ -153,7 +152,9 @@ void loop() {
 #endif
   
   // Make a step with the executor
-  executor.step();
+  //executor.step();
+
+  ledStrip.setColor(LightController(PPMCHANNEL_R), LightController(PPMCHANNEL_G), LightController(PPMCHANNEL_B));
 }
 
 #ifdef ENABLE_SERIAL_INPUT
