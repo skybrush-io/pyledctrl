@@ -2,61 +2,34 @@
 * \file voltmeter.h
 * \brief Voltage meter class.
 */
-#define INCREASEACCURACY 1
-#ifdef INCREASEACCURACY
-#define ACCURACY 5
-#endif
-
 
 #ifndef VOLTMETER_H
 #define VOLTMETER_H
 
+#include "config.h"
 #include <Arduino.h>
 #include <math.h>
 
 /**
-* Class that represents a voltage meter.
-*/
+ * Class that represents a voltage meter.
+ */
 class VoltMeter {
 
 private:
 	/**
-	* Index of the pin on which the voltmeter measurement can be read.
-	*/
+	 * Index of the pin on which the voltmeter measurement can be read.
+	 */
 	u8 m_pin;
 
 	/**
-	* Correction coefficient to use on the voltmeter readings.
-	*/
+	 * Correction coefficient to use on the voltmeter readings.
+	 */
 	float m_coefficient;
 
 	/**
-	* Storage for the last measured value to implement a simple noise filtering.
-	*/
+	 * Storage for the last measured value to implement a simple noise filtering.
+	 */
 	float m_lastReading;
-	/*
-	* readed value of analog input. This is unscaled and non-usable like this
-	*/
-	int readed_value;
-
-	/*
-	* vector of valided values
-	*/
-	float valided[ACCURACY];
-	/*
-	* calculated accurate voltage
-	*/
-	float accurate_value;
-
-	/*
-	* the calculated value, which is usable for compensate lighting
-	*/
-	float compensator;
-	/*
-	* temp values for function of increasing accuracy
-	*/
-	byte i = 1;
-	byte validednum = 1;
 
 public:
 	/**
@@ -81,47 +54,51 @@ public:
 	* if which is multiply the desired lighting, compensate the decreasing or increasing of voltage
 	* This function can compensate in around half of full interval
 	*/
-	float measure()
-	{
-		#if INCREASEACCURACY
-		readed_value = read_Accurate();
-		#elif INCREASEACCURACY == 0
-		readed_value = analogRead(m_pin);
-		#endif
+	float measure() {
+		int unscaled_reading = readUnscaledValue();
+		float compensator;
 
 		#ifdef DEBUG
 		Serial.print(" Voltage meter read raw value:");
-		Serial.println(readed_value);
+		Serial.println(unscaled_reading);
 		#endif
 
-		compensator = constrain(m_coefficient / (static_cast<float>(readed_value) / 1023), 0, 1);
+		compensator = constrain(m_coefficient / (static_cast<float>(unscaled_reading) / 1023), 0, 1);
 		if (fabs(compensator - m_lastReading) <= 0.05) {
 			m_lastReading = compensator;
 		}
-		//Serial.println(m_lastReading);
 		return m_lastReading;
 	}
 
-	/*
-	* function for reading more sample and increase accuracy with this
-	*/
+	/**
+	 * \brief Reads an unscaled voltage measure from the voltmeter pin,
+	 *        optionally performing some black magic with multiple readings to
+	 *        return a voltage reading with increased accuracy.
+	 *
+	 * \return An unscaled voltage measure
+	 */
+	int readUnscaledValue() {
+#if VOLTMETER_ACCURACY > 1
+		float curr_reading, prev_reading;
+		float sum_readings = 0.0;
+		byte i, num_readings;
 
-	int read_Accurate()
-	{
-		valided[0] = analogRead(m_pin);
-		i = 1;
-		validednum = 1;
-		while (i < ACCURACY)
-		{
-			valided[i] = analogRead(m_pin);
-			if (abs(valided[i] - valided[i - 1]) < 2)
-			{
-				validednum++;
-				accurate_value += valided[i];
+		prev_reading = analogRead(m_pin);
+		num_readings = 1;
+		sum_readings = prev_reading;
+		for (i = 1; i < VOLTMETER_ACCURACY; i++) {
+			curr_reading = analogRead(m_pin);
+			if (fabs(curr_reading - prev_reading) < 2) {
+				num_readings++;
+				sum_readings += curr_reading;
 			}
-			i++;
+			prev_reading = curr_reading;
 		}
-		return accurate_value /= validednum;
+
+		return sum_readings / num_readings;
+#else
+		return analogRead(m_pin);
+#endif
 	}
 };
 

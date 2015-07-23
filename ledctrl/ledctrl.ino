@@ -72,12 +72,9 @@ CommandExecutor executor(&ledStrip);
  * Setup function; called once after a reset.
  */
 void setup() {
-  // Wait 100 milliseconds
-  /* NOTE:	This is necessary, because we give some time to PCB's circuit, 
-  *			which is enough for prepare oneself (for example condensators need some time for dicharging)
-  */
-
-	delay(100);
+  // Wait 100 milliseconds. This is necessary to give some time to PCB's circuit
+  // to prepare itself (e.g., condensators need some time to discharge)
+  delay(100);
 
   // Configure the serial port where we will listen for commands and
   // send debug output
@@ -92,11 +89,11 @@ void setup() {
 #endif
 
   // Attach to the PPM/PWM interrupts if needed
-	#if PPM_INTERRUPT
-	attachInterrupt(ITNUM, ppmIT, RISING);
-	#elif PWM_INTERRUPT
-	attachInterrupt(ITNUM, pwmIT, CHANGE);
-	#endif
+  #if PPM_INTERRUPT
+  attachInterrupt(ITNUM, ppmIT, RISING);
+  #elif PWM_INTERRUPT
+  attachInterrupt(ITNUM, pwmIT, CHANGE);
+  #endif
   
   // Load the bytecode into the executor. We have to do it here and not
   // before the +OK prompt because errors might already happen here
@@ -131,13 +128,13 @@ void setup() {
  */
 void loop() {
 #ifdef HAS_MAIN_SWITCH
-	// Check the main switch
-	if (!mainSwitch.on()) {
-		// Turn off the LEDs
-		builtinLed.off();
-		ledStrip.off();
-		return;
-	}
+  // Check the main switch
+  if (!mainSwitch.on()) {
+    // Turn off the LEDs
+    builtinLed.off();
+    ledStrip.off();
+    return;
+  }
 #endif
 
 #ifdef HAS_VOLTMETER
@@ -146,15 +143,20 @@ void loop() {
 #endif
 
 #if PPM_INTERRUPT
-	PPMsignalToSerial();
+  PPMsignalToSerial();
 #elif PWM_INTERRUPT
-	//PWMsignalToSerial();
+  //PWMsignalToSerial();
 #endif
-  
-  // Make a step with the executor
-  //executor.step();
 
+#if OPERATION_MODE == 0
+  // Make a step with the executor
+  executor.step();
+#elif OPERATION_MODE == 1
+  // Control the color of the LED strip with PPM signals
   ledStrip.setColor(LightController(PPMCHANNEL_R), LightController(PPMCHANNEL_G), LightController(PPMCHANNEL_B));
+#else
+#  error "Invalid operation mode constant in config.h
+#endif
 }
 
 #ifdef ENABLE_SERIAL_INPUT
@@ -172,15 +174,15 @@ void serialEvent() {
 
 void wait(unsigned long ms)
 {
-	uint16_t start = (uint16_t)micros();
-	while (ms > 0)
-	{
-		if (((uint16_t)micros() - start) >= 1000)
-		{
-			ms--;
-			start += 1000;
-		}
-	}
+  uint16_t start = (uint16_t)micros();
+  while (ms > 0)
+  {
+    if (((uint16_t)micros() - start) >= 1000)
+    {
+      ms--;
+      start += 1000;
+    }
+  }
 }
 
 /**
