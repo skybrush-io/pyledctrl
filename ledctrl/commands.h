@@ -64,7 +64,7 @@ extern const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS];
 #define DURATION_BYTE(duration) (              \
     ((duration) >= 1) ? (                      \
         ((duration) < 192) ?                   \
-            ((u8)round(duration) & 0x3F) :     \
+            (u8)round(duration) :              \
             0                                  \
         ) :                                    \
         ((u8)((duration)*32) & 0x3F) | 0xC0    \
