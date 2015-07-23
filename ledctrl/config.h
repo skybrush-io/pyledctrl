@@ -20,6 +20,14 @@ extern "C" {
 #define DEBUG 1
 
 /**
+ * \def OPERATION_MODE
+ *
+ * The operation mode of \c ledctrl. 0 means bytecode execution; 1 means RC
+ * controller.
+ */
+#define OPERATION_MODE 0
+
+/**
  * \def RED_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the red LEDs.
@@ -68,6 +76,15 @@ extern "C" {
  * the LED brightness. Otherwise comment this out.
  */
 #define HAS_VOLTMETER 1
+
+/**
+ * \def VOLTMETER_ACCURACY
+ *
+ * Accuracy level for the voltmeter. This constant defines the number of
+ * measurements to take on the voltmeter pin before a single measured
+ * value is stored in our voltmeter class.
+ */
+#define VOLTMETER_ACCURACY 5
 
 /**
  * \def VOLTMETER_PIN
