@@ -1,0 +1,5 @@
+FADE_DURATION=1.25
+
+with loop():
+	for color in "red yellow green cyan blue magenta".split():
+		fade_to_color(color, duration=FADE_DURATION)

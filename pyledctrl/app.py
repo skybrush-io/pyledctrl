@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 
+from pyledctrl.compiler import BytecodeCompiler
 from pyledctrl.config import DEFAULT_BAUD
 from pyledctrl.upload import BytecodeUploader
 from pyledctrl.utils import error, get_serial_port_filename, \
@@ -18,14 +19,20 @@ pyledctrl = baker.Baker()
 
 
 @pyledctrl.command(shortopts=dict(output="o"))
-def compile(filename, output="a.out"):
+def compile(filename, output=None):
     """\
     Compiles a LedCtrl source file to a bytecode file.
 
     :param filename: The name of the source file to compile.
-    :param output: The name of the output file.
+    :param output: The name of the output file. When omitted, it will be
+        the same as the input file but the extension will be replaced with
+        ``.bin``.
     """
-    pass
+    if output is None:
+        base, _ = os.path.splitext(filename)
+        output = base + ".bin"
+    compiler = BytecodeCompiler()
+    compiler.compile(filename, output)
 
 
 @pyledctrl.command(shortopts=dict(port="p", baud="b"))
