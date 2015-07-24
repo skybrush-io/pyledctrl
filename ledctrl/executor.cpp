@@ -139,16 +139,15 @@ unsigned long CommandExecutor::nextDuration() {
   unsigned long duration;
   
   /* If the two most significant bits are 1, the remaining six bits
-   * denote units of 1/32-th of a second.
+   * denote units of 1/25-th of a second.
    */
   if ((encodedDuration & 0xC0) == 0xC0) {
-    /* 1/32 sec = 31.25 msec
-     * x*31.25 = x*31 + (x >> 2)
-     * x*31 + (x >> 2) = (x << 5) - x + (x >> 2)
+    /* 1/25 sec = 40 msec
+     * x*40 = x*32 + x*8 = (x << 5) + (x << 3)
      */
     encodedDuration &= 0x3F;
     duration = encodedDuration & 0x3F;
-    duration = (duration << 5) - duration + (duration >> 2);
+    duration = (duration << 5) + (duration << 3);
   } else {
     /* The value denotes whole seconds */
     duration = encodedDuration * 1000;
@@ -299,7 +298,7 @@ void CommandExecutor::handleLoopEndCommand() {
 }
 
 void CommandExecutor::handleResetClockCommand() {
-  m_lastClockResetTime = m_currentCommandStartTime;
+  resetClock();
 }
 
 void CommandExecutor::handleSetBlackCommand() {

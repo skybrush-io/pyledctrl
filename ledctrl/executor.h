@@ -116,6 +116,13 @@ public:
   void rewind();
 
   /**
+   * \brief Resets the internal clock of the bytecode executor.
+   */
+  void resetClock() {
+    m_lastClockResetTime = m_currentCommandStartTime;
+  }
+
+  /**
    * \brief Sets the bytecode store that the executor will use.
    */
   void setBytecodeStore(BytecodeStore* pBytecodeStore) {
