@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 from .colors import parse_color
 from .errors import InvalidDurationError
-from functools import partial, wraps
+from functools import wraps
 
 
 class CommandCode(object):
@@ -99,6 +99,7 @@ def fade_to_gray(value, duration=None, easing=None):
         easing = EasingMode.get(easing)
         return CommandCode.FADE_TO_GRAY + _to_char(value) + duration + easing
 
+
 def fade_to_white(duration=None, easing=None):
     duration = _to_duration_char(duration)
     easing = EasingMode.get(easing)
@@ -111,7 +112,7 @@ def nop():
 
 def set_black(duration=None):
     duration = _to_duration_char(duration)
-    return CommandCode.SET_BLACK
+    return CommandCode.SET_BLACK + duration
 
 
 def set_color(red, green=None, blue=None, duration=None):
@@ -124,18 +125,19 @@ def set_color(red, green=None, blue=None, duration=None):
     return CommandCode.SET_COLOR + rgb_code + duration
 
 
-def set_gray(value, duration=None, easing=None):
+def set_gray(value, duration=None):
     if value == 0:
-        return set_black(duration, easing)
+        return set_black(duration)
     elif value == 255:
-        return set_white(duration, easing)
+        return set_white(duration)
     else:
         duration = _to_duration_char(duration)
         return CommandCode.SET_GRAY + _to_char(value) + duration
 
+
 def set_white(duration=None):
     duration = _to_duration_char(duration)
-    return CommandCode.SET_WHITE
+    return CommandCode.SET_WHITE + duration
 
 
 def loop_begin(body, iterations=None):
@@ -164,21 +166,22 @@ def _to_duration_char(seconds):
     that is typically used in the bytecode.
 
     The bytecode can encode integer seconds up to 191 (inclusive) and
-    fractional seconds up to 2 seconds in units of 1/32 seconds."""
+    fractional seconds up to 2.56 seconds in units of 1/25 seconds."""
+    if seconds is None:
+        seconds = 0
     if seconds < 0 or seconds >= 192:
         raise InvalidDurationError(seconds)
     if int(seconds) == seconds:
         return _to_char(seconds)
-    if seconds > 2:
+    frames = seconds / 25.0
+    if frames > 0x3F:
         raise InvalidDurationError(seconds)
-    if int(seconds * 32) != seconds * 32:
-        raise InvalidDurationError(seconds)
-    return _to_char((int(seconds * 32) & 0x3F) + 0xC0)
+    return _to_char(int(frames & 0x3F) + 0xC0)
 
 
 def writer_of(bytecode_func, to):
     """Takes a function that returns bytecode and returns another
-    function that writes the returned bytecode from the inner function
+    function that writes the returned bytecode from the *inner* function
     into a file.
 
     :param bytecode_func: the bytecode-generating function to wrap
