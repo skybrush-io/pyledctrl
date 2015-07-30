@@ -28,7 +28,7 @@ void CommandExecutor::executeNextCommand() {
 #ifdef DEBUG
   if (m_pBytecodeStore && !m_pBytecodeStore->suspended()) {
     Serial.print(F(" ["));
-    Serial.print(clock());
+    Serial.print(m_currentCommandStartTime - m_lastClockResetTime);
     Serial.print(F(" ms] Command: "));
     Serial.println(commandCode);
   }

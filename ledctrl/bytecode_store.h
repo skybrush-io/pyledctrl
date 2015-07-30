@@ -320,6 +320,7 @@ public:
   int write(u8 value) {
     assert(m_pNextCommand != 0);
     *m_pNextCommand = value;
+    m_pNextCommand++;
     return 1;
   }
 };

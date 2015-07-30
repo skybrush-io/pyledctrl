@@ -109,10 +109,10 @@ void setup() {
 #endif
   
   // Load the bytecode into the executor. We have to do it here and not
-  // before the +OK prompt because errors might already happen here
+  // before the +READY prompt because errors might already happen here
   // (e.g., we are trying to load bytecode from the EEPROM but there is
   // no bytecode there) and we don't want error messages to appear
-  // before the +OK prompt.
+  // before the +READY prompt.
   executor.setBytecodeStore(&bytecodeStore);
 
   // Attach the signal source to the executor
@@ -139,7 +139,7 @@ void setup() {
   // to find when the app sitting on the other side of the port is reading
   // the serial port line by line and there is some junk left in the
   // serial port buffer from an earlier run.
-  Serial.println(F("\n+OK"));
+  Serial.println(F("\n+READY"));
 }
 
 /**

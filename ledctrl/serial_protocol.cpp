@@ -180,14 +180,15 @@ void SerialProtocolParser::finishExecutionOfCurrentCommand() {
       if (!bytecodeStore) {
         m_currentErrorCode = Errors::NO_BYTECODE_STORE;
       } else {
+        // Add a terminating CMD_END if needed to ensure that we do not accidentally read parts of the
+        // memory that we are not supposed to
         if (m_pCommandInfo->commandCode == EXECUTE || m_pCommandInfo->commandCode == EXECUTE_BIN) {
           // TODO: syntax checking for the uploaded command to see if we have all the args?
-          // Add a terminating CMD_END to ensure that we do not accidentally read parts of the
-          // memory that we are not supposed to
           if (bytecodeStore->write(CMD_END) == 0) {
             m_currentErrorCode = Errors::OPERATION_NOT_SUPPORTED;
           }
         }
+        // Rewind the command executor and resume execution
         m_pCommandExecutor->rewind();
         bytecodeStore->resume();
       }
@@ -319,23 +320,27 @@ void SerialProtocolParser::feed(int character) {
       break;
     
     case BINARY_LENGTH_1:
-      m_nextMessageLength = character & 0xFF;
+      m_nextMessageLength = character;
       m_state = BINARY_LENGTH_2;
       break;
 
     case BINARY_LENGTH_2:
-      m_nextMessageLength <<= 8;
-      m_nextMessageLength += character & 0xFF;
+      m_nextMessageLength = m_nextMessageLength * 256 + character;
       m_remainingMessageLength = m_nextMessageLength;
       m_state = (m_remainingMessageLength > 0) ? BINARY_DATA : START;
       break;
 
     case BINARY_DATA:
-      handleCommandArgument(static_cast<u8>(character & 0xFF));
+      handleCommandArgument(static_cast<u8>(character));
       m_remainingMessageLength--;
       if (m_remainingMessageLength == 0) {
         finishExecutionOfCurrentCommand();
         m_state = START;
+      } else if ((m_remainingMessageLength & 0x3F) == 0) {
+        // After every 64 byte, print the number of bytes written into the bytecode
+        // store as progress information
+        Serial.print(':');
+        Serial.println(m_nextMessageLength - m_remainingMessageLength);
       }
       break;
 

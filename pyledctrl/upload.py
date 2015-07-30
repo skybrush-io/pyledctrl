@@ -14,6 +14,7 @@ class BytecodeUploader(object):
         :type port: groundctrl.serial_port.SerialPort
         """
         self.port = port
+        self.length = 0
 
     def log(self, message):
         """Prints a log message."""
@@ -25,19 +26,25 @@ class BytecodeUploader(object):
         :param bytecode: the bytecode to upload as a raw Python bytes object
         :type bytecode: bytes
         """
-        length = len(bytecode)
+        length = self.length = len(bytecode)
 
         try:
             fd = self.port.fdspawn()
+            fd = self.port.fdspawn()
+
 
             self.log("Waiting for device to finish booting...")
-            if not self._wait_for_response():
-                self.log("Device failed to boot.")
-                return False
+            while True:
+                response = self._wait_for_response(fd)
+                if not response:
+                    self.log("Device failed to boot.")
+                    return False
+                elif response.message == "READY":
+                    break
 
             self.log("Querying maximum bytecode size...")
             fd.send(b"c\n")
-            response = self._wait_for_response()
+            response = self._wait_for_response(fd)
             if not response.successful:
                 self.log("Failed to query maximum bytecode size.")
                 return False
@@ -50,10 +57,12 @@ class BytecodeUploader(object):
 
             self.log("Sending bytecode...")
             fd.send(b"U")
-            fd.send(chr((length & 0xFF00) >> 16))
+            fd.send(chr((length >> 8) & 0xFF))
             fd.send(chr(length & 0xFF))
             fd.send(bytecode)
             fd.send("\n")
+
+            response = self._wait_for_response(fd)
             if response.successful:
                 self.log("Bytecode uploaded successfully.")
             else:
@@ -61,6 +70,7 @@ class BytecodeUploader(object):
             return response.successful
         finally:
             self.port.close()
+            self.length = None
 
     def upload_file(self, filename):
         """Uploads the bytecode from the given file to the LED controller.
@@ -70,19 +80,29 @@ class BytecodeUploader(object):
         """
         return self.upload(open(filename, "rb").read())
 
-    def _wait_for_response(self):
+    def _wait_for_response(self, fd):
         """Waits for the next response on the associated serial port.
 
         :return: an error code or zero if the serial port returned a message
              indicating success.
         """
-        fd = self.port.fdspawn()
-        index = fd.expect(["\\+(.*)\r?\n", "-E(.*)\r?\n"])
-        if index:
-            self.log("Device returned error code {0}.".format(fd.match.group(1)))
-            return Response.failure(fd.match.group(1))
-        else:
-            return Response.success(fd.match.group(1))
+        while True:
+            index = fd.expect([
+                "\\+([^\r\n]*)\r?\n",
+                "-E([^\r\n]*)\r?\n",
+                ":([^\r\n]*)\r?\n"
+            ])
+            if index == 2:
+                try:
+                    bytes_uploaded = int(fd.match.group(1))
+                    sys.stderr.write("{0:.2f}%\r".format(100.0 * bytes_uploaded / self.length))
+                except:
+                    pass
+            elif index == 1:
+                self.log("Device returned error code {0}.".format(fd.match.group(1)))
+                return Response.failure(fd.match.group(1))
+            else:
+                return Response.success(fd.match.group(1))
 
 
 class Response(object):
