@@ -1,4 +1,4 @@
-#define NUMBEROFEDGES 9
+#define NUMBEROFEDGES 8
 /*
 * \def NUMBEROFEDGES
 * define how many edges are in  an PPM signal-period (8 channel: 8 rising edge and 1 rising edge in the next cycle,

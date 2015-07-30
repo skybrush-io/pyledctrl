@@ -25,28 +25,28 @@ extern "C" {
  * The operation mode of \c ledctrl. 0 means bytecode execution; 1 means RC
  * controller.
  */
-#define OPERATION_MODE 0
+#define OPERATION_MODE 1
 
 /**
  * \def RED_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the red LEDs.
  */
-#define RED_PWM_PIN 5
-
+#define RED_PWM_PIN 6
+	//szigetes PCB config
 /**
  * \def GREEN_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the green LEDs.
  */
-#define GREEN_PWM_PIN 6
-
+#define GREEN_PWM_PIN 9
+	//A szigetes PCB-n a zöld a 9-es pin-en van!!!!!!!!!
 /**
  * \def BLUE_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the blue LEDs.
  */
-#define BLUE_PWM_PIN 9
+#define BLUE_PWM_PIN 5
 
 /**
  * \def HAS_MAIN_SWITCH
@@ -122,7 +122,7 @@ extern "C" {
 #define PPM_INTERRUPT 1
 
 
-#define ITNUM 1
+#define ITNUM 0
 	/**
 	* \def ITNUM
 	* Number of interrapt. (0 or 1)
