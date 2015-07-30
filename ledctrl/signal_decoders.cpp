@@ -94,8 +94,6 @@ void PPMSignalSource_interruptHandler() {
   }
 
   ppmSignalSource_lastTime = currentTime;
-
-  ppmSignalSource_interruptLength = micros() - currentTime;
 }
 
 void PPMSignalSource::dumpDebugInformation() const {
