@@ -95,6 +95,11 @@ class EasyStepTimeline(object):
     def has_instants(self):
         return len(self.instants) > 0
 
+    def has_same_instants(self, other):
+        """Checks whether this timeline has exactly the same time instants as
+        some other timeline."""
+        return self.instants == other.instants
+
     @classmethod
     def from_xml(cls, tag):
         result = cls()
@@ -104,7 +109,7 @@ class EasyStepTimeline(object):
         for time_tag in tag.findall("./Time"):
             time_obj = Time.from_xml(time_tag, time=time)
             result.instants.append(time_obj)
-            time += time_obj.wait
+            time += time_obj.total_duration
         if time > 0:
             result.instants.append(Time(time=time))
 
@@ -126,10 +131,10 @@ class EasyStepTimeline(object):
 class Time(object):
     """Represents a ``<Time>`` tag from an ``<EasyStep>`` timeline object."""
 
-    def __init__(self, time=0, fade=False, wait=0):
+    def __init__(self, time=0, fade=0, wait=0):
         self.tag = None
         self.time = time
-        self.fade = bool(fade)
+        self.fade = fade
         self.wait = wait
 
     @classmethod
@@ -141,6 +146,18 @@ class Time(object):
         )
         result.tag = tag
         return result
+
+    @property
+    def total_duration(self):
+        """The total duration of the time step on the timeline. The total
+        duration is the sum of the wait time and the fade time."""
+        return self.wait + self.fade
+
+    def __eq__(self, other):
+        return self.time == other.time and self.fade == other.fade and \
+            self.wait == other.wait
+
+    __hash__ = None
 
     def __repr__(self):
         return "{0.__class__.__name__}(time={0.time!r}, fade={0.fade!r}, wait={0.wait!r})".format(self)

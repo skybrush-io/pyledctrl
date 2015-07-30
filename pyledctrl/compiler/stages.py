@@ -3,10 +3,11 @@
 import heapq
 import os
 
-from itertools import groupby
+from itertools import izip
 from operator import itemgetter
 from pyledctrl.compiler.contexts import FileWriterExecutionContext
 from pyledctrl.parsers.sunlite import SunliteSuiteParser, Time
+from pyledctrl.utils import first
 
 
 class CompilationStage(object):
@@ -138,43 +139,23 @@ class SunliteSceneToPythonSourceCompilationStage(FileBasedCompilationStage):
     def _merge_channels(self, channels):
         """Merges multiple channels into a common timeline. Yields pairs
         containing the current time and a tuple of the corresponding channel
-        values. Time is represented as a ``pyledctrl.parsers.sunlite.Time``
-        object where the ``wait`` property is set to the delay from the
-        current time point to the *next* time point that will come up in the
-        sequence, and the ``fade`` property is set to ``True`` if the transition
-        should be a fade from the *previous* value."""
+        values. It is assumed that all the channels share the same timeline
+        object, otherwise the operation would be ambiguous if there are
+        different fade or wait times for different channels.
+        """
+        if not channels:
+            return
 
-        # Extract all the steps from the timelines of the channels and sort them
-        # by time
-        steps = []
-        for index, channel in enumerate(channels):
-            steps.extend((time_obj.time, index, time_obj, step)
-                         for time_obj, step in channel.timeline.iteritems())
-        steps.sort()
+        timeline = first(channel.timeline for channel in channels)
+        if not all(channel.timeline.has_same_instants(timeline) for channel in channels):
+            raise RuntimeError("channel merging is supported only if all the "
+                               "channels share the same timeline")
 
         # Run the steps and maintain a list containing the current state of
         # each channel
-        channel_values = [None] * len(channels)
-        prev_time_obj = Time()
-        for time, steps_at_same_time in groupby(steps, key=itemgetter(0)):
-            # Calculate the time that has passed since the previous call
-            # to yield
-            prev_time_obj.wait = time - prev_time_obj.time
-            if prev_time_obj.wait > 0:
-                yield prev_time_obj, tuple(channel_values)
-                prev_time_obj.time = time
-
-            # Now perform the steps.
-            # We will ask for a faded transition if at least one of the channels
-            # requests a faded transition (as we cannot fade LED components
-            # separately)
-            for _, index, time_obj, step in steps_at_same_time:
-                channel_values[index] = step
-                prev_time_obj.fade = prev_time_obj.fade or time_obj.fade
-
-        # Yield the final state of the channels
-        prev_time_obj.wait = 0
-        yield prev_time_obj, tuple(channel_values)
+        steps_by_channel = zip(channel.timeline.steps for channel in channels)
+        for index, time in enumerate(timeline.instants):
+            yield time, (channel.timeline.steps[index] for channel in channels)
 
     def run(self):
         for fx in self.parsed_input.fxs:
@@ -189,12 +170,24 @@ class SunliteSceneToPythonSourceCompilationStage(FileBasedCompilationStage):
         :param fx: the FX component object
         :param fp: the file-like object to write the bytecode into
         """
+        prev_time = None
         for time, steps_by_channels in self._merge_channels(fx.channels):
             r, g, b = tuple(step.value if step else 0
                             for step in steps_by_channels)
-            params = {
-                "cmd": "fade_to_color" if time.fade else "set_color",
-                "r": r, "g": g, "b": b,
-                "dt": time.wait / 25.0
-            }
-            fp.write("{cmd}({r}, {g}, {b}, duration={dt})\n".format(**params))
+            params = dict(r=r, g=g, b=b)
+            if prev_time is None:
+                # This is the first step; process time.wait only as time.fade
+                # will be processed in the next iteration
+                fp.write("set_color({r}, {g}, {b}, duration={dt})\n".format(
+                    dt=time.wait / 25.0, **params))
+            elif prev_time.fade == 0:
+                fp.write("set_color({r}, {g}, {b}, duration={dt})\n".format(
+                    dt=time.wait / 25.0, **params))
+            elif prev_time.fade > 0:
+                fp.write("fade_to_color({r}, {g}, {b}, duration={dt})\n".format(
+                    dt=prev_time.fade / 25.0, **params))
+                if time.wait > 0:
+                    fp.write("# sleep(duration={dt})\n".format(dt=time.wait / 25.0))
+            else:
+                raise InvalidDurationError(prev_time.fade + " frames")
+            prev_time = time

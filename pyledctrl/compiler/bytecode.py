@@ -166,17 +166,17 @@ def _to_duration_char(seconds):
     that is typically used in the bytecode.
 
     The bytecode can encode integer seconds up to 191 (inclusive) and
-    fractional seconds up to 2.56 seconds in units of 1/25 seconds."""
+    fractional seconds up to 1.28 seconds in units of 1/50 seconds."""
     if seconds is None:
         seconds = 0
     if seconds < 0 or seconds >= 192:
         raise InvalidDurationError(seconds)
     if int(seconds) == seconds:
         return _to_char(seconds)
-    frames = seconds / 25.0
+    frames = int(seconds / 50.0)
     if frames > 0x3F:
         raise InvalidDurationError(seconds)
-    return _to_char(int(frames & 0x3F) + 0xC0)
+    return _to_char((frames & 0x3F) + 0xC0)
 
 
 def writer_of(bytecode_func, to):

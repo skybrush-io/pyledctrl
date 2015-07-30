@@ -21,6 +21,14 @@ def error(message, fatal=False):
         sys.exit(1)
 
 
+def first(iterable):
+    """Returns the first element from the given iterable. Raises ``ValueError``
+    if the iterable is empty."""
+    for item in iterable:
+        return item
+    raise ValueError("iterable is empty")
+
+
 def get_serial_port_filename(port=None):
     """Returns the serial port filename from the given string, handling
     defaults gracefully.
