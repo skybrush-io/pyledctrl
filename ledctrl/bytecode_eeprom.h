@@ -3,5 +3,5 @@
  * \brief Default EEPROM-based bytecode store for ledctrl
  */
 
-EEPROMBytecodeStore bytecodeStore;
+EEPROMBytecodeStore bytecodeStore(0, 1000);
 

@@ -62,7 +62,7 @@ def upload(filename, port=None, baud=DEFAULT_BAUD):
     """
     port = get_serial_connection(port, baud)
     uploader = BytecodeUploader(port)
-    uploader.upload_file(filename)
+    sys.exit(0 if uploader.upload_file(filename) else 1)
 
 
 def main():

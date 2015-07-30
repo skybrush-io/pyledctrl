@@ -18,11 +18,13 @@ namespace SerialProtocolCommand {
   enum Code {
     NO_COMMAND  = 0,        ///< No command
     REWIND      = '<',      ///< Rewinds the execution to the start of the bytecode store
+    CAPACITY    = 'c',      ///< Prints the capacity of the bytecode store
     RESUME      = 'r',      ///< Resumes the execution of the bytecode
     SUSPEND     = 's',      ///< Suspends the execution of the bytecode
     TERMINATE   = 't',      ///< Terminates the execution of the bytecode
     UPLOAD      = 'u',      ///< Uploads a chunk of bytecode, overwriting the bytecode store (text version)
     UPLOAD_BIN  = 'U',      ///< Uploads a chunk of bytecode, overwriting the bytecode store (binary version)
+    VERSION     = 'v',      ///< Prints the version number
     EXECUTE     = 'x',      ///< Executes some bytecode command immediately, overwriting the bytecode store (text version)
     EXECUTE_BIN = 'X',      ///< Executes some bytecode command immediately, overwriting the bytecode store (binary version)
   };

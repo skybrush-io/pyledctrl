@@ -3,8 +3,7 @@
 from __future__ import absolute_import
 
 from .colors import parse_color
-from .errors import InvalidDurationError
-from functools import wraps
+from .errors import InvalidDurationError, MarkerNotResolvableError
 
 
 class CommandCode(object):
@@ -23,6 +22,7 @@ class CommandCode(object):
     LOOP_BEGIN = b'\x0C'
     LOOP_END = b'\x0D'
     RESET_TIMER = b'\x0E'
+    JUMP = b'\x0F'
 
 
 class EasingMode(object):
@@ -68,6 +68,61 @@ class EasingMode(object):
         return getattr(cls, spec)
 
 
+class Marker(object):
+    """Superclass for marker objects placed in the bytecode stream that are
+    resolved to actual bytecode in a later compilation stage."""
+
+    def as_bytecode(self):
+        """Returns the bytecode that should be inserted into the bytecode
+        stream in place of the marker.
+
+        Returns:
+            list of bytes: a list containing the bytes to be inserted into
+                the bytecode
+
+        Raises:
+            MarkerNotResolvableError: if the marker does not "know" all the
+                information that is needed to produce a bytecode representation.
+        """
+        return []
+
+
+class LabelMarker(Marker):
+    """Marker object for a label that jump instructions can refer to."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "{0.__class__.__name__}(name={0.name!r})".format(self)
+
+
+class JumpMarker(Marker):
+    """Marker object for a jump instruction."""
+
+    def __init__(self, destination):
+        self.destination = destination
+        self.address = None
+
+    def as_bytecode(self):
+        if self.address is None:
+            raise MarkerNotResolvableError(self)
+        else:
+            return CommandCode.JUMP, _to_varint(self.address)
+
+    def resolve_to_address(self, address):
+        assert self.address is None
+        self.address = address
+
+    def __repr__(self):
+        return "{0.__class__.__name__}(destination={0.destination!r})".format(self)
+
+
+class UnconditionalJumpMarker(JumpMarker):
+    """Marker object for an unconditional jump instruction."""
+    pass
+
+
 def end():
     return CommandCode.END
 
@@ -75,7 +130,7 @@ def end():
 def fade_to_black(duration=None, easing=None):
     duration = _to_duration_char(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_BLACK + duration + easing
+    return CommandCode.FADE_TO_BLACK, duration, easing
 
 
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
@@ -86,7 +141,7 @@ def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
     rgb_code = _to_char(red, green, blue)
     duration = _to_duration_char(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_COLOR + rgb_code + duration + easing
+    return CommandCode.FADE_TO_COLOR, rgb_code, duration, easing
 
 
 def fade_to_gray(value, duration=None, easing=None):
@@ -97,13 +152,21 @@ def fade_to_gray(value, duration=None, easing=None):
     else:
         duration = _to_duration_char(duration)
         easing = EasingMode.get(easing)
-        return CommandCode.FADE_TO_GRAY + _to_char(value) + duration + easing
+        return CommandCode.FADE_TO_GRAY, _to_char(value), duration, easing
 
 
 def fade_to_white(duration=None, easing=None):
     duration = _to_duration_char(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_WHITE + duration + easing
+    return CommandCode.FADE_TO_WHITE, duration, easing
+
+
+def jump(destination):
+    return UnconditionalJumpMarker(destination)
+
+
+def label(name):
+    return LabelMarker(name)
 
 
 def nop():
@@ -112,7 +175,7 @@ def nop():
 
 def set_black(duration=None):
     duration = _to_duration_char(duration)
-    return CommandCode.SET_BLACK + duration
+    return CommandCode.SET_BLACK, duration
 
 
 def set_color(red, green=None, blue=None, duration=None):
@@ -122,7 +185,7 @@ def set_color(red, green=None, blue=None, duration=None):
         return set_gray(red, duration)
     rgb_code = _to_char(red, green, blue)
     duration = _to_duration_char(duration)
-    return CommandCode.SET_COLOR + rgb_code + duration
+    return CommandCode.SET_COLOR, rgb_code, duration
 
 
 def set_gray(value, duration=None):
@@ -132,16 +195,16 @@ def set_gray(value, duration=None):
         return set_white(duration)
     else:
         duration = _to_duration_char(duration)
-        return CommandCode.SET_GRAY + _to_char(value) + duration
+        return CommandCode.SET_GRAY, _to_char(value), duration
 
 
 def set_white(duration=None):
     duration = _to_duration_char(duration)
-    return CommandCode.SET_WHITE + duration
+    return CommandCode.SET_WHITE, duration
 
 
 def loop_begin(body, iterations=None):
-    return CommandCode.LOOP_BEGIN + _to_char(iterations)
+    return CommandCode.LOOP_BEGIN, _to_char(iterations)
 
 
 def loop_end():
@@ -173,24 +236,19 @@ def _to_duration_char(seconds):
         raise InvalidDurationError(seconds)
     if int(seconds) == seconds:
         return _to_char(seconds)
-    frames = int(seconds / 50.0)
+    frames = int(seconds * 50.0)
     if frames > 0x3F:
         raise InvalidDurationError(seconds)
     return _to_char((frames & 0x3F) + 0xC0)
 
 
-def writer_of(bytecode_func, to):
-    """Takes a function that returns bytecode and returns another
-    function that writes the returned bytecode from the *inner* function
-    into a file.
-
-    :param bytecode_func: the bytecode-generating function to wrap
-    :type bytecode_func: callable that returns bytecode
-    :param to: the file-like object to write to
-    :type to: file-like
-    """
-    @wraps(bytecode_func)
-    def result(*args, **kwds):
-        returned_bytecode = bytecode_func(*args, **kwds)
-        to.write(returned_bytecode)
-    return result
+def _to_varint(value):
+    """Converts the given numeric value into its varint representation."""
+    result = []
+    while value > 0:
+        if value < 128:
+            result.append(value)
+        else:
+            result.append(value & 0x7F + 0x80)
+        value >>= 7
+    return bytes(bytearray(result))

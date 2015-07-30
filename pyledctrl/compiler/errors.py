@@ -33,3 +33,23 @@ class InvalidDurationError(RuntimeError):
         self.duration = duration
         message = message or "Invalid duration in input: {0!r}".format(duration)
         super(InvalidDurationError, self).__init__(message)
+
+
+class DuplicateLabelError(RuntimeError):
+    """Exception thrown when the input file contains a duplicate label."""
+
+    def __init__(self, label, message=None):
+        self.label = label
+        message = message or "Duplicate label in input: {0!r}".format(label)
+        super(DuplicateLabelError, self).__init__(message)
+
+
+class MarkerNotResolvableError(CompilerError):
+    """Exception thrown by a marker when the marker cannot be replaced with "real"
+    bytecode in the bytecode stream, most likely because the marker does not "know"
+    all the information it needs to replace itself with bytecode."""
+
+    def __init__(self, marker, message=None):
+        self.marker = marker
+        message = message or "Marker not resolvable; {0!r}".format(marker)
+        super(MarkerNotResolvableError, self).__init__(message)

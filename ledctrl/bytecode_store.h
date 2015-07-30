@@ -16,13 +16,13 @@
 /**
  * Typedef for locations in a bytecode store.
  */
-typedef uintptr_t bytecode_location_t;
+typedef int bytecode_location_t;
 
 /**
  * \def BYTECODE_LOCATION_NOWHERE
  * Special value for \c bytecode_location_t that indicates "nowhere".
  */
-#define BYTECODE_LOCATION_NOWHERE 0
+#define BYTECODE_LOCATION_NOWHERE -1
 
 /**
  * Pure abstract class for bytecode store objects.
@@ -41,6 +41,20 @@ public:
    * Constructor.
    */
   BytecodeStore() : m_suspendCounter(0) {}
+
+  /**
+   * Destructor.
+   */
+  virtual ~BytecodeStore() {}
+  
+  /**
+   * \brief Returns the capacity of the store.
+   * 
+   * The capacity of the store is equal to the length of the longest bytecode
+   * that one can write into it. Read-only bytecode stores should report a
+   * capacity of zero.
+   */
+  virtual int capacity() const = 0;
   
   /**
    * \brief Returns whether the store is empty.
@@ -49,7 +63,7 @@ public:
    * the store is \em not empty if it contains code but the internal pointer is
    * at the end of the store.
    */
-  virtual bool empty() = 0;
+  virtual bool empty() const = 0;
   
   /**
    * \brief Returns the next byte from the bytecode store and advances the
@@ -74,6 +88,9 @@ public:
 
   /**
    * \brief Moves the internal pointer of the bytecode to the given location.
+   * 
+   * Bytecode cells are non-negative integers starting from zero. Zero means the
+   * point where the execution starts.
    */
   virtual void seek(bytecode_location_t location) = 0;
 
@@ -157,7 +174,11 @@ public:
     return m_bytecode;
   }
 
-  bool empty() {
+  int capacity() const {
+    return 0;
+  }
+  
+  bool empty() const {
     return m_bytecode == 0;
   }
   
@@ -191,11 +212,13 @@ public:
   }
 
   void seek(bytecode_location_t location) {
-    m_pNextCommand = (const u8*)location;
+    assert(location >= 0);
+    m_pNextCommand = m_bytecode + location;
   }
   
   bytecode_location_t tell() const {
-    return (bytecode_location_t)m_pNextCommand;
+    bytecode_location_t location = m_pNextCommand - m_bytecode;
+    return location < 0 ? BYTECODE_LOCATION_NOWHERE : location;
   }
 
   int write(u8 value) {
@@ -213,6 +236,11 @@ private:
    * is stored.
    */
   u8* m_bytecode;
+
+  /**
+   * Capacity of the bytecode store.
+   */
+  int m_capacity;
   
   /**
    * Pointer to the current location within the bytecode.
@@ -226,8 +254,8 @@ public:
    * \param  bytecode  pointer to the start of the memory block in SRAM where
    *                   the bytecode is stored.
    */
-  explicit SRAMBytecodeStore(u8* bytecode=0) : BytecodeStore() {
-    load(bytecode);
+  explicit SRAMBytecodeStore(u8* bytecode=0, int capacity=0) : BytecodeStore() {
+    load(bytecode, capacity);
   }
 
   /**
@@ -238,7 +266,11 @@ public:
     return m_bytecode;
   }
 
-  bool empty() {
+  int capacity() const {
+    return m_capacity;
+  }
+  
+  bool empty() const {
     return m_bytecode == 0;
   }
   
@@ -252,9 +284,13 @@ public:
    * 
    * \param  bytecode  the bytecode to be loaded. \c NULL is supported; passing
    *                   \c NULL here simply unloads the previous bytecode.
+   * \param  capacity  the length of the memory area that will hold the bytecode,
+   *                   in bytes. Ignored and assumed to be zero if \c bytecode
+   *                   is \c NULL
    */
-  void load(u8* bytecode) {
+  void load(u8* bytecode, int capacity) {
     m_bytecode = bytecode;
+    m_capacity = bytecode ? capacity : 0;
     rewind();
   }
 
@@ -272,11 +308,13 @@ public:
   }
 
   void seek(bytecode_location_t location) {
-    m_pNextCommand = (u8*)location;
+    assert(location >= 0);
+    m_pNextCommand = m_bytecode + location;
   }
   
   bytecode_location_t tell() const {
-    return (bytecode_location_t)m_pNextCommand;
+    bytecode_location_t location = m_pNextCommand - m_bytecode;
+    return location < 0 ? BYTECODE_LOCATION_NOWHERE : location;
   }
 
   int write(u8 value) {
@@ -300,6 +338,11 @@ private:
   const int m_startIndex;
   
   /**
+   * Capacity of the bytecode store.
+   */
+  int m_capacity;
+  
+  /**
    * Pointer to the byte in EEPROM that contains the next byte to be returned, or
    * -1 if the EEPROM memory segment does not contain valid bytecode.
    */
@@ -309,10 +352,12 @@ public:
   /**
    * Constructor.
    * 
-   * \param  Index of the byte in EEPROM where the bytecode starts, including
-   *         the magic byte sequence at the start.
+   * \param  startIndex  Index of the byte in EEPROM where the bytecode starts, including
+   *                     the magic byte sequence at the start.
+   * \param  capacity    The capacity of the bytecode store
    */
-  explicit EEPROMBytecodeStore(int startIndex=0) : BytecodeStore(), m_startIndex(startIndex) {
+  explicit EEPROMBytecodeStore(int startIndex=0, int capacity=0)
+    : BytecodeStore(), m_startIndex(startIndex), m_capacity(capacity) {
     rewind();
   }
 
@@ -324,7 +369,11 @@ public:
     return m_startIndex;
   }
 
-  virtual bool empty() {
+  int capacity() const {
+    return m_capacity;
+  }
+  
+  virtual bool empty() const {
     return m_startIndex < 0 || m_nextIndex < m_startIndex;
   }
   
@@ -351,11 +400,12 @@ public:
   }
 
   void seek(bytecode_location_t location) {
-    m_nextIndex = (int)(location-1);
+    assert(location >= 0);
+    m_nextIndex = m_startIndex + location + 2;
   }
   
   bytecode_location_t tell() const {
-    return m_nextIndex >= 0 ? (bytecode_location_t)(m_nextIndex+1) : BYTECODE_LOCATION_NOWHERE;
+    return m_nextIndex >= m_startIndex+2 ? (m_nextIndex-m_startIndex-2) : BYTECODE_LOCATION_NOWHERE;
   }
 
   int write(u8 value) {

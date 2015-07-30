@@ -82,5 +82,23 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
   /* 0x0E = CMD_RESET_TIMER */
   {
     .arg_count = 0
+  },
+  /* 0x0F = CMD_JUMP
+   * Arguments: address (varint)
+   */
+  {
+    .arg_count = ARG_VARINT
+  },
+  /* 0x10 = CMD_SET_COLOR_FROM_CHANNELS
+   * Arguments: red channel, green channel, blue channel, duration
+   */
+  {
+    .arg_count = 4
+  },
+  /* 0x11 = CMD_FADE_TO_COLOR_FROM_CHANNELS
+   * Arguments: red channel, green channel, blue channel, duration, easing
+   */
+  {
+    .arg_count = 5
   }
 };

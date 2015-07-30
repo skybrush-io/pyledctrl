@@ -1,0 +1,11 @@
+# Testing labels and jump instructions
+
+set_white(duration=0.5)
+set_black(duration=0.5)
+
+label("start")
+
+fade_to_color("red", duration=1)
+fade_to_black(duration=1)
+
+goto("start")

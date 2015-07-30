@@ -21,6 +21,8 @@ namespace Errors {
     SERIAL_PROTOCOL_PARSE_ERROR,       /**< Serial protocol parse error */
     SERIAL_PROTOCOL_INVALID_STATE,     /**< Serial protocol somehow managed to get into an invalid state */
     NO_BYTECODE_IN_EEPROM,             /**< No bytecode has been uploaded to the EEPROM yet */
+    INVALID_ADDRESS,                   /**< Invalid jump address found in bytecode */
+    INVALID_CHANNEL_INDEX,             /**< Invalid channel index found in bytecode */
     NUMBER_OF_ERRORS
   };
 }

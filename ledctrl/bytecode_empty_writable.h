@@ -13,5 +13,5 @@ u8 bytecode[MAX_BYTECODE_SIZE] = {
   CMD_END
 };
 
-SRAMBytecodeStore bytecodeStore(bytecode);
+SRAMBytecodeStore bytecodeStore(bytecode, MAX_BYTECODE_SIZE);
 

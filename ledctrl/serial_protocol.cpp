@@ -1,5 +1,6 @@
 #include "commands.h"
 #include "serial_protocol.h"
+#include "version.h"
 
 using namespace SerialProtocolParserState;
 using namespace SerialProtocolCommand;
@@ -16,6 +17,10 @@ bool SerialCommandInfo::hasArguments() const {
 }
 
 const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
+  {
+    /* .commandCode = */ CAPACITY,
+    /* .flags = */ CMD_FLAG_NO_ARGS,
+  },
   {
     /* .commandCode = */ REWIND,
     /* .flags = */ CMD_FLAG_NO_ARGS,
@@ -41,6 +46,10 @@ const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
     /* .flags = */ CMD_FLAG_BINARY,
   },
   {
+    /* .commandCode = */ VERSION,
+    /* .flags = */ CMD_FLAG_NO_ARGS,
+  },
+  {
     /* .commandCode = */ EXECUTE,
     /* .flags = */ 0,
   },
@@ -48,7 +57,6 @@ const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
     /* .commandCode = */ EXECUTE_BIN,
     /* .flags = */ CMD_FLAG_BINARY
   },
-  
   /* sentinel element, this must always be the last one */
   {
     /* .commandCode = */ NO_COMMAND
@@ -109,6 +117,7 @@ void SerialProtocolParser::startExecutionOfCurrentCommand() {
 
 void SerialProtocolParser::finishExecutionOfCurrentCommand() {
   BytecodeStore* bytecodeStore;
+  bool suppressOk = 0;
   
   if (m_pCommandInfo == 0)
     return;
@@ -141,7 +150,28 @@ void SerialProtocolParser::finishExecutionOfCurrentCommand() {
         }
       }
       break;
+
+    case CAPACITY:
+      bytecodeStore = this->bytecodeStore();
+      if (!bytecodeStore) {
+        m_currentErrorCode = Errors::NO_BYTECODE_STORE;
+      } else {
+        Serial.print("+");
+        Serial.println(bytecodeStore->capacity(), DEC);
+        suppressOk = true;
+      }
+      break;
       
+    case VERSION:
+      Serial.print("+");
+      Serial.print(LEDCTRL_VERSION_MAJOR, DEC);
+      Serial.print(".");
+      Serial.print(LEDCTRL_VERSION_MINOR, DEC);
+      Serial.print(".");
+      Serial.println(LEDCTRL_VERSION_PATCH, DEC);
+      suppressOk = true;
+      break;
+    
     case EXECUTE:
     case EXECUTE_BIN:
     case UPLOAD:
@@ -169,7 +199,9 @@ void SerialProtocolParser::finishExecutionOfCurrentCommand() {
   }
 
   if (m_currentErrorCode == Errors::SUCCESS) {
-    Serial.println(F("+OK"));
+    if (!suppressOk) {
+      Serial.println(F("+OK"));
+    }
   } else {
     writeErrorCode(m_currentErrorCode);
   }

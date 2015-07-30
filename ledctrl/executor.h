@@ -12,8 +12,9 @@
 #include "transition.h"
 #include "types.h"
 
-class LED;
 class BytecodeStore;
+class LED;
+class SignalSource;
 
 /**
  * Executes commands that control the attached LED strip.
@@ -30,6 +31,11 @@ private:
    */
   BytecodeStore* m_pBytecodeStore;
 
+  /**
+   * Object managing access to the values of the signal channels (typically from a remote controller).
+   */
+  SignalSource* m_pSignalSource;
+  
   /**
    * Pointer to the current location within the bytecode.
    */
@@ -129,6 +135,20 @@ public:
     m_pBytecodeStore = pBytecodeStore;
     rewind();
   }
+
+  /**
+   * \brief Sets the signal source that the executor will use.
+   */
+  void setSignalSource(SignalSource* pSignalSource) {
+    m_pSignalSource = pSignalSource;
+  }
+  
+  /**
+   * \brief Returns the signal source that the executor will use.
+   */
+  SignalSource* signalSource() const {
+    return m_pSignalSource;
+  }
   
   /**
    * \brief This function must be called repeatedly from the main loop
@@ -208,6 +228,11 @@ protected:
    * \brief Handles the execution of \c CMD_FADE_TO_COLOR commands.
    */
   void handleFadeToColorCommand();
+        
+  /**
+   * \brief Handles the execution of \c CMD_FADE_TO_COLOR_FROM_CHANNELS commands.
+   */
+  void handleFadeToColorFromChannelsCommand();
 
   /**
    * \brief Handles the execution of \c CMD_FADE_TO_GRAY commands.
@@ -219,6 +244,11 @@ protected:
    */
   void handleFadeToWhiteCommand();
 
+  /**
+   * \brief Handles the execution of \c CMD_JUMP commands.
+   */
+  void handleJumpCommand();
+  
   /**
    * \brief Handles the execution of \c CMD_LOOP_BEGIN commands.
    */
@@ -243,6 +273,11 @@ protected:
    * \brief Handles the execution of \c CMD_SET_COLOR commands.
    */
   void handleSetColorCommand();
+
+  /**
+   * \brief Handles the execution of \c CMD_SET_COLOR_FROM_CHANNELS commands.
+   */
+  void handleSetColorFromChannelsCommand();
 
   /**
    * \brief Handles the execution of \c CMD_SET_GRAY commands.

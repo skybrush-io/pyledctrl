@@ -59,8 +59,8 @@ public:
 		float compensator;
 
 		#ifdef DEBUG
-		Serial.print(" Voltage meter read raw value:");
-		Serial.println(unscaled_reading);
+		// Serial.print(" Voltage meter read raw value:");
+		// Serial.println(unscaled_reading);
 		#endif
 
 		compensator = constrain(m_coefficient / (static_cast<float>(unscaled_reading) / 1023), 0, 1);

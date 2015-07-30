@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include "bytecode_store.h"
 #include "colors.h"
 #include "commands.h"
@@ -6,6 +7,7 @@
 #include "executor.h"
 #include "led.h"
 #include "led_strip.h"
+#include "signal_decoders.h"
 
 void CommandExecutor::delayExecutionFor(unsigned long duration) {
   delayExecutionUntil(m_currentCommandStartTime + duration);
@@ -87,6 +89,18 @@ void CommandExecutor::executeNextCommand() {
     case CMD_LOOP_END:        /* Marks the end of a loop */
       handleLoopEndCommand();
       break;
+
+    case CMD_JUMP:            /* Unconditional jump to address */
+      handleJumpCommand();
+      break;
+
+    case CMD_SET_COLOR_FROM_CHANNELS:        /* Set color from the current values of some channels */
+      handleSetColorFromChannelsCommand();
+      break;
+      
+    case CMD_FADE_TO_COLOR_FROM_CHANNELS:    /* Fade to color from the current values of some channels */
+      handleFadeToColorFromChannelsCommand();
+      break;
       
     default:
       /* Unknown command code, stop execution and set an error condition */
@@ -139,15 +153,15 @@ unsigned long CommandExecutor::nextDuration() {
   unsigned long duration;
   
   /* If the two most significant bits are 1, the remaining six bits
-   * denote units of 1/25-th of a second.
+   * denote units of 1/50-th of a second.
    */
   if ((encodedDuration & 0xC0) == 0xC0) {
-    /* 1/25 sec = 40 msec
-     * x*40 = x*32 + x*8 = (x << 5) + (x << 3)
+    /* 1/50 sec = 20 msec
+     * x*20 = x*16 + x*4 = (x << 4) + (x << 2)
      */
     encodedDuration &= 0x3F;
     duration = encodedDuration & 0x3F;
-    duration = (duration << 5) + (duration << 3);
+    duration = (duration << 4) + (duration << 2);
   } else {
     /* The value denotes whole seconds */
     duration = encodedDuration * 1000;
@@ -183,8 +197,6 @@ void CommandExecutor::rewind() {
 }
 
 void CommandExecutor::setColorOfLEDStrip(rgb_color_t color) {
-  handleDelayByte();
-  
   assert(m_pLEDStrip != 0);
   m_pLEDStrip->setColor(color);
   m_ledStripFader.startColor = color;
@@ -240,6 +252,55 @@ void CommandExecutor::handleFadeToColorCommand() {
   fadeColorOfLEDStrip(color);
 }
 
+void CommandExecutor::handleFadeToColorFromChannelsCommand() {
+  rgb_color_t color;
+  u8 numChannels;
+  u8 channelIndices[3];
+
+  channelIndices[0] = nextByte();
+  channelIndices[1] = nextByte();
+  channelIndices[2] = nextByte();
+  
+#ifdef DEBUG
+  Serial.print(F(" Arguments: "));
+  Serial.print(channelIndices[0]);
+  Serial.print(' ');
+  Serial.print(channelIndices[1]);
+  Serial.print(' ');
+  Serial.println(channelIndices[2]);
+#endif
+  
+  if (m_pSignalSource == 0) {
+    SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
+    color.red = color.green = color.blue = 0;
+  } else {
+    numChannels = m_pSignalSource->numChannels();
+    
+    if (channelIndices[0] > numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.red = 0;
+    } else {
+      color.red = m_pSignalSource->channelValue(channelIndices[0]);
+    }
+    
+    if (channelIndices[1] > numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.green = 0;
+    } else {
+      color.green = m_pSignalSource->channelValue(channelIndices[1]);
+    }
+    
+    if (channelIndices[2] > numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.blue = 0;
+    } else {
+      color.blue = m_pSignalSource->channelValue(channelIndices[2]);
+    }
+  }
+  
+  fadeColorOfLEDStrip(color);
+}
+
 void CommandExecutor::handleFadeToGrayCommand() {
   rgb_color_t color;
   
@@ -255,6 +316,22 @@ void CommandExecutor::handleFadeToGrayCommand() {
 
 void CommandExecutor::handleFadeToWhiteCommand() {
   fadeColorOfLEDStrip(COLOR_WHITE);
+}
+
+void CommandExecutor::handleJumpCommand() {
+  unsigned long address = nextVarint();
+  
+#ifdef DEBUG
+  Serial.print(F(" Arguments: "));
+  Serial.println(address);
+#endif
+
+  if (address >= 0 && address < INT_MAX) {
+    m_pBytecodeStore->seek(address);
+  } else {
+    SET_ERROR(Errors::INVALID_ADDRESS);
+    stop();
+  }
 }
 
 void CommandExecutor::handleLoopBeginCommand() {
@@ -302,6 +379,7 @@ void CommandExecutor::handleResetClockCommand() {
 }
 
 void CommandExecutor::handleSetBlackCommand() {
+  handleDelayByte();
   setColorOfLEDStrip(COLOR_BLACK);
 }
 
@@ -321,6 +399,57 @@ void CommandExecutor::handleSetColorCommand() {
   Serial.println(color.blue);
 #endif
 
+  handleDelayByte();
+  setColorOfLEDStrip(color);
+}
+
+void CommandExecutor::handleSetColorFromChannelsCommand() {
+  rgb_color_t color;
+  u8 numChannels;
+  u8 channelIndices[3];
+
+  channelIndices[0] = nextByte();
+  channelIndices[1] = nextByte();
+  channelIndices[2] = nextByte();
+  
+#ifdef DEBUG
+  Serial.print(F(" Arguments: "));
+  Serial.print(channelIndices[0]);
+  Serial.print(' ');
+  Serial.print(channelIndices[1]);
+  Serial.print(' ');
+  Serial.println(channelIndices[2]);
+#endif
+
+  if (m_pSignalSource == 0) {
+    SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
+    color.red = color.green = color.blue = 0;
+  } else {
+    numChannels = m_pSignalSource->numChannels();
+    
+    if (channelIndices[0] >= numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.red = 0;
+    } else {
+      color.red = m_pSignalSource->channelValue(channelIndices[0]);
+    }
+    
+    if (channelIndices[1] >= numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.green = 0;
+    } else {
+      color.green = m_pSignalSource->channelValue(channelIndices[1]);
+    }
+    
+    if (channelIndices[2] >= numChannels) {
+      SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
+      color.blue = 0;
+    } else {
+      color.blue = m_pSignalSource->channelValue(channelIndices[2]);
+    }
+  }
+  
+  handleDelayByte();
   setColorOfLEDStrip(color);
 }
 
@@ -334,10 +463,12 @@ void CommandExecutor::handleSetGrayCommand() {
   Serial.println(color.red);
 #endif
 
+  handleDelayByte();
   setColorOfLEDStrip(color);
 }
 
 void CommandExecutor::handleSetWhiteCommand() {
+  handleDelayByte();
   setColorOfLEDStrip(COLOR_WHITE);
 }
 

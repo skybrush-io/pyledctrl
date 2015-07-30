@@ -31,8 +31,22 @@ class BytecodeUploader(object):
             fd = self.port.fdspawn()
 
             self.log("Waiting for device to finish booting...")
-            if self._wait_for_response() != 0:
-                return
+            if not self._wait_for_response():
+                self.log("Device failed to boot.")
+                return False
+
+            self.log("Querying maximum bytecode size...")
+            fd.send(b"c\n")
+            response = self._wait_for_response()
+            if not response.successful:
+                self.log("Failed to query maximum bytecode size.")
+                return False
+
+            max_bytecode_size = int(response.message)
+            if max_bytecode_size < length:
+                self.log("Cannot upload bytecode; maximum allowed size is {0} bytes "
+                         "but we tried to upload {1} bytes.".format(max_bytecode_size, length))
+                return False
 
             self.log("Sending bytecode...")
             fd.send(b"U")
@@ -40,12 +54,11 @@ class BytecodeUploader(object):
             fd.send(chr(length & 0xFF))
             fd.send(bytecode)
             fd.send("\n")
-            response = self._wait_for_response()
-            if response != 0:
-                self.log("Bytecode upload failed.")
-            else:
+            if response.successful:
                 self.log("Bytecode uploaded successfully.")
-            return response
+            else:
+                self.log("Bytecode upload failed.")
+            return response.successful
         finally:
             self.port.close()
 
@@ -64,9 +77,28 @@ class BytecodeUploader(object):
              indicating success.
         """
         fd = self.port.fdspawn()
-        index = fd.expect(["\\+OK\r?\n", "-E(.*)\r?\n"])
+        index = fd.expect(["\\+(.*)\r?\n", "-E(.*)\r?\n"])
         if index:
             self.log("Device returned error code {0}.".format(fd.match.group(1)))
-            return int(fd.match.group(1))
+            return Response.failure(fd.match.group(1))
         else:
-            return 0
+            return Response.success(fd.match.group(1))
+
+
+class Response(object):
+    """Represents a response from the Arduino."""
+
+    @classmethod
+    def failure(cls, message):
+        return cls(message, successful=False)
+
+    @classmethod
+    def success(cls, message):
+        return cls(message, successful=True)
+
+    def __init__(self, message, successful):
+        self.message = message
+        self.successful = bool(successful)
+
+    def __nonzero__(self):
+        return self.successful

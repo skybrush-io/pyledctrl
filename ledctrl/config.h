@@ -20,27 +20,19 @@ extern "C" {
 #define DEBUG 1
 
 /**
- * \def OPERATION_MODE
- *
- * The operation mode of \c ledctrl. 0 means bytecode execution; 1 means RC
- * controller.
- */
-#define OPERATION_MODE 1
-
-/**
  * \def RED_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the red LEDs.
  */
 #define RED_PWM_PIN 6
-	//szigetes PCB config
+
 /**
  * \def GREEN_PWM_PIN
  * 
  * Index of the PWM pin corresponding to the green LEDs.
  */
 #define GREEN_PWM_PIN 9
-	//A szigetes PCB-n a zöld a 9-es pin-en van!!!!!!!!!
+
 /**
  * \def BLUE_PWM_PIN
  * 
@@ -49,17 +41,12 @@ extern "C" {
 #define BLUE_PWM_PIN 5
 
 /**
- * \def HAS_MAIN_SWITCH
- * If you have a switch-button, you should define this; otherwise comment this out.
- */
-#define HAS_MAIN_SWITCH 0
-
-/**
  * \def MAIN_SWITCH_PIN
  * 
  * Analog input corresponding to the main switch.
+ * If you have a switch-button, you should define this; otherwise comment this out.
  */
-#define MAIN_SWITCH_PIN A5
+// #define MAIN_SWITCH_PIN A5
 
 /**
  * \def ENABLE_SERIAL_INPUT
@@ -70,12 +57,12 @@ extern "C" {
 #define ENABLE_SERIAL_INPUT 1
 
 /**
- * \def HAS_VOLTMETER
+ * \def VOLTMETER_PIN
  * 
- * Define this if you have a voltage meter that can be used to compensate
- * the LED brightness. Otherwise comment this out.
+ * Index of the pin corresponding to the voltmeter. Comment this out if
+ * you don't have a voltmeter.
  */
-#define HAS_VOLTMETER 1
+#define VOLTMETER_PIN 5
 
 /**
  * \def VOLTMETER_ACCURACY
@@ -85,13 +72,6 @@ extern "C" {
  * value is stored in our voltmeter class.
  */
 #define VOLTMETER_ACCURACY 5
-
-/**
- * \def VOLTMETER_PIN
- * 
- * Index of the pin corresponding to the voltmeter. Ignored if we have no voltmeter.
- */
-#define VOLTMETER_PIN 5
 
 /**
  * \def LIGHT_COEFF
@@ -115,25 +95,27 @@ extern "C" {
  */
 #define MAX_LOOP_DEPTH 4
 
-	/*
-	* define interrupts
-	*/
-#define PWM_INTERRUPT 0
-#define PPM_INTERRUPT 1
+/**
+ * \def USE_PPM_REMOTE_CONTROLLER
+ * Define this to 1 if you want to read PPM encoded signals from an RC controller.
+ */
+#define USE_PPM_REMOTE_CONTROLLER 1
 
+/**
+ * \def USE_PWM_REMOTE_CONTROLLER
+ * Define this to 1 if you want to read PWM encoded signals from an RC controller.
+ */
+#define USE_PWM_REMOTE_CONTROLLER 0
 
-#define ITNUM 0
-	/**
-	* \def ITNUM
-	* Number of interrapt. (0 or 1)
-	* Arduino Nano has two IT pins.
-	* Interrupt 0 is on digital pin 2, IT1 is on D2
-	*/
-#if ITNUM == 0 //number of interrupt
-#define ITPIN 2 //PIN of Interrupt
-#elif ITNUM == 1
-#define ITPIN 3
-#endif
+/**
+ * \def RC_INTERRUPT
+ * Define this to the index of the interrupt to use for reading the RC controller
+ * signal.
+ * 
+ * The Arduino Nano has two interrupt pins; interrupt 0 is on digital pin 2,
+ * while interrupt 1 is on digital pin 3.
+ */
+#define RC_INTERRUPT 0
 
 /**
  * \def BOARD_MAX_INPUT_VOLTAGE

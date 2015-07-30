@@ -6,8 +6,8 @@
 #include "led.h"
 #include "led_strip.h"
 #include "serial_protocol.h"
+#include "signal_decoders.h"
 #include "switch.h"
-#include "SignalDecoders.h"
 
 
 /**
@@ -20,7 +20,7 @@ LED builtinLed;
  */
 LEDStrip ledStrip(RED_PWM_PIN, GREEN_PWM_PIN, BLUE_PWM_PIN);
 
-#ifdef HAS_MAIN_SWITCH
+#ifdef MAIN_SWITCH_PIN
 /**
  * An optional main switch that can be used to turn off the LED strip and
  * suspend execution.
@@ -28,7 +28,7 @@ LEDStrip ledStrip(RED_PWM_PIN, GREEN_PWM_PIN, BLUE_PWM_PIN);
 Switch mainSwitch(MAIN_SWITCH_PIN);
 #endif
 
-#ifdef HAS_VOLTMETER
+#ifdef VOLTMETER_PIN
 /**
  * A voltmeter.
  */
@@ -51,10 +51,11 @@ CommandExecutor executor(&ledStrip);
 // Set the following macro to the number of the test sequence that you want to start
 // 0 = simple test sequence
 // 1 = testing transition types and easing functions
-// 2 = another simple test sequence
+// 2 = testing jump instruction
 // 3 = writable bytecode in SRAM with no program loaded by default
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
-#define BYTECODE_INDEX 1
+// 5 = LED strip controlled from remote controller, channels 1, 2 and 3
+#define BYTECODE_INDEX 5
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -66,6 +67,20 @@ CommandExecutor executor(&ledStrip);
 #  include "bytecode_empty_writable.h"
 #elif BYTECODE_INDEX == 4
 #  include "bytecode_eeprom.h"
+#elif BYTECODE_INDEX == 5
+#  include "bytecode_rc.h"
+#else
+#  error "Invalid BYTECODE_INDEX value"
+#endif
+
+#if USE_PPM_REMOTE_CONTROLLER
+PPMSignalSource signalSource(RC_INTERRUPT);
+#elif USE_PWM_REMOTE_CONTROLLER
+PWMSignalSource signalSource(RC_INTERRUPT);
+#else
+#  define NUM_FAKE_SIGNAL_PINS 2
+static const u8 signalSourcePins[NUM_FAKE_SIGNAL_PINS] = { A0, A5 };
+DummySignalSource signalSource(NUM_FAKE_SIGNAL_PINS, signalSourcePins);
 #endif
 
 /**
@@ -83,17 +98,15 @@ void setup() {
   // Set up the error handler as early as possible
   ErrorHandler::instance().setErrorLED(&builtinLed);
   
-#ifdef HAS_VOLTMETER
+#ifdef VOLTMETER_PIN
   // Attach the voltage meter to the LED strip
   ledStrip.setVoltmeter(&voltmeter);
 #endif
 
   // Attach to the PPM/PWM interrupts if needed
-  #if PPM_INTERRUPT
-  attachInterrupt(ITNUM, ppmIT, RISING);
-  #elif PWM_INTERRUPT
-  attachInterrupt(ITNUM, pwmIT, CHANGE);
-  #endif
+#if USE_PPM_REMOTE_CONTROLLER || USE_PWM_REMOTE_CONTROLLER
+  signalSource.attachInterruptHandler();
+#endif
   
   // Load the bytecode into the executor. We have to do it here and not
   // before the +OK prompt because errors might already happen here
@@ -102,6 +115,9 @@ void setup() {
   // before the +OK prompt.
   executor.setBytecodeStore(&bytecodeStore);
 
+  // Attach the signal source to the executor
+  executor.setSignalSource(&signalSource);
+  
 #ifdef ENABLE_SERIAL_INPUT
   // Inform the serial protocol parser about the executor so the parser
   // can manipulate it. This is not really nice; a better solution would
@@ -112,6 +128,9 @@ void setup() {
   serialProtocolParser.setCommandExecutor(&executor);
 #endif
 
+  // Reset the clock of the executor now
+  executor.resetClock();
+  
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and
@@ -127,7 +146,7 @@ void setup() {
  * The body of the main loop of the application, executed in an infinite loop.
  */
 void loop() {
-#ifdef HAS_MAIN_SWITCH
+#ifdef MAIN_SWITCH_PIN
   // Check the main switch
   if (!mainSwitch.on()) {
     // Turn off the LEDs
@@ -137,26 +156,18 @@ void loop() {
   }
 #endif
 
-#ifdef HAS_VOLTMETER
+#ifdef VOLTMETER_PIN
   // Update the voltmeter reading
   voltmeter.measure();
 #endif
 
-#if PPM_INTERRUPT
-  PPMsignalToSerial();
-#elif PWM_INTERRUPT
-  //PWMsignalToSerial();
+  // Dump some debug information of the signal source
+#ifdef DEBUG
+  // signalSource.dumpDebugInformation();
 #endif
 
-#if OPERATION_MODE == 0
   // Make a step with the executor
   executor.step();
-#elif OPERATION_MODE == 1
-  // Control the color of the LED strip with PPM signals
-  ledStrip.setColor(LightController(PPMCHANNEL_R), LightController(PPMCHANNEL_G), LightController(PPMCHANNEL_B));
-#else
-#  error "Invalid operation mode constant in config.h
-#endif
 }
 
 #ifdef ENABLE_SERIAL_INPUT
@@ -170,20 +181,6 @@ void serialEvent() {
   }
 }
 #endif
-
-
-void wait(unsigned long ms)
-{
-  uint16_t start = (uint16_t)micros();
-  while (ms > 0)
-  {
-    if (((uint16_t)micros() - start) >= 1000)
-    {
-      ms--;
-      start += 1000;
-    }
-  }
-}
 
 /**
  * \brief Forwards assertion error messages to the serial link.

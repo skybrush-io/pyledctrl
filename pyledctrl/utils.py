@@ -10,6 +10,12 @@ from groundctrl.serial_port import SerialPort
 from pyledctrl.config import DEFAULT_BAUD
 
 
+def ensure_tuple(obj):
+    """Ensures that the given object is a tuple. If it is not a tuple,
+    returns a tuple containing the object only."""
+    return obj if isinstance(obj, tuple) else obj,
+
+
 def error(message, fatal=False):
     """Prints an error message to stderr.
 
