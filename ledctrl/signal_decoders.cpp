@@ -120,10 +120,10 @@ u8 PPMSignalSource::rescalePeriodLengthToByte(long periodLength) {
 #define MAX_PERIOD_LENGTH 1900
   periodLength = (
     constrain(periodLength, MIN_PERIOD_LENGTH, MAX_PERIOD_LENGTH) - MIN_PERIOD_LENGTH
-  ) * (254.0 / (MAX_PERIOD_LENGTH-MIN_PERIOD_LENGTH));
+  ) * (255.0 / (MAX_PERIOD_LENGTH-MIN_PERIOD_LENGTH));
 #undef MIN_PERIOD_LENGTH
 #undef MAX_PERIOD_LENGTH
-  return static_cast<u8>(round(periodLength / 10) * 10);
+  return periodLength;
 }
 
 /*======================================================================================*/

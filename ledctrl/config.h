@@ -96,6 +96,13 @@ extern "C" {
 #define MAX_LOOP_DEPTH 4
 
 /**
+ * \def MAX_TRIGGER_COUNT
+ * 
+ * Maximum number of triggers that the command executor will be able to handle.
+ */
+#define MAX_TRIGGER_COUNT 4
+
+/**
  * \def USE_PPM_REMOTE_CONTROLLER
  * Define this to 1 if you want to read PPM encoded signals from an RC controller.
  */

@@ -6,6 +6,8 @@
 #ifndef EXECUTOR_H
 #define EXECUTOR_H
 
+#include "config.h"
+#include "edge_detector.h"
 #include "errors.h"
 #include "led_strip.h"
 #include "loop_stack.h"
@@ -85,6 +87,12 @@ private:
    * Maintains the time-related state variables of the current transition.
    */
   Transition<LEDStripColorFader> m_transition;
+
+  /**
+   * Auxiliary structure for holding information about the edge detectors
+   * that are used in the triggers.
+   */
+  EdgeDetector m_edgeDetectors[MAX_TRIGGER_COUNT];
   
 public:
   /**
@@ -92,11 +100,7 @@ public:
    * 
    * \param  pLEDStrip  the LED strip that the executor will control
    */
-  explicit CommandExecutor(LEDStrip* pLEDStrip=0)
-    : m_pLEDStrip(pLEDStrip), m_pBytecodeStore(0), m_ended(true),
-      m_ledStripFader(pLEDStrip) {
-    rewind();
-  };
+  explicit CommandExecutor(LEDStrip* pLEDStrip=0);
 
   /**
    * \brief Returns the bytecode store that the executor will use.

@@ -55,7 +55,7 @@ CommandExecutor executor(&ledStrip);
 // 3 = writable bytecode in SRAM with no program loaded by default
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
 // 5 = LED strip controlled from remote controller, channels 1, 2 and 3
-#define BYTECODE_INDEX 5
+#define BYTECODE_INDEX 3
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"

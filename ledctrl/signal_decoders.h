@@ -1,16 +1,7 @@
-<<<<<<< .working
 /**
  * \file signal_decoders.h
  * \brief Decoding of PPM and PWM signals.
  */
-=======
-#define NUMBEROFEDGES 8
-/*
-* \def NUMBEROFEDGES
-* define how many edges are in  an PPM signal-period (8 channel: 8 rising edge and 1 rising edge in the next cycle,
-* which is ndicate the next period and end of current one.
-*/
->>>>>>> .new
 
 #ifndef SIGNAL_DECODERS_H
 #define SIGNAL_DECODERS_H

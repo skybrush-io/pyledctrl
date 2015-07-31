@@ -7,7 +7,7 @@
  * \def MAX_BYTECODE_SIZE
  * Maximum allowed size of the bytecode store.
  */
-#define MAX_BYTECODE_SIZE 1024
+#define MAX_BYTECODE_SIZE 512
 
 u8 bytecode[MAX_BYTECODE_SIZE] = {
   CMD_END

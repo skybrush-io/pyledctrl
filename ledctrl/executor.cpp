@@ -9,6 +9,12 @@
 #include "led_strip.h"
 #include "signal_decoders.h"
 
+CommandExecutor::CommandExecutor(LEDStrip* pLEDStrip) : m_pLEDStrip(pLEDStrip),
+      m_pBytecodeStore(0), m_ended(true), m_ledStripFader(pLEDStrip)
+{
+  rewind();
+};
+
 void CommandExecutor::delayExecutionFor(unsigned long duration) {
   delayExecutionUntil(m_currentCommandStartTime + duration);
 }
@@ -204,7 +210,12 @@ void CommandExecutor::setColorOfLEDStrip(rgb_color_t color) {
 
 unsigned long CommandExecutor::step() {
   unsigned long now = millis();
+
+  // Check the state of the signals being watched in the triggers
+  // TODO
+  // m_edgeDetectors[0].feedAnalogSignal(m_pSignalSource->channelValue(1));
   
+  // Handle the active transition
   if (m_transition.active()) {
     if (!m_transition.step(m_ledStripFader, now)) {
       // Transition not active any more; make sure that the next
@@ -212,7 +223,8 @@ unsigned long CommandExecutor::step() {
       m_ledStripFader.startColor = m_ledStripFader.endColor;
     }
   }
-  
+
+  // If the time has come, execute the next command
   if (now >= m_nextWakeupTime) {
     m_currentCommandStartTime = now;
     executeNextCommand();
