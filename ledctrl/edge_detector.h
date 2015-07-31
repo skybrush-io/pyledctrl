@@ -26,7 +26,7 @@ class EdgeDetector;
 /**
  * Typedef for a callback function of an edge detector.
  */
-typedef void EdgeDetectorCallback(EdgeDetector* detector, long time);
+typedef void EdgeDetectorCallback(EdgeDetector* detector, long time, void* data);
 
 /**
  * Structure holding the callback functions of an edge detector.
@@ -105,6 +105,11 @@ public:
    * Callback functions of the edge detector.
    */
   EdgeDetectorCallbacks callbacks;
+
+  /**
+   * Additional data pointer to pass to the callbacks.
+   */
+  void* callbackData;
   
   /**
    * Constructor.
@@ -115,7 +120,7 @@ public:
    */
   explicit EdgeDetector(u8 midRangeStart=64, u8 midRangeEnd=192, u16 debounceMs=0)
     : m_midRangeStart(midRangeStart), m_midRangeEnd(midRangeEnd),
-    m_debounceMs(debounceMs) {
+    m_debounceMs(debounceMs), callbackData(0) {
     reset();
   }
 
@@ -227,7 +232,7 @@ private:
   void handleFallingEdge(long time) {
     m_lastTransition = time;
     if (callbacks.falling != 0) {
-      callbacks.falling(this, time);
+      callbacks.falling(this, time, callbackData);
     }
   }
 
@@ -237,7 +242,7 @@ private:
   void handleRisingEdge(long time) {
     m_lastTransition = time;
     if (callbacks.rising != 0) {
-      callbacks.rising(this, time);
+      callbacks.rising(this, time, callbackData);
     }
   }
 };

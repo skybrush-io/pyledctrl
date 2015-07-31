@@ -10,6 +10,7 @@
 extern "C" {
 #endif
 
+#include <Arduino.h>
 #include <stdint.h>
 
 typedef int8_t s8;

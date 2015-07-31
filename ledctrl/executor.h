@@ -7,11 +7,11 @@
 #define EXECUTOR_H
 
 #include "config.h"
-#include "edge_detector.h"
 #include "errors.h"
 #include "led_strip.h"
 #include "loop_stack.h"
 #include "transition.h"
+#include "trigger.h"
 #include "types.h"
 
 class BytecodeStore;
@@ -89,10 +89,9 @@ private:
   Transition<LEDStripColorFader> m_transition;
 
   /**
-   * Auxiliary structure for holding information about the edge detectors
-   * that are used in the triggers.
+   * Auxiliary structure for holding information about the triggers in the code.
    */
-  EdgeDetector m_edgeDetectors[MAX_TRIGGER_COUNT];
+  Trigger m_triggers[MAX_TRIGGER_COUNT];
   
 public:
   /**
@@ -168,7 +167,12 @@ public:
    */
   void stop();
   
-protected:
+private:
+  /**
+   * \brief Checks and fires the active triggers if needed.
+   */
+  void checkAndFireTriggers();
+  
   /**
    * \brief Delays the execution of the commands for the given duration,
    *        relative to the current time.

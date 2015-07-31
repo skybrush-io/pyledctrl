@@ -15,6 +15,13 @@ CommandExecutor::CommandExecutor(LEDStrip* pLEDStrip) : m_pLEDStrip(pLEDStrip),
   rewind();
 };
 
+void CommandExecutor::checkAndFireTriggers() {
+  int i, n = MAX_TRIGGER_COUNT;
+  for (i = 0; i < n; i++) {
+    m_triggers[i].checkAndFireWhenNeeded();
+  }
+}
+
 void CommandExecutor::delayExecutionFor(unsigned long duration) {
   delayExecutionUntil(m_currentCommandStartTime + duration);
 }
@@ -212,8 +219,7 @@ unsigned long CommandExecutor::step() {
   unsigned long now = millis();
 
   // Check the state of the signals being watched in the triggers
-  // TODO
-  // m_edgeDetectors[0].feedAnalogSignal(m_pSignalSource->channelValue(1));
+  checkAndFireTriggers();
   
   // Handle the active transition
   if (m_transition.active()) {

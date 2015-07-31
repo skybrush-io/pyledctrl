@@ -6,6 +6,7 @@
 #ifndef SIGNAL_DECODERS_H
 #define SIGNAL_DECODERS_H
 
+#include <assert.h>
 #include "config.h"
 
 /**
