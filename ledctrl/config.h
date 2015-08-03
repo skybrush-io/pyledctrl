@@ -49,6 +49,14 @@ extern "C" {
 // #define MAIN_SWITCH_PIN A5
 
 /**
+ * \def START_SIGNAL_CHANNEL
+ * 
+ * RC channel index on which the start signal will be transmitted.
+ * Comment this out if you want the bytecode to start immediately.
+ */
+#define START_SIGNAL_CHANNEL 1
+
+/**
  * \def ENABLE_SERIAL_INPUT
  * 
  * Whether the LED controller should listen for incoming commands on the

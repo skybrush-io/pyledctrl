@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "commands.h"
+#include "edge_detector.h"
 #include "executor.h"
 #include "led.h"
 #include "led_strip.h"
@@ -55,7 +56,7 @@ CommandExecutor executor(&ledStrip);
 // 3 = writable bytecode in SRAM with no program loaded by default
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
 // 5 = LED strip controlled from remote controller, channels 1, 2 and 3
-#define BYTECODE_INDEX 5
+#define BYTECODE_INDEX 0
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -81,6 +82,15 @@ PWMSignalSource signalSource(RC_INTERRUPT);
 #  define NUM_FAKE_SIGNAL_PINS 2
 static const u8 signalSourcePins[NUM_FAKE_SIGNAL_PINS] = { A0, A5 };
 DummySignalSource signalSource(NUM_FAKE_SIGNAL_PINS, signalSourcePins);
+#endif
+
+#ifdef START_SIGNAL_CHANNEL
+bool seenStartSignal;
+EdgeDetector startSignalEdgeDetector;
+
+void startSignalCallback(EdgeDetector* detector, long time, void* data) {
+  seenStartSignal = true;
+}
 #endif
 
 /**
@@ -131,6 +141,13 @@ void setup() {
   // Reset the clock of the executor now
   executor.resetClock();
   
+#ifdef START_SIGNAL_CHANNEL
+  seenStartSignal = false;
+  startSignalEdgeDetector.callbacks.rising = startSignalCallback;
+  startSignalEdgeDetector.callbacks.falling = startSignalCallback;
+  startSignalEdgeDetector.reset();
+#endif
+
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and
@@ -146,6 +163,16 @@ void setup() {
  * The body of the main loop of the application, executed in an infinite loop.
  */
 void loop() {
+#ifdef START_SIGNAL_CHANNEL
+  if (!seenStartSignal) {
+    // Feed the edge detector of the start signal if we haven't seen the signal
+    // yet. The callback function of the edge detector will set the seenStartSignal
+    // flag when an appropriate edge is detected.
+    startSignalEdgeDetector.feedAnalogSignal(signalSource.channelValue(START_SIGNAL_CHANNEL));
+    return;
+  }
+#endif
+
 #ifdef MAIN_SWITCH_PIN
   // Check the main switch
   if (!mainSwitch.on()) {
