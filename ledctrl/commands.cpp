@@ -19,7 +19,7 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
    * Arguments: duration (varint)
    */
   {
-    .arg_count = ARG_VARINT
+    .arg_count = LAST_ARG_IS_VARINT(1)
   },
   /* 0x04 = CMD_SET_COLOR
    * Arguments: red, green, blue, duration
@@ -83,11 +83,9 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
   {
     .arg_count = 0
   },
-  /* 0x0F = CMD_JUMP
-   * Arguments: address (varint)
-   */
+  /* 0x0F is unused */
   {
-    .arg_count = ARG_VARINT
+    .arg_count = 0
   },
   /* 0x10 = CMD_SET_COLOR_FROM_CHANNELS
    * Arguments: red channel, green channel, blue channel, duration
@@ -100,5 +98,27 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
    */
   {
     .arg_count = 5
-  }
+  },
+  /* 0x12 = CMD_JUMP
+   * Arguments: address (varint)
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(1)
+  },
+  /* 0x13 = CMD_TRIGGERED_JUMP
+   * Arguments: trigger parameters, address (varint)
+   * 
+   * Trigger parameters are encoded in a byte as follows:
+   * 
+   * xSRFCCCC
+   * 
+   * where CCCC is the index of the channel,
+   * S is set to 1 if the trigger is one-shot and 0 if it is permanent,
+   * R is set to 1 if the trigger should respond to the rising edge,
+   * F is set to 1 if the trigger should respond to the falling edge.
+   * Triggers can be cleared by setting both R and F to 0.
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(1)
+  },
 };

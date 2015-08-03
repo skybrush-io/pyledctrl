@@ -17,8 +17,12 @@ CommandExecutor::CommandExecutor(LEDStrip* pLEDStrip) : m_pLEDStrip(pLEDStrip),
 
 void CommandExecutor::checkAndFireTriggers() {
   int i, n = MAX_TRIGGER_COUNT;
+  bool fired;
   for (i = 0; i < n; i++) {
-    m_triggers[i].checkAndFireWhenNeeded();
+    fired = m_triggers[i].checkAndFireWhenNeeded();
+    if (fired) {
+      executeActionOfTrigger(&m_triggers[i]);
+    }
   }
 }
 
@@ -28,6 +32,27 @@ void CommandExecutor::delayExecutionFor(unsigned long duration) {
 
 void CommandExecutor::delayExecutionUntil(unsigned long ms) {
   m_nextWakeupTime = ms;
+}
+
+void CommandExecutor::executeActionOfTrigger(const Trigger* trigger) {
+  assert(trigger != 0);
+
+  TriggerAction action = trigger->action();
+  
+  switch (action.type) {
+    case TriggerActionType::RESUME:
+      m_pBytecodeStore->resume();
+      break;
+
+    case TriggerActionType::JUMP_TO_ADDRESS:
+      Serial.print(" Triggered jump to address ");
+      Serial.println(action.arguments.address);
+      m_pBytecodeStore->seek(action.arguments.address);
+      break;
+
+    default:
+      SET_ERROR(Errors::INVALID_TRIGGER_ACTION_TYPE);
+  }
 }
 
 void CommandExecutor::executeNextCommand() {
@@ -130,6 +155,21 @@ void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
   m_transition.setEasingMode(easingMode);
   m_transition.start(duration, m_currentCommandStartTime);
   m_transition.step(m_ledStripFader);
+}
+
+Trigger* CommandExecutor::findTriggerForChannelIndex(u8 channelIndex) {
+  u8 index;
+  u8 freeTriggerIndex = 255;
+
+  for (index = 0; index < MAX_TRIGGER_COUNT; index++) {
+    if (m_triggers[index].channelIndex() == channelIndex) {
+      return &m_triggers[index];
+    } else if (freeTriggerIndex == 255 && !m_triggers[index].active()) {
+      freeTriggerIndex = index;
+    }
+  }
+
+  return freeTriggerIndex < 255 ? &m_triggers[freeTriggerIndex] : 0;
 }
 
 unsigned long CommandExecutor::handleDelayByte() {
@@ -493,6 +533,66 @@ void CommandExecutor::handleSetWhiteCommand() {
 
 void CommandExecutor::handleSleepCommand() {
   handleDelayByte();
+}
+
+void CommandExecutor::handleTriggeredJumpCommand() {
+  u8 triggerParams = nextByte();
+  unsigned long address;
+  u8 channelIndex;
+  u8 edge;
+  u8 willNeedAddress;
+  Trigger* pTrigger;
+
+  // First let's check whether we'll need an address in the next byte(s).
+  // We need that if either the R or the F bit is set in the triggerParams
+  if (triggerParams & 0x10) {
+    if (triggerParams & 0x20) {
+      edge = CHANGE;
+    } else {
+      edge = FALLING;
+    }
+  } else {
+    if (triggerParams & 0x20) {
+      edge = RISING;
+    } else {
+      edge = 0;
+    }
+  }
+  willNeedAddress = (edge != 0);
+  if (willNeedAddress) {
+    address = nextVarint();
+  }
+
+  // Also extract the channel index
+  channelIndex = triggerParams & 0x0F;
+  
+#ifdef DEBUG
+  Serial.print(F(" Arguments: "));
+  Serial.println(triggerParams);
+  if (willNeedAddress) {
+    Serial.println(address);
+  }
+#endif
+
+  // Validate the address and send an error signal if it is invalid
+  if (willNeedAddress && (address < 0 || address >= INT_MAX)) {
+    SET_ERROR(Errors::INVALID_ADDRESS);
+    stop();
+  }
+
+  // Find the trigger corresponding to the channel
+  pTrigger = findTriggerForChannelIndex(channelIndex);
+  if (pTrigger == 0) {
+    SET_ERROR(Errors::NO_MORE_AVAILABLE_TRIGGERS);
+    stop();
+  }
+
+  pTrigger->watchChannel(m_pSignalSource, channelIndex, edge);
+  if (triggerParams & 0x40) {
+    pTrigger->setOneShotMode();
+  } else {
+    pTrigger->setPermanentMode();
+  }
 }
 
 void CommandExecutor::handleWaitUntilCommand() {

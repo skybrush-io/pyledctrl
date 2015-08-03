@@ -32,9 +32,11 @@ typedef enum {
   CMD_LOOP_BEGIN,                  /**< 0x0C = Mark the beginning of a loop */
   CMD_LOOP_END,                    /**< 0x0D = Mark the end of a loop */
   CMD_RESET_CLOCK,                 /**< 0x0E = Reset the internal clock */
-  CMD_JUMP,                        /**< 0x0F = Jump to address */
+  CMD_UNUSED_1,
   CMD_SET_COLOR_FROM_CHANNELS,     /**< 0x10 = Set color from channels */
   CMD_FADE_TO_COLOR_FROM_CHANNELS, /**< 0x11 = Fade to color from channels */
+  CMD_JUMP,                        /**< 0x12 = Jump to address */
+  CMD_TRIGGERED_JUMP,              /**< 0x13 = Triggered jump to address */
   NUMBER_OF_COMMANDS,
 } command_t;
 
@@ -50,10 +52,10 @@ typedef struct {
 
 /**
  * Special constant that is used in the \c arg_count member of
- * \c command_info_t to denote a command that uses a single variable-length
- * int as its argument.
+ * \c command_info_t to denote a command that uses a given number of arguments,
+ * the last of which is variable-length.
  */
-#define ARG_VARINT 255
+#define LAST_ARG_IS_VARINT(x) ((x) + 127)
 
 /**
  * Array that holds information for each of the commands that we support.

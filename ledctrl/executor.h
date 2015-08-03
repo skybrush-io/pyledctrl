@@ -196,6 +196,13 @@ private:
    * \param  ms  the desired value of the internal clock to wait for
    */
   void delayExecutionUntil(unsigned long ms);
+
+  /**
+   * \brief Executes the action prescribed by the given trigger.
+   * 
+   * This function must be called after the trigger fired.
+   */
+  void executeActionOfTrigger(const Trigger* trigger);
   
   /**
    * \brief Executes the next command from the bytecode.
@@ -212,6 +219,21 @@ private:
    */
   void fadeColorOfLEDStrip(rgb_color_t color);
 
+  /**
+   * \brief Finds a trigger that will handle the given channel.
+   * 
+   * When the channel already had a previous trigger, this function
+   * will return the same trigger. When the channel did not have a trigger
+   * before, this function will find a free trigger slot and return
+   * that. When there are no more free trigger slots, the function
+   * returns NULL.
+   * 
+   * \param   channelIndex  index of the channel
+   * \return  pointer to the trigger slot that will handle the given channel,
+   *          or \c NULL if there are no more available trigger slots.
+   */
+  Trigger* findTriggerForChannelIndex(u8 channelIndex);
+  
   /**
    * \brief Interprets the next byte from the bytecode as a duration and
    *        sets the next wakeup time of the executor appropriately. 
@@ -301,6 +323,11 @@ private:
    * \brief Handles the execution of \c CMD_SLEEP commands.
    */
   void handleSleepCommand();
+
+  /**
+   * \brief Handles the execution of \c CMD_TRIGGERED_JUMP commands.
+   */
+  void handleTriggeredJumpCommand();
   
   /**
    * \brief Handles the execution of \c CMD_WAIT_UNTIL commands.

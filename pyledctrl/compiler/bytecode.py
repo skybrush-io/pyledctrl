@@ -22,7 +22,10 @@ class CommandCode(object):
     LOOP_BEGIN = b'\x0C'
     LOOP_END = b'\x0D'
     RESET_TIMER = b'\x0E'
-    JUMP = b'\x0F'
+    SET_COLOR_FROM_CHANNELS = b'\x10'
+    FADE_COLOR_FROM_CHANNELS = b'\x11'
+    JUMP = b'\x12'
+    TRIGGERED_JUMP = b'\x13'
 
 
 class EasingMode(object):

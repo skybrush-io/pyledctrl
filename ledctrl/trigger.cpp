@@ -8,16 +8,16 @@ static void fireTrigger(EdgeDetector* detector, long time, void* data) {
   }
 }
 
-Trigger::Trigger() : m_pSignalSource(0), m_channelIndex(0), m_edgeDetector() {
+Trigger::Trigger() : m_pSignalSource(0), m_channelIndex(0), m_edgeDetector(), m_oneShotMode(0) {
   m_edgeDetector.callbackData = this;
 }
 
-void Trigger::checkAndFireWhenNeeded() {
+bool Trigger::checkAndFireWhenNeeded() {
   if (m_pSignalSource == 0)
-    return;
+    return false;
 
   u8 value = m_pSignalSource->channelValue(m_channelIndex);
-  m_edgeDetector.feedAnalogSignal(value);
+  return m_edgeDetector.feedAnalogSignal(value);
 }
 
 void Trigger::disable() {
@@ -28,9 +28,20 @@ void Trigger::disable() {
 }
 
 void Trigger::fire() {
-  Serial.println("Trigger fired!");  
+  /* disable the trigger if it was in one-shot mode */
+  if (m_oneShotMode) {
+    disable();
+  }
 }
 
+void Trigger::setOneShotMode() {
+  m_oneShotMode = true;
+}
+  
+void Trigger::setPermanentMode() {
+  m_oneShotMode = false;
+}
+  
 void Trigger::watchChannel(const SignalSource* signalSource, u8 channelIndex, u8 edge) {
   m_pSignalSource = signalSource;
   m_channelIndex = signalSource ? channelIndex : 0;

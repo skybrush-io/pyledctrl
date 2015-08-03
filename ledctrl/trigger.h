@@ -11,6 +11,26 @@
 class SignalSource;
 
 /**
+ * Enum that describes the set of actions that may happen when a trigger is fired.
+ */
+namespace TriggerActionType {
+  enum Enum {
+    RESUME,                 ///< Resume execution (if the trigger suspended execution)
+    JUMP_TO_ADDRESS,        ///< Jump to a given address    
+  };
+};
+
+/**
+ * Struct that fully describes an action that may happen when a trigger is fired.
+ */
+typedef struct {
+  TriggerActionType::Enum type;       ///< The type of the action
+  union {
+    uint16_t address;                 ///< The jump address for a JUMP_TO_ADDRESS action
+  } arguments;
+} TriggerAction;
+
+/**
  * \brief Trigger implementation for the bytecode executor.
  * 
  * Bytecode executors may have up to a given number of triggers, where each
@@ -26,6 +46,11 @@ private:
   const SignalSource* m_pSignalSource;
 
   /**
+   * The action to perform when the trigger is fired.
+   */
+  TriggerAction m_action;
+  
+  /**
    * The index of the channel in the signal source that the trigger is watching.
    */
   u8 m_channelIndex;
@@ -35,6 +60,11 @@ private:
    */
   EdgeDetector m_edgeDetector;
 
+  /**
+   * Whether the trigger is in one-shot mode.
+   */
+  bool m_oneShotMode;
+  
 public:
   /**
    * Constructor.
@@ -49,10 +79,26 @@ public:
   } 
 
   /**
+   * Returns the action to be executed by the trigger.
+   */
+  TriggerAction action() const {
+    return m_action;
+  }
+
+  /**
+   * Returns the index of the channel watched by this trigger.
+   */
+  u8 channelIndex() const {
+    return m_channelIndex;
+  }
+  
+  /**
    * Asks the trigger to check the state of the signal being watched (if any)
    * and fire if needed.
+   * 
+   * \return  \c true if the trigger fired, \c false otherwise
    */
-  void checkAndFireWhenNeeded();
+  bool checkAndFireWhenNeeded();
   
   /**
    * Disables the trigger.
@@ -63,6 +109,18 @@ public:
    * Fires the trigger unconditionally.
    */
   void fire();
+
+  /**
+   * Sets the trigger to one-shot mode. Triggers in one-shot mode deactivate
+   * themselves automatically after they fire.
+   */
+  void setOneShotMode();
+  
+  /**
+   * Sets the trigger to permanent mode. Triggers in permanent mode stay
+   * activated after they fire.
+   */
+  void setPermanentMode();
   
   /**
    * Asks the trigger to watch the given channel of the given signal source

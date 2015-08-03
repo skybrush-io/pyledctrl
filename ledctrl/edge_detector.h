@@ -142,9 +142,10 @@ public:
    * Feeds the edge detector with the current state of the analog signal.
    *
    * \param  signal  the current state of the analog signal
+   * \return whether at least one callback function was fired
    */
-  void feedAnalogSignal(u8 signal) {
-    feedAnalogSignal(signal, millis());
+  bool feedAnalogSignal(u8 signal) {
+    return feedAnalogSignal(signal, millis());
   }
 
   /**
@@ -156,11 +157,14 @@ public:
    *
    * \param  signal  the current state of the analog signal
    * \param  time    the timestamp
+   * \return whether at least one callback function was fired
    */
-  void feedAnalogSignal(u8 signal, long time) {
+  bool feedAnalogSignal(u8 signal, long time) {
+    bool result = false;
+    
     if (m_debounceMs > 0 && m_lastTransition + m_debounceMs < time) {
       // Debounce filter active; do nothing.
-      return;
+      return false;
     }
 
     switch (m_state) {
@@ -178,7 +182,7 @@ public:
       case EdgeDetectorState::SIGNAL_LOW:
         if (signal >= m_midRangeEnd) {
           m_state = EdgeDetectorState::SIGNAL_HIGH;
-          handleRisingEdge(time);
+          result = handleRisingEdge(time);
         }
         break;
 
@@ -190,7 +194,7 @@ public:
       case EdgeDetectorState::SIGNAL_HIGH:
         if (signal < m_midRangeStart) {
           m_state = EdgeDetectorState::SIGNAL_LOW;
-          handleFallingEdge(time);
+          result = handleFallingEdge(time);
         }
         break;
 
@@ -204,6 +208,8 @@ public:
         reset();
         break;
     }
+
+    return result;
   }
 
   /**
@@ -228,22 +234,28 @@ public:
 private:
   /**
    * Handles a falling edge detected on the input signal at the given time.
+   * 
+   * \return whether the falling edge clalback function was called. 
    */
-  void handleFallingEdge(long time) {
+  bool handleFallingEdge(long time) {
     m_lastTransition = time;
     if (callbacks.falling != 0) {
       callbacks.falling(this, time, callbackData);
+      return true;
     }
+    return false;
   }
 
   /**
    * Handles a rising edge detected on the input signal at the given time.
    */
-  void handleRisingEdge(long time) {
+  bool handleRisingEdge(long time) {
     m_lastTransition = time;
     if (callbacks.rising != 0) {
       callbacks.rising(this, time, callbackData);
+      return true;
     }
+    return false;
   }
 };
 

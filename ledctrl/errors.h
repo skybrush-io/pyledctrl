@@ -23,6 +23,8 @@ namespace Errors {
     NO_BYTECODE_IN_EEPROM,             /**< No bytecode has been uploaded to the EEPROM yet */
     INVALID_ADDRESS,                   /**< Invalid jump address found in bytecode */
     INVALID_CHANNEL_INDEX,             /**< Invalid channel index found in bytecode */
+    INVALID_TRIGGER_ACTION_TYPE,       /**< Invalid trigger action type found while executing a trigger */
+    NO_MORE_AVAILABLE_TRIGGERS,        /**< No more available triggers */
     NUMBER_OF_ERRORS
   };
 }
