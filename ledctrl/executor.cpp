@@ -346,6 +346,7 @@ void CommandExecutor::handleJumpCommand() {
 
   if (address >= 0 && address < INT_MAX) {
     m_pBytecodeStore->seek(address);
+    m_loopStack.clear();
   } else {
     SET_ERROR(Errors::INVALID_ADDRESS);
     stop();

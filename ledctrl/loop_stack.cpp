@@ -31,14 +31,14 @@ const bytecode_location_t LoopStack::end() {
       m_pTopItem->iterationsLeftPlusOne = 0;
       m_pTopItem = (m_pTopItem == m_items) ? 0 : m_pTopItem-1;
       m_numLoops--;
-      return 0;
+      return BYTECODE_LOCATION_NOWHERE;
     } else {
       /* We still have some iterations */
       m_pTopItem->iterationsLeftPlusOne--;
       return m_pTopItem->start;
     }
   } else {
-    return 0;
+    return BYTECODE_LOCATION_NOWHERE;
   }
 }
 
