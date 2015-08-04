@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <assert.h>
 #include <avr/eeprom.h>
+#include <avr/pgmspace.h>
 #include <stdint.h>
 #include "commands.h"
 #include "errors.h"
@@ -54,7 +55,7 @@ public:
    * that one can write into it. Read-only bytecode stores should report a
    * capacity of zero.
    */
-  virtual int capacity() const = 0;
+  virtual unsigned int capacity() const = 0;
   
   /**
    * \brief Returns whether the store is empty.
@@ -174,7 +175,7 @@ public:
     return m_bytecode;
   }
 
-  int capacity() const {
+  unsigned int capacity() const {
     return 0;
   }
   
@@ -186,7 +187,7 @@ public:
    * \brief Loads the given bytecode into the store.
    * 
    * Note that the memory area holding the bytecode is \em not copied into
-   * the executor; it is the responsibility of the caller to manage the
+   * the bytecode store; it is the responsibility of the caller to manage the
    * memory occupied by the bytecode and free it when it is not needed
    * any more.
    * 
@@ -254,7 +255,7 @@ public:
    * \param  bytecode  pointer to the start of the memory block in SRAM where
    *                   the bytecode is stored.
    */
-  explicit SRAMBytecodeStore(u8* bytecode=0, int capacity=0) : BytecodeStore() {
+  explicit SRAMBytecodeStore(u8* bytecode=0, unsigned int capacity=0) : BytecodeStore() {
     load(bytecode, capacity);
   }
 
@@ -266,7 +267,7 @@ public:
     return m_bytecode;
   }
 
-  int capacity() const {
+  unsigned int capacity() const {
     return m_capacity;
   }
   
@@ -288,7 +289,7 @@ public:
    *                   in bytes. Ignored and assumed to be zero if \c bytecode
    *                   is \c NULL
    */
-  void load(u8* bytecode, int capacity) {
+  void load(u8* bytecode, unsigned int capacity) {
     m_bytecode = bytecode;
     m_capacity = bytecode ? capacity : 0;
     rewind();
@@ -357,7 +358,7 @@ public:
    *                     the magic byte sequence at the start.
    * \param  capacity    The capacity of the bytecode store
    */
-  explicit EEPROMBytecodeStore(int startIndex=0, int capacity=0)
+  explicit EEPROMBytecodeStore(int startIndex=0, unsigned int capacity=0)
     : BytecodeStore(), m_startIndex(startIndex), m_capacity(capacity) {
     rewind();
   }
@@ -370,7 +371,7 @@ public:
     return m_startIndex;
   }
 
-  int capacity() const {
+  unsigned int capacity() const {
     return m_capacity;
   }
   
@@ -451,6 +452,97 @@ private:
     if (nextByte() != 0xCA)
       return false;
     return nextByte() == 0xFE;
+  }
+};
+
+/**
+ * Provides access to bytecode stored in a constant in PROGMEM.
+ */
+class PROGMEMBytecodeStore : public BytecodeStore {
+private:
+  /** 
+   * Pointer to the start of the memory block in PROGMEM where the bytecode
+   * is stored.
+   */
+  const u8* m_bytecode;
+
+  /**
+   * Pointer to the current location within the bytecode.
+   */
+  const u8* m_pNextCommand;
+
+public:
+  /**
+   * Constructor.
+   * 
+   * \param  bytecode  pointer to the start of the memory block in PROGMEM where
+   *                   the bytecode is stored.
+   */
+  explicit PROGMEMBytecodeStore(const u8* bytecode=0) : BytecodeStore() {
+    load(bytecode);
+  }
+
+  /**
+   * Returns a pointer to the start of the memory block where the bytecode
+   * is stored.
+   */
+  const u8* begin() const {
+    return m_bytecode;
+  }
+
+  unsigned int capacity() const {
+    return 0;
+  }
+  
+  bool empty() const {
+    return m_bytecode == 0;
+  }
+  
+  /**
+   * \brief Loads the given bytecode into the store.
+   * 
+   * Note that the memory area holding the bytecode is \em not copied into
+   * the bytecode store; it is the responsibility of the caller to manage the
+   * memory occupied by the bytecode and free it when it is not needed
+   * any more.
+   * 
+   * \param  bytecode  the bytecode to be loaded. \c NULL is supported; passing
+   *                   \c NULL here simply unloads the previous bytecode.
+   */
+  void load(const u8* bytecode) {
+    m_bytecode = bytecode;
+    rewind();
+  }
+  
+  u8 next() {
+    u8 result;
+    
+    if (suspended()) {
+      return CMD_NOP;
+    } else {
+      assert(m_pNextCommand != 0);
+      result = pgm_read_byte_near(m_pNextCommand);
+      m_pNextCommand++;
+      return result;
+    }
+  }
+
+  void rewind() {
+    m_pNextCommand = m_bytecode;
+  }
+
+  void seek(bytecode_location_t location) {
+    assert(location >= 0);
+    m_pNextCommand = m_bytecode + location;
+  }
+  
+  bytecode_location_t tell() const {
+    bytecode_location_t location = m_pNextCommand - m_bytecode;
+    return location < 0 ? BYTECODE_LOCATION_NOWHERE : location;
+  }
+
+  int write(u8 value) {
+    return 0;
   }
 };
 
