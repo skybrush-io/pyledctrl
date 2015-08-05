@@ -5,7 +5,8 @@ import os
 
 from .errors import CompilerError, UnsupportedInputFileFormatError
 from .stages import SunliteSceneToPythonSourceCompilationStage, \
-    PythonSourceToBytecodeCompilationStage
+    PythonSourceToBytecodeCompilationStage, \
+    BytecodeToProgmemHeaderCompilationStage
 
 
 class BytecodeCompiler(object):
@@ -78,8 +79,14 @@ class BytecodeCompiler(object):
 
         # Add the stages based on the extension of the output file
         if output_ext == ".h":
-            # We need to generate a PROGMEM header file
-            raise NotImplementedError
+            # We need to generate a PROGMEM header file for each bytecode file
+            for index, stage in reversed(list(enumerate(plan))):
+                if isinstance(stage, PythonSourceToBytecodeCompilationStage):
+                    output_file = stage.output
+                    stage.output = output_file.replace(".h", ".bin")
+                    new_stage = BytecodeToProgmemHeaderCompilationStage(
+                        stage.output, output_file)
+                    plan.insert(index+1, new_stage)
         else:
             # We are okay with the stages that we have now
             return

@@ -5,8 +5,8 @@ from __future__ import print_function
 import glob
 import sys
 
-
 from groundctrl.serial_port import SerialPort
+from itertools import islice
 from pyledctrl.config import DEFAULT_BAUD
 
 
@@ -59,3 +59,22 @@ def get_serial_connection(port, baud=None):
     """
     return SerialPort(port=get_serial_port_filename(port),
                       baud=baud or DEFAULT_BAUD)
+
+
+def grouper(iterable, n):
+    """Iterates over the given iterable in chunks of n items."""
+    it = iter(iterable)
+    while True:
+        chunk = tuple(islice(it, n))
+        if not chunk:
+            return
+        yield chunk
+
+
+def iterbytes(fp):
+    """Iterates over the bytes of a file-like object."""
+    while True:
+        b = fp.read(1)
+        if not b:
+            return
+        yield b

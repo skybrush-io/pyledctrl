@@ -221,6 +221,11 @@ def set_white(duration=None):
     return CommandCode.SET_WHITE, duration
 
 
+def sleep(duration):
+    duration = _to_duration(duration)
+    return CommandCode.SLEEP, duration
+
+
 def loop_begin(body, iterations=None):
     return CommandCode.LOOP_BEGIN, _to_char(iterations)
 
@@ -255,10 +260,15 @@ def _to_duration(seconds):
 def _to_varint(value):
     """Converts the given numeric value into its varint representation."""
     result = []
-    while value > 0:
-        if value < 128:
-            result.append(value)
-        else:
-            result.append((value & 0x7F) + 0x80)
-        value >>= 7
+    if value < 0:
+        raise ValueError("negative varints are not supported")
+    elif value == 0:
+        result = [0]
+    else:
+        while value > 0:
+            if value < 128:
+                result.append(value)
+            else:
+                result.append((value & 0x7F) + 0x80)
+            value >>= 7
     return bytes(bytearray(result))

@@ -94,7 +94,8 @@ class ExecutionContext(object):
             "set_black": wrapper_for(bytecode.set_black),
             "set_color": wrapper_for(bytecode.set_color),
             "set_gray": wrapper_for(bytecode.set_gray),
-            "set_white": wrapper_for(bytecode.set_white)
+            "set_white": wrapper_for(bytecode.set_white),
+            "sleep": wrapper_for(bytecode.sleep)
         }
         aliases = dict(off="set_black", on="set_white", goto="jump")
         for alias, func in aliases.items():
