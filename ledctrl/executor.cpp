@@ -148,8 +148,8 @@ void CommandExecutor::executeNextCommand() {
 }
 
 void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
+  EasingMode easingMode = EASING_LINEAR;
   unsigned long duration = handleDelayByte();
-  EasingMode easingMode = handleEasingModeByte();
   
   m_ledStripFader.endColor = color;
   m_transition.setEasingMode(easingMode);
@@ -202,25 +202,8 @@ u8 CommandExecutor::nextByte() {
 }
 
 unsigned long CommandExecutor::nextDuration() {
-  u8 encodedDuration = nextByte();
-  unsigned long duration;
-  
-  /* If the two most significant bits are 1, the remaining six bits
-   * denote units of 1/50-th of a second.
-   */
-  if ((encodedDuration & 0xC0) == 0xC0) {
-    /* 1/50 sec = 20 msec
-     * x*20 = x*16 + x*4 = (x << 4) + (x << 2)
-     */
-    encodedDuration &= 0x3F;
-    duration = encodedDuration & 0x3F;
-    duration = (duration << 4) + (duration << 2);
-  } else {
-    /* The value denotes whole seconds */
-    duration = encodedDuration * 1000;
-  }
-
-  return duration;
+  unsigned long durationInHalfFrames = nextVarint();
+  return durationInHalfFrames * 20;
 }
 
 unsigned long CommandExecutor::nextVarint() {
@@ -246,6 +229,7 @@ void CommandExecutor::rewind() {
   }
   m_loopStack.clear();
   CLEAR_ERROR();
+  resetClock();
   delayExecutionFor(0);
 }
 
@@ -434,7 +418,7 @@ void CommandExecutor::handleLoopEndCommand() {
 }
 
 void CommandExecutor::handleResetClockCommand() {
-  resetClock();
+  setClockOriginToTimestamp(m_currentCommandStartTime);
 }
 
 void CommandExecutor::handleSetBlackCommand() {

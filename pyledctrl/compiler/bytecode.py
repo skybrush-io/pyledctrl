@@ -3,7 +3,8 @@
 from __future__ import absolute_import
 
 from .colors import parse_color
-from .errors import InvalidDurationError, MarkerNotResolvableError
+from .errors import InvalidDurationError, MarkerNotResolvableError, \
+    FeatureNotImplementedError
 
 
 class CommandCode(object):
@@ -71,6 +72,16 @@ class EasingMode(object):
         return getattr(cls, spec)
 
 
+def _check_easing_is_supported(easing):
+    """Checks whether the given easing mode is supported.
+
+    Raises:
+        FeatureNotImplementedError: if the easing mode is not supported
+    """
+    if easing is not EasingMode.LINEAR:
+        raise FeatureNotImplementedError("only linear easing is supported")
+
+
 class Marker(object):
     """Superclass for marker objects placed in the bytecode stream that are
     resolved to actual bytecode in a later compilation stage."""
@@ -131,9 +142,10 @@ def end():
 
 
 def fade_to_black(duration=None, easing=None):
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_BLACK, duration, easing
+    _check_easing_is_supported(easing)
+    return CommandCode.FADE_TO_BLACK, duration
 
 
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
@@ -142,9 +154,10 @@ def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
     if red == green and green == blue:
         return fade_to_gray(red, duration, easing)
     rgb_code = _to_char(red, green, blue)
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_COLOR, rgb_code, duration, easing
+    _check_easing_is_supported(easing)
+    return CommandCode.FADE_TO_COLOR, rgb_code, duration
 
 
 def fade_to_gray(value, duration=None, easing=None):
@@ -153,15 +166,17 @@ def fade_to_gray(value, duration=None, easing=None):
     elif value == 255:
         return fade_to_white(duration, easing)
     else:
-        duration = _to_duration_char(duration)
+        duration = _to_duration(duration)
         easing = EasingMode.get(easing)
-        return CommandCode.FADE_TO_GRAY, _to_char(value), duration, easing
+        _check_easing_is_supported(easing)
+        return CommandCode.FADE_TO_GRAY, _to_char(value), duration
 
 
 def fade_to_white(duration=None, easing=None):
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     easing = EasingMode.get(easing)
-    return CommandCode.FADE_TO_WHITE, duration, easing
+    _check_easing_is_supported(easing)
+    return CommandCode.FADE_TO_WHITE, duration
 
 
 def jump(destination):
@@ -177,7 +192,7 @@ def nop():
 
 
 def set_black(duration=None):
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     return CommandCode.SET_BLACK, duration
 
 
@@ -187,7 +202,7 @@ def set_color(red, green=None, blue=None, duration=None):
     if red == green and green == blue:
         return set_gray(red, duration)
     rgb_code = _to_char(red, green, blue)
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     return CommandCode.SET_COLOR, rgb_code, duration
 
 
@@ -197,12 +212,12 @@ def set_gray(value, duration=None):
     elif value == 255:
         return set_white(duration)
     else:
-        duration = _to_duration_char(duration)
+        duration = _to_duration(duration)
         return CommandCode.SET_GRAY, _to_char(value), duration
 
 
 def set_white(duration=None):
-    duration = _to_duration_char(duration)
+    duration = _to_duration(duration)
     return CommandCode.SET_WHITE, duration
 
 
@@ -227,23 +242,15 @@ def _to_char(*values):
     return bytes(bytearray([_to_byte(value) for value in values]))
 
 
-def _to_duration_char(seconds):
-    """Converts the given duration (specified in seconds) into a duration byte
-    that is typically used in the bytecode.
-
-    The bytecode can encode integer seconds up to 191 (inclusive) and
-    fractional seconds up to 1.28 seconds in units of 1/50 seconds."""
+def _to_duration(seconds):
+    """Converts the given duration (specified in seconds) into a duration
+    varint that is typically used in the bytecode."""
     if seconds is None:
         seconds = 0
-    if seconds < 0 or seconds >= 192:
+    if seconds < 0 or seconds >= 268435:
+        # 268435 is equal to floor(2**28/1000), which should be safe
         raise InvalidDurationError(seconds)
-    if int(seconds) == seconds:
-        return _to_char(seconds)
-    frames = int(seconds * 50.0)
-    if frames > 0x3F:
-        raise InvalidDurationError(seconds)
-    return _to_char((frames & 0x3F) + 0xC0)
-
+    return _to_varint(int(seconds * 50.0))
 
 def _to_varint(value):
     """Converts the given numeric value into its varint representation."""
@@ -252,6 +259,6 @@ def _to_varint(value):
         if value < 128:
             result.append(value)
         else:
-            result.append(value & 0x7F + 0x80)
+            result.append((value & 0x7F) + 0x80)
         value >>= 7
     return bytes(bytearray(result))

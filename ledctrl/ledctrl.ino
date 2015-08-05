@@ -57,7 +57,7 @@ CommandExecutor executor(&ledStrip);
 // 4 = writable bytecode in EEPROM with whatever program there is in the EEPROM
 // 5 = LED strip controlled from remote controller, channels 1, 2 and 3
 // 6 = read-only bytecode in PROGMEM
-#define BYTECODE_INDEX 6
+#define BYTECODE_INDEX 4
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -141,16 +141,17 @@ void setup() {
   serialProtocolParser.setCommandExecutor(&executor);
 #endif
 
-  // Reset the clock of the executor now
-  executor.resetClock();
-  
 #ifdef START_SIGNAL_CHANNEL
+  // Set up the start signal edge detector
   seenStartSignal = false;
   startSignalEdgeDetector.callbacks.rising = startSignalCallback;
   startSignalEdgeDetector.callbacks.falling = startSignalCallback;
   startSignalEdgeDetector.reset();
 #endif
 
+  // Reset the clock of the executor now
+  executor.resetClock();
+  
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and

@@ -6,7 +6,7 @@
  
 static const u8 bytecode[] = {
   CMD_LOOP_BEGIN, 0,
-  CMD_SET_COLOR_FROM_CHANNELS, 1, 2, 3, DURATION_BYTE(0),
+  CMD_SET_COLOR_FROM_CHANNELS, 1, 2, 3, 0,
   CMD_LOOP_END,
   CMD_END
 };

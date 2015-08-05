@@ -54,6 +54,10 @@ class BytecodeCompiler(object):
         _, ext = os.path.splitext(input_file)
         ext = ext.lower()
 
+        _, output_ext = os.path.splitext(output_file)
+        output_ext = output_ext.lower()
+
+        # Add the stages based on the extension of the input file
         if ext == ".led":
             plan.append(PythonSourceToBytecodeCompilationStage(input_file, output_file))
         elif ext == ".sce":
@@ -71,3 +75,11 @@ class BytecodeCompiler(object):
                 plan.append(stage)
         else:
             raise UnsupportedInputFileFormatError(ext)
+
+        # Add the stages based on the extension of the output file
+        if output_ext == ".h":
+            # We need to generate a PROGMEM header file
+            raise NotImplementedError
+        else:
+            # We are okay with the stages that we have now
+            return

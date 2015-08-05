@@ -54,7 +54,7 @@ extern "C" {
  * RC channel index on which the start signal will be transmitted.
  * Comment this out if you want the bytecode to start immediately.
  */
-#define START_SIGNAL_CHANNEL 1
+// #define START_SIGNAL_CHANNEL 1
 
 /**
  * \def ENABLE_SERIAL_INPUT

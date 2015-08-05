@@ -128,7 +128,7 @@ public:
    * \brief Resets the internal clock of the bytecode executor.
    */
   void resetClock() {
-    m_lastClockResetTime = m_currentCommandStartTime;
+    setClockOriginToTimestamp(millis());
   }
 
   /**
@@ -358,6 +358,16 @@ private:
    * functions.
    */
   void setColorOfLEDStrip(rgb_color_t color);
+
+  /**
+   * \brief Sets the origin of the internal clock of the executor to the given timestamp.
+   * 
+   * \param  timestamp  the timestamp that will be treated as T=0 by the
+   *                    executor
+   */
+  void setClockOriginToTimestamp(unsigned long timestamp) {
+    m_lastClockResetTime = timestamp;
+  }
 };
 
 #endif

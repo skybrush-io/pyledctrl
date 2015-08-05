@@ -10,64 +10,64 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
     .arg_count = 0
   },
   /* 0x02 = CMD_SLEEP
-   * Arguments: duration
-   */
-  {
-    .arg_count = 1
-  },
-  /* 0x03 = CMD_WAIT_UNTIL
    * Arguments: duration (varint)
    */
   {
     .arg_count = LAST_ARG_IS_VARINT(1)
   },
-  /* 0x04 = CMD_SET_COLOR
-   * Arguments: red, green, blue, duration
+  /* 0x03 = CMD_WAIT_UNTIL
+   * Arguments: timestamp (varint)
    */
   {
-    .arg_count = 4
+    .arg_count = LAST_ARG_IS_VARINT(1)
+  },
+  /* 0x04 = CMD_SET_COLOR
+   * Arguments: red, green, blue, duration (varint)
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(4)
   },
   /* 0x05 = CMD_SET_GRAY
-   * Arguments: gray, duration
+   * Arguments: gray, duration (varint)
    */
   {
-    .arg_count = 2
+    .arg_count = LAST_ARG_IS_VARINT(2)
   },
   /* 0x06 = CMD_SET_BLACK
-   * Arguments: duration
+   * Arguments: duration (varint)
    */
   {
-    .arg_count = 1
+    .arg_count = LAST_ARG_IS_VARINT(1)
   },
   /* 0x07 = CMD_SET_WHITE
+   * Arguments: duration (varint)
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(1)
+  },
+  /* 0x08 = CMD_FADE_TO_COLOR
+   * Arguments: red, green, blue, duration (varint)
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(4)
+  },
+  /* 0x09 = CMD_FADE_TO_GRAY
+   * Arguments: gray, duration (varint)
+   */
+  {
+    .arg_count = LAST_ARG_IS_VARINT(2)
+  },
+  /* 0x0A = CMD_FADE_TO_BLACK
    * Arguments: duration
    */
   {
-    .arg_count = 1
-  },
-  /* 0x08 = CMD_FADE_TO_COLOR
-   * Arguments: red, green, blue, duration, easing
-   */
-  {
-    .arg_count = 5
-  },
-  /* 0x09 = CMD_FADE_TO_GRAY
-   * Arguments: gray, duration, easing
-   */
-  {
-    .arg_count = 3
-  },
-  /* 0x0A = CMD_FADE_TO_BLACK
-   * Arguments: duration, easing
-   */
-  {
-    .arg_count = 2
+    .arg_count = LAST_ARG_IS_VARINT(1)
   },
   /* 0x0B = CMD_FADE_TO_WHITE
-   * Arguments: duration, easing
+   * Arguments: duration
    */
   {
-    .arg_count = 2
+    .arg_count = LAST_ARG_IS_VARINT(1)
   },
   /* 0x0C = CMD_LOOP_BEGIN
    * Arguments: counter
@@ -88,16 +88,16 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
     .arg_count = 0
   },
   /* 0x10 = CMD_SET_COLOR_FROM_CHANNELS
-   * Arguments: red channel, green channel, blue channel, duration
+   * Arguments: red channel, green channel, blue channel, duration (varint)
    */
   {
-    .arg_count = 4
+    .arg_count = LAST_ARG_IS_VARINT(4)
   },
   /* 0x11 = CMD_FADE_TO_COLOR_FROM_CHANNELS
-   * Arguments: red channel, green channel, blue channel, duration, easing
+   * Arguments: red channel, green channel, blue channel, duration (varint)
    */
   {
-    .arg_count = 5
+    .arg_count = LAST_ARG_IS_VARINT(4)
   },
   /* 0x12 = CMD_JUMP
    * Arguments: address (varint)
@@ -119,6 +119,6 @@ const command_info_t COMMAND_INFO[NUMBER_OF_COMMANDS] = {
    * Triggers can be cleared by setting both R and F to 0.
    */
   {
-    .arg_count = LAST_ARG_IS_VARINT(1)
+    .arg_count = LAST_ARG_IS_VARINT(2)
   },
 };

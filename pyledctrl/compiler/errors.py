@@ -6,6 +6,12 @@ class CompilerError(RuntimeError):
     pass
 
 
+class FeatureNotImplementedError(CompilerError):
+    """Exception thrown when the compiler encounters a feature that has not
+    been implemented yet."""
+    pass
+
+
 class UnsupportedInputFileFormatError(RuntimeError):
     """Exception thrown when the input file format is not supported by the
     compiler."""
