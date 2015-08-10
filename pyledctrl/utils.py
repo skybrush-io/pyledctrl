@@ -3,7 +3,9 @@
 from __future__ import print_function
 
 import glob
+import shutil
 import sys
+import tempfile
 
 from groundctrl.serial_port import SerialPort
 from itertools import islice
@@ -78,3 +80,51 @@ def iterbytes(fp):
         if not b:
             return
         yield b
+
+
+class _TemporaryDirectory(object):
+    """Create and return a temporary directory.  This has the same
+    behaviour as mkdtemp but can be used as a context manager.
+    Backported from Python 3.x. For example:
+
+        with TemporaryDirectory() as tmpdir:
+            ...
+
+    Upon exiting the context, the directory and everything contained
+    in it are removed.
+    """
+
+    # Handle mkdtemp raising an exception
+    name = None
+    _closed = False
+
+    def __init__(self, suffix="", prefix=tempfile.template, dir=None, keep=False):
+        self.name = tempfile.mkdtemp(suffix, prefix, dir)
+        self.keep = keep
+
+    @classmethod
+    def _cleanup(cls, name, warn_message=None):
+        if not self.keep:
+            shutil.rmtree(name)
+        if warn_message is not None:
+            warnings.warn(warn_message, ResourceWarning)
+
+    def __repr__(self):
+        return "<{} {!r}>".format(self.__class__.__name__, self.name)
+
+    def __enter__(self):
+        return self.name
+
+    def __exit__(self, exc, value, tb):
+        self.cleanup()
+
+    def cleanup(self):
+        if self.name is not None and not self._closed:
+            if not self.keep:
+                shutil.rmtree(self.name)
+            self._closed = True
+
+try:
+    from tempfile import TemporaryDirectory
+except ImportError:
+    TemporaryDirectory = _TemporaryDirectory

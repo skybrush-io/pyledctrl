@@ -1,12 +1,18 @@
 """Compilation stages being used in the bytecode compiler."""
 
-import heapq
 import os
+import re
 
-from itertools import izip
-from operator import itemgetter
-from pyledctrl.compiler.contexts import FileWriterExecutionContext
-from pyledctrl.parsers.sunlite import SunliteSuiteParser, Time
+try:
+    import cPickle as pickle     # for Python 2.x
+except ImportError:
+    import pickle                # for Python 3.x
+
+from functools import partial
+from pyledctrl.compiler.contexts import ExecutionContext
+from pyledctrl.compiler.errors import InvalidDurationError, \
+    InvalidASTFormatError
+from pyledctrl.parsers.sunlite import SunliteSuiteParser
 from pyledctrl.utils import first, grouper, iterbytes
 from textwrap import dedent
 
@@ -64,11 +70,15 @@ class FileBasedCompilationStage(CompilationStage):
         return oldest_input >= youngest_output
 
 
-class PythonSourceToBytecodeCompilationStage(FileBasedCompilationStage):
-    def __init__(self, input, output):
-        super(PythonSourceToBytecodeCompilationStage, self).__init__()
+class PythonSourceToASTCompilationStage(FileBasedCompilationStage):
+    """Compilation stage that turns a Python source file into an abstract
+    syntax tree representation of the LED controller program."""
+
+    def __init__(self, input, output, id=None):
+        super(PythonSourceToASTCompilationStage, self).__init__()
         self._input = input
         self._output = output
+        self.id = id
 
     @FileBasedCompilationStage.input_files.getter
     def input_files(self):
@@ -87,14 +97,69 @@ class PythonSourceToBytecodeCompilationStage(FileBasedCompilationStage):
         self._output = value
 
     def run(self):
+        pickle_format, pickler = self._choose_pickler()
         with open(self._output, "wb") as output:
-            context = FileWriterExecutionContext(output)
+            output.write(b"# Format: {0}\n".format(pickle_format.encode("utf-8")))
+            context = ExecutionContext()
             with open(self._input) as fp:
                 code = compile(fp.read(), self.input_files[0], "exec")
                 context.evaluate(code, add_end_command=True)
+                pickler(context.ast, output)
+
+    def _choose_pickler(self):
+        return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class BytecodeToProgmemHeaderCompilationStage(FileBasedCompilationStage):
+class ASTToOutputCompilationStage(FileBasedCompilationStage):
+    """Abstract compilation stage that turns a pickled abstract syntax tree
+    into some output file."""
+
+    def __init__(self, input, output):
+        super(ASTToOutputCompilationStage, self).__init__()
+        self._input = input
+        self._output = output
+
+    def get_ast(self):
+        """Returns the abstract syntax tree from the input file."""
+        with open(self._input, "rb") as fp:
+            ast_format = self._get_ast_format(fp.readline())
+            if ast_format == "pickle":
+                return self._get_ast_pickle(fp)
+            else:
+                raise InvalidASTFormatError(self._input, ast_format)
+
+    def _get_ast_pickle(self, fp):
+        return pickle.load(fp)
+
+    @staticmethod
+    def _get_ast_format(line):
+        match = re.match("# Format: (.*)", line.decode("utf-8"))
+        return match.group(1).lower() if match else None
+
+    @FileBasedCompilationStage.input_files.getter
+    def input_files(self):
+        return [self._input]
+
+    @FileBasedCompilationStage.output_files.getter
+    def output_files(self):
+        return [self._output]
+
+
+class ASTToBytecodeCompilationStage(ASTToOutputCompilationStage):
+    """Compilation stage that turns a pickled abstract syntax tree from a
+    file into a bytecode file that can be uploaded to the Arduino using
+    ``ledctrl upload``."""
+
+    def run(self):
+        ast = self.get_ast()
+        with open(self._output, "wb") as output:
+            output.write(ast.to_bytecode())
+
+
+class ASTToProgmemHeaderCompilationStage(ASTToOutputCompilationStage):
+    """Compilation stage that turns a pickled abstract syntax tree from a
+    file into a header file that can be compiled into the ``ledctrl`` source code
+    with an ``#include`` directive."""
 
     HEADER = dedent(
         """\
@@ -112,24 +177,12 @@ class BytecodeToProgmemHeaderCompilationStage(FileBasedCompilationStage):
         PROGMEMBytecodeStore bytecodeStore(_bytecode);
         """)
 
-    def __init__(self, input, output):
-        super(BytecodeToProgmemHeaderCompilationStage, self).__init__()
-        self._input = input
-        self._output = output
-
-    @FileBasedCompilationStage.input_files.getter
-    def input_files(self):
-        return [self._input]
-
-    @FileBasedCompilationStage.output_files.getter
-    def output_files(self):
-        return [self._output]
-
     def run(self):
+        ast = self.get_ast()
         with open(self._output, "w") as output:
             output.write(self.HEADER)
             with open(self._input, "rb") as fp:
-                for bytes_in_row in grouper(iterbytes(fp), 16):
+                for bytes_in_row in grouper(ast.to_bytecode(), 16):
                     output.write("  {0},\n".format(
                         ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
                     ))
@@ -204,7 +257,6 @@ class SunliteSceneToPythonSourceCompilationStage(FileBasedCompilationStage):
 
         # Run the steps and maintain a list containing the current state of
         # each channel
-        steps_by_channel = zip(channel.timeline.steps for channel in channels)
         for index, time in enumerate(timeline.instants):
             yield time, (channel.timeline.steps[index] for channel in channels)
 

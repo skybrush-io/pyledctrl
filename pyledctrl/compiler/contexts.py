@@ -12,8 +12,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import wraps
 from pyledctrl.compiler import bytecode
+from pyledctrl.compiler.ast import LoopBlock, Node, StatementSequence
 from pyledctrl.compiler.bytecode import Marker
-from pyledctrl.compiler.errors import DuplicateLabelError
+from pyledctrl.compiler.errors import DuplicateLabelError, MarkerNotResolvableError
 from pyledctrl.utils import ensure_tuple
 
 
@@ -23,6 +24,7 @@ def _flatten_bytes(iterable):
     markers in the same order but "flattened" so there are no nestings
     wihtin the list."""
     return list(_flatten_bytes_helper(iterable))
+
 
 def _flatten_bytes_helper(iterable):
     for item in iterable:
@@ -34,6 +36,7 @@ def _flatten_bytes_helper(iterable):
         else:
             for sub_item in _flatten_bytes_helper(item):
                 yield sub_item
+
 
 class ExecutionContext(object):
     """Base class for execution contexts.
@@ -48,9 +51,15 @@ class ExecutionContext(object):
         self.reset()
 
     @property
+    def ast(self):
+        """Returns the abstract syntax tree that was parsed after evaluating
+        the source code."""
+        return self._ast
+
+    @property
     def bytecode(self):
         """Returns the compiled bytecode."""
-        return list(self._bytecode)
+        return self._ast.to_bytecode()
 
     def evaluate(self, code, add_end_command=False):
         """Evaluates the given Python code object in this execution context.
@@ -63,7 +72,7 @@ class ExecutionContext(object):
         exec(code, global_vars, {})
         if add_end_command:
             global_vars["end"]()
-        self._postprocess_bytecode()
+        self._postprocess_syntax_tree()
 
     def get_globals(self):
         """Returns a dictionary containing the global variables to be made
@@ -74,15 +83,14 @@ class ExecutionContext(object):
 
     def reset(self):
         """Resets the execution context to a pristine state."""
-        self._bytecode = []
+        self._ast = StatementSequence()
+        self._ast_stack = [self._ast]
         self._labels = {}
         self._globals = None
 
     def _construct_globals(self):
         wrapper_for = self._create_bytecode_func_wrapper
         result = {
-            "_loop_begin": wrapper_for(bytecode.loop_begin),
-            "_loop_end": wrapper_for(bytecode.loop_end),
             "end": wrapper_for(bytecode.end),
             "fade_to_black": wrapper_for(bytecode.fade_to_black),
             "fade_to_color": wrapper_for(bytecode.fade_to_color),
@@ -103,9 +111,11 @@ class ExecutionContext(object):
 
         @contextmanager
         def _loop_context(iterations=None):
-            result["_loop_begin"](iterations)
+            loop_block = LoopBlock()
+            self._ast_stack.append(loop_block.body)
             yield
-            result["_loop_end"]()
+            self._ast_stack.pop()
+            self._ast_stack[-1].append(loop_block)
 
         result["loop"] = _loop_context
         return {k: v for k, v in result.items() if not k.startswith("_")}
@@ -113,27 +123,25 @@ class ExecutionContext(object):
     def _create_bytecode_func_wrapper(self, func):
         @wraps(func)
         def wrapped(*args, **kwds):
-            result = _flatten_bytes(ensure_tuple(func(*args, **kwds)))
-            for token in result:
-                if isinstance(token, bytes):
-                    self._bytecode.extend(token)
-                elif isinstance(token, Marker):
-                    self._bytecode.append(token)
+            node = func(*args, **kwds)
+            if isinstance(node, (Node, Marker)):
+                self._ast_stack[-1].append(node)
+            else:
+                raise ValueError("unknown value returned from bytecode "
+                                 "function: {0!r}".format(node))
+            if isinstance(node, bytecode.LabelMarker):
+                if node.name in self._labels:
+                    raise DuplicateLabelError(node.name)
                 else:
-                    raise ValueError("unknown value returned from bytecode "
-                                     "function: {0!r}".format(token))
-                if isinstance(token, bytecode.LabelMarker):
-                    if token.name in self._labels:
-                        raise DuplicateLabelError(token.name)
-                    else:
-                        self._labels = len(self._bytecode)-1
+                    self._labels[node.name] = node
         return wrapped
 
-    def _postprocess_bytecode(self):
-        """Post-processes the bytecode and the additional instructions
-        collected in ``self._bytecode`` at the end of an execution, finalizes
+    def _postprocess_syntax_tree(self):
+        """Post-processes the abstract syntax tree and the additional markers
+        collected in ``self._ast`` at the end of an execution, finalizes
         jump addresses etc."""
-
+        return
+        # TODO: fix this
         # Find all the jump instructions in the bytecode
         jumps_by_destination = defaultdict(list)
         for item in self._bytecode:
@@ -158,9 +166,9 @@ class ExecutionContext(object):
             self._resolve_markers()
 
     def _resolve_markers(self, cls=Marker, graceful=False):
-        """Tries to resolve all markers of the given class within the bytecode
-        by replacing them with the result of calling their ``as_bytecode()``
-        method.
+        """Tries to resolve all markers of the given class within the abstract
+        syntax tree by replacing them with the result of calling their
+        ``to_ast_node()`` method.
 
         Args:
             cls (type): the marker class to replace
@@ -173,31 +181,13 @@ class ExecutionContext(object):
             if isinstance(marker, cls):
                 if graceful:
                     try:
-                        replacement = marker.as_bytecode()
+                        replacement = marker.to_ast_node()
                     except MarkerNotResolvableError:
                         replacement = None
                 else:
-                    replacement = marker.as_bytecode()
+                    replacement = marker.to_ast_node()
                 if replacement is not None:
                     replacement = _flatten_bytes(ensure_tuple(replacement))
                     self._bytecode[index:(index+1)] = replacement
                     length += len(replacement)-1
             index += 1
-
-
-class FileWriterExecutionContext(ExecutionContext):
-    """Execution context that writes the generated bytecode in response to each
-    command to a file-like object."""
-
-    def __init__(self, fp):
-        """Constructor.
-
-        :param fp: a file-like object to write the generated bytecode to
-        :type fp: file-like
-        """
-        super(FileWriterExecutionContext, self).__init__()
-        self.fp = fp
-
-    def evaluate(self, code, add_end_command=False):
-        super(FileWriterExecutionContext, self).evaluate(code, add_end_command)
-        self.fp.write("".join(self.bytecode))

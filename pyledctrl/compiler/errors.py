@@ -59,3 +59,21 @@ class MarkerNotResolvableError(CompilerError):
         self.marker = marker
         message = message or "Marker not resolvable; {0!r}".format(marker)
         super(MarkerNotResolvableError, self).__init__(message)
+
+
+class InvalidASTFormatError(RuntimeError):
+    """Exception thrown when the compiler tries to parse an AST file with an
+    invalid or unsupported format."""
+
+    def __init__(self, filename, format, message=None):
+        self.filename = filename
+        self.format = format
+        message = message or self._get_default_message()
+        super(InvalidASTFormatError, self).__init__(message)
+
+    def _get_default_message(self):
+        if self.format is None:
+            return "The AST file {0.filename!r} has an unknown format".format(self)
+        else:
+            return "The AST file {0.filename!r} has an unknown format: "\
+                "{0.format!r}".format(self)

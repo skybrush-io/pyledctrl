@@ -1,75 +1,10 @@
-"""Functions that emit bytecode fragments."""
+"""Functions that roughly correspond to the bytecode statements and emit
+abstract syntax tree fragments."""
 
-from __future__ import absolute_import
-
-from .colors import parse_color
-from .errors import InvalidDurationError, MarkerNotResolvableError, \
-    FeatureNotImplementedError
-
-
-class CommandCode(object):
-    END = b'\x00'
-    NOP = b'\x01'
-    SLEEP = b'\x02'
-    WAIT_UNTIL = b'\x03'
-    SET_COLOR = b'\x04'
-    SET_GRAY = b'\x05'
-    SET_BLACK = b'\x06'
-    SET_WHITE = b'\x07'
-    FADE_TO_COLOR = b'\x08'
-    FADE_TO_GRAY = b'\x09'
-    FADE_TO_BLACK = b'\x0A'
-    FADE_TO_WHITE = b'\x0B'
-    LOOP_BEGIN = b'\x0C'
-    LOOP_END = b'\x0D'
-    RESET_TIMER = b'\x0E'
-    SET_COLOR_FROM_CHANNELS = b'\x10'
-    FADE_COLOR_FROM_CHANNELS = b'\x11'
-    JUMP = b'\x12'
-    TRIGGERED_JUMP = b'\x13'
-
-
-class EasingMode(object):
-    LINEAR = b'\x00'
-    IN_SINE = b'\x01'
-    OUT_SINE = b'\x02'
-    IN_OUT_SINE = b'\x03'
-    IN_QUAD = b'\x04'
-    OUT_QUAD = b'\x05'
-    IN_OUT_QUAD = b'\x06'
-    IN_CUBIC = b'\x07'
-    OUT_CUBIC = b'\x08'
-    IN_OUT_CUBIC = b'\x09'
-    IN_QUART = b'\x0A'
-    OUT_QUART = b'\x0B'
-    IN_OUT_QUART = b'\x0C'
-    IN_QUINT = b'\x0D'
-    OUT_QUINT = b'\x0E'
-    IN_OUT_QUINT = b'\x0F'
-    IN_EXPO = b'\x10'
-    OUT_EXPO = b'\x11'
-    IN_OUT_EXPO = b'\x12'
-    IN_CIRC = b'\x13'
-    OUT_CIRC = b'\x14'
-    IN_OUT_CIRC = b'\x15'
-    IN_BACK = b'\x16'
-    OUT_BACK = b'\x17'
-    IN_OUT_BACK = b'\x18'
-    IN_ELASTIC = b'\x19'
-    OUT_ELASTIC = b'\x1A'
-    IN_OUT_ELASTIC = b'\x1B'
-    IN_BOUNCE = b'\x1C'
-    OUT_BOUNCE = b'\x1D'
-    IN_OUT_BOUNCE = b'\x1E'
-
-    @classmethod
-    def get(cls, spec):
-        if spec is None:
-            return cls.LINEAR
-        if isinstance(spec, int):
-            return spec
-        spec = spec.upper().replace("-", "_")
-        return getattr(cls, spec)
+from pyledctrl.compiler import ast
+from pyledctrl.compiler.colors import parse_color
+from pyledctrl.compiler.errors import InvalidDurationError, \
+    MarkerNotResolvableError, FeatureNotImplementedError
 
 
 def _check_easing_is_supported(easing):
@@ -78,7 +13,7 @@ def _check_easing_is_supported(easing):
     Raises:
         FeatureNotImplementedError: if the easing mode is not supported
     """
-    if easing is not EasingMode.LINEAR:
+    if easing is not ast.EasingMode.LINEAR:
         raise FeatureNotImplementedError("only linear easing is supported")
 
 
@@ -86,19 +21,21 @@ class Marker(object):
     """Superclass for marker objects placed in the bytecode stream that are
     resolved to actual bytecode in a later compilation stage."""
 
-    def as_bytecode(self):
-        """Returns the bytecode that should be inserted into the bytecode
-        stream in place of the marker.
+    def to_ast_node(self):
+        """Returns the abstract syntax tree node that should replace the marker
+        in the abstract syntax tree.
 
         Returns:
-            list of bytes: a list containing the bytes to be inserted into
-                the bytecode
+            ast.Node or None: the absrtact syntax tree node that should replace
+                the marker or None if the marker should be removed from the
+                abstract syntax tree
 
         Raises:
             MarkerNotResolvableError: if the marker does not "know" all the
-                information that is needed to produce a bytecode representation.
+                information that is needed to produce a corresponding abstract
+                syntax tree node.
         """
-        return []
+        return None
 
 
 class LabelMarker(Marker):
@@ -118,15 +55,15 @@ class JumpMarker(Marker):
         self.destination = destination
         self.address = None
 
-    def as_bytecode(self):
-        if self.address is None:
-            raise MarkerNotResolvableError(self)
-        else:
-            return CommandCode.JUMP, _to_varint(self.address)
-
     def resolve_to_address(self, address):
         assert self.address is None
         self.address = address
+
+    def to_ast_node(self):
+        if self.address is None:
+            raise MarkerNotResolvableError(self)
+        else:
+            return ast.JumpCommand(address=self.address)
 
     def __repr__(self):
         return "{0.__class__.__name__}(destination={0.destination!r})".format(self)
@@ -138,14 +75,14 @@ class UnconditionalJumpMarker(JumpMarker):
 
 
 def end():
-    return CommandCode.END
+    return ast.EndCommand()
 
 
 def fade_to_black(duration=None, easing=None):
     duration = _to_duration(duration)
-    easing = EasingMode.get(easing)
+    easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
-    return CommandCode.FADE_TO_BLACK, duration
+    return ast.FadeToBlackCommand(duration=duration)
 
 
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
@@ -153,11 +90,11 @@ def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
         red, green, blue = parse_color(red)
     if red == green and green == blue:
         return fade_to_gray(red, duration, easing)
-    rgb_code = _to_char(red, green, blue)
     duration = _to_duration(duration)
-    easing = EasingMode.get(easing)
+    easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
-    return CommandCode.FADE_TO_COLOR, rgb_code, duration
+    return ast.FadeToColorCommand(color=ast.RGBColor(red, green, blue),
+                                  duration=duration)
 
 
 def fade_to_gray(value, duration=None, easing=None):
@@ -167,16 +104,16 @@ def fade_to_gray(value, duration=None, easing=None):
         return fade_to_white(duration, easing)
     else:
         duration = _to_duration(duration)
-        easing = EasingMode.get(easing)
+        easing = ast.EasingMode.get(easing)
         _check_easing_is_supported(easing)
-        return CommandCode.FADE_TO_GRAY, _to_char(value), duration
+        return ast.FadeToGrayCommand(value=value, duration=duration)
 
 
 def fade_to_white(duration=None, easing=None):
     duration = _to_duration(duration)
-    easing = EasingMode.get(easing)
+    easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
-    return CommandCode.FADE_TO_WHITE, duration
+    return ast.FadeToWhiteCommand(duration=duration)
 
 
 def jump(destination):
@@ -188,12 +125,11 @@ def label(name):
 
 
 def nop():
-    return CommandCode.NOP
+    return ast.NopCommand()
 
 
 def set_black(duration=None):
-    duration = _to_duration(duration)
-    return CommandCode.SET_BLACK, duration
+    return ast.SetBlackCommand(duration=_to_duration(duration))
 
 
 def set_color(red, green=None, blue=None, duration=None):
@@ -201,9 +137,8 @@ def set_color(red, green=None, blue=None, duration=None):
         red, green, blue = parse_color(red)
     if red == green and green == blue:
         return set_gray(red, duration)
-    rgb_code = _to_char(red, green, blue)
-    duration = _to_duration(duration)
-    return CommandCode.SET_COLOR, rgb_code, duration
+    return ast.SetColorCommand(color=ast.RGBColor(red, green, blue),
+                               duration=_to_duration(duration))
 
 
 def set_gray(value, duration=None):
@@ -212,63 +147,21 @@ def set_gray(value, duration=None):
     elif value == 255:
         return set_white(duration)
     else:
-        duration = _to_duration(duration)
-        return CommandCode.SET_GRAY, _to_char(value), duration
+        return ast.SetGrayCommand(duration=_to_duration(duration))
 
 
 def set_white(duration=None):
-    duration = _to_duration(duration)
-    return CommandCode.SET_WHITE, duration
+    return ast.SetWhiteCommand(duration=_to_duration(duration))
 
 
 def sleep(duration):
-    duration = _to_duration(duration)
-    return CommandCode.SLEEP, duration
-
-
-def loop_begin(body, iterations=None):
-    return CommandCode.LOOP_BEGIN, _to_char(iterations)
-
-
-def loop_end():
-    return CommandCode.LOOP_END
-
-
-def _to_byte(value):
-    """Converts the given value to a byte between 0 and 255."""
-    if value is None:
-        return 0
-    return max(min(int(round(value)), 255), 0)
-
-
-def _to_char(*values):
-    """Converts the given value or values to bytes between 0 and 255, then
-    casts them into characters."""
-    return bytes(bytearray([_to_byte(value) for value in values]))
+    return ast.SleepCommand(duration=_to_duration(duration))
 
 
 def _to_duration(seconds):
-    """Converts the given duration (specified in seconds) into a duration
-    varint that is typically used in the bytecode."""
+    """Converts the given duration (specified in seconds) into the number
+    of frames (assuming 50 frames per second); this is the format that is
+    expected by the bytecode."""
     if seconds is None:
         seconds = 0
-    if seconds < 0 or seconds >= 268435:
-        # 268435 is equal to floor(2**28/1000), which should be safe
-        raise InvalidDurationError(seconds)
-    return _to_varint(int(seconds * 50.0))
-
-def _to_varint(value):
-    """Converts the given numeric value into its varint representation."""
-    result = []
-    if value < 0:
-        raise ValueError("negative varints are not supported")
-    elif value == 0:
-        result = [0]
-    else:
-        while value > 0:
-            if value < 128:
-                result.append(value)
-            else:
-                result.append((value & 0x7F) + 0x80)
-            value >>= 7
-    return bytes(bytearray(result))
+    return int(seconds * 50.0)
