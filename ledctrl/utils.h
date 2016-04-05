@@ -21,9 +21,9 @@ extern "C" {
  * the board.
  */
 #ifdef ENABLE_IS_LOW
-#  define LED_PIN_WRITE(pin, value) analogWrite(pin, 255-(value))
+#  define LED_PIN_WRITE(pin, value) analogWrite(pin, 255-(MAX_PWM * value / 255))
 #else
-#  define LED_PIN_WRITE(pin, value) analogWrite(pin, value)
+#  define LED_PIN_WRITE(pin, value) analogWrite(pin, MAX_PWM * value / 255)
 #endif
 
 #ifdef __cplusplus

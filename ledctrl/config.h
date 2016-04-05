@@ -21,6 +21,14 @@ extern "C" {
 #define ENABLE_IS_LOW
 
 /**
+ * \def MAX_PWM
+ *
+ * With this macro we can downscale all raw outputs to e.g. avoid overheating
+ * of the module.
+ */
+#define MAX_PWM 255
+
+/**
  * \def DEBUG
  * 
  * Define this if you need debugging information on the serial console.
