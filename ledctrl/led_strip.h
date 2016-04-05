@@ -13,8 +13,9 @@
 #include <Arduino.h>
 #include <assert.h>
 #include "colors.h"
-#include "types.h"
 #include "config.h"
+#include "types.h"
+#include "utils.h"
 #include "voltmeter.h"
 
 
@@ -108,40 +109,15 @@ public:
     // will actually be written to the pin
     byte compensatedRed = calculateVoltageCompensatedValue(red,
                           m_pwmIntervals.red_duty_range, compensator);
-#if DEBUG
-    // Serial.print(" R: "); Serial.print(compensatedRed);
-#endif
-
-#ifdef ENABLE_IS_LOW
-    analogWrite(m_redPin, 255 - compensatedRed);
-#else
-    analogWrite(m_redPin, compensatedRed);
-#endif
+	  LED_PIN_WRITE(m_redPin, compensatedRed);
 
     byte compensatedGreen = calculateVoltageCompensatedValue(green,
                             m_pwmIntervals.green_duty_range, compensator);
-#if DEBUG
-    // Serial.print(" G: "); Serial.print(compensatedGreen);
-#endif
-
-#ifdef ENABLE_IS_LOW
-    analogWrite(m_greenPin, 255 - compensatedGreen);
-#else
-    analogWrite(m_greenPin, compensatedGreen);
-#endif
+	  LED_PIN_WRITE(m_greenPin, compensatedGreen);
 
     byte compensatedBlue = calculateVoltageCompensatedValue(blue,
                            m_pwmIntervals.blue_duty_range, compensator);
-#if DEBUG
-    // Serial.print(" B: "); Serial.println(compensatedBlue);
-#endif
-
-#ifdef ENABLE_IS_LOW
-    analogWrite(m_bluePin, 255 - compensatedBlue);
-#else
-    analogWrite(m_bluePin, compensatedBlue);
-#endif
-
+	  LED_PIN_WRITE(m_bluePin, compensatedBlue);
   }
 
   /**

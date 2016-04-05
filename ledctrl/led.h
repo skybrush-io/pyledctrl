@@ -7,6 +7,7 @@
 #define LED_H
 
 #include <Arduino.h>
+#include "utils.h"
 
 /**
  * \brief Represents a single LED attached to the Arduino on a given pin.
@@ -52,11 +53,7 @@ public:
    * PWM pins.
    */
   void setBrightness(u8 level) const {
-#ifdef ENABLE_IS_LOW
-    analogWrite(m_pin, 255 - level);
-#else
-    analogWrite(m_pin, level);
-#endif
+	  LED_PIN_WRITE(m_pin, level);
   }
 };
 
