@@ -13,6 +13,14 @@ extern "C" {
 #endif
 
 /**
+ * \def ENABLE_IS_LOW
+ *
+ * Define if enable of LED is at LOW/zero PWM (NanoLED v2 based on XL4001)
+ * Do not define if it is at HIGH/max PWM (NanoLED v1 based on pure led strip)
+ */
+#define ENABLE_IS_LOW
+
+/**
  * \def DEBUG
  * 
  * Define this if you need debugging information on the serial console.

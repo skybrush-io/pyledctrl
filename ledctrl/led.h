@@ -52,7 +52,11 @@ public:
    * PWM pins.
    */
   void setBrightness(u8 level) const {
+#ifdef ENABLE_IS_LOW
+    analogWrite(m_pin, 255 - level);
+#else
     analogWrite(m_pin, level);
+#endif
   }
 };
 

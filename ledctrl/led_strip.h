@@ -111,21 +111,37 @@ public:
 #if DEBUG
     // Serial.print(" R: "); Serial.print(compensatedRed);
 #endif
+
+#ifdef ENABLE_IS_LOW
+    analogWrite(m_redPin, 255 - compensatedRed);
+#else
     analogWrite(m_redPin, compensatedRed);
+#endif
 
     byte compensatedGreen = calculateVoltageCompensatedValue(green,
                             m_pwmIntervals.green_duty_range, compensator);
 #if DEBUG
     // Serial.print(" G: "); Serial.print(compensatedGreen);
 #endif
+
+#ifdef ENABLE_IS_LOW
+    analogWrite(m_greenPin, 255 - compensatedGreen);
+#else
     analogWrite(m_greenPin, compensatedGreen);
+#endif
 
     byte compensatedBlue = calculateVoltageCompensatedValue(blue,
                            m_pwmIntervals.blue_duty_range, compensator);
 #if DEBUG
     // Serial.print(" B: "); Serial.println(compensatedBlue);
 #endif
+
+#ifdef ENABLE_IS_LOW
+    analogWrite(m_bluePin, 255 - compensatedBlue);
+#else
     analogWrite(m_bluePin, compensatedBlue);
+#endif
+
   }
 
   /**
