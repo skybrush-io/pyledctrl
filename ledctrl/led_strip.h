@@ -158,8 +158,10 @@ private:
    * \param  compensator  compensation coefficient calculated by the voltmeter
    */
   u8 calculateVoltageCompensatedValue(u8 value, byte_range_t range, float compensator) const {
-    float cubedValue = pow(static_cast<float>(value * compensator) / 255, 3);
-    return static_cast<byte>(range.min + cubedValue * (range.max - range.min));
+//TODO: now we leave out the voltage compensation for a while...
+//    float cubedValue = pow(static_cast<float>(value * compensator) / 255, 3);
+//    return static_cast<byte>(range.min + cubedValue * (range.max - range.min));
+    return value;
   }
 
   /**
@@ -173,7 +175,7 @@ private:
 
   /**
    * \brief Normalizes a voltage given as a floating point number between zero
-   *        and the board's maximum input voltage to the range 0-254.
+   *        and the board's maximum input voltage to the range 0-255.
    */
   byte normalizeVoltage(float voltage) const;
 };

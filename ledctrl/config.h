@@ -57,6 +57,13 @@ extern "C" {
 #define BLUE_PWM_PIN 5
 
 /**
+ * \def WHITE_PWM_PIN
+ * 
+ * Index of the PWM pin corresponding to the WHITE LEDs.
+ */
+#define WHITE_PWM_PIN 10
+
+/**
  * \def MAIN_SWITCH_PIN
  * 
  * Analog input corresponding to the main switch.
@@ -65,12 +72,23 @@ extern "C" {
 // #define MAIN_SWITCH_PIN A5
 
 /**
- * \def START_SIGNAL_CHANNEL
+ * \def MAIN_SWITCH_CHANNEL
  * 
- * RC channel index on which the start signal will be transmitted.
- * Comment this out if you want the bytecode to start immediately.
+ * RC channel corresponding to the main switch
+ * Comment this out if you do not want to have
+ * an RC channel associated with a main switch
  */
-// #define START_SIGNAL_CHANNEL 1
+#define MAIN_SWITCH_CHANNEL 6
+
+/**
+ * \def BYTECODE_RC_CHANNEL
+ *
+ * RC channel corresponding to the bytecode_rc mode (color selection through
+ * rc sticks). Comment this out if you do not want to have
+ * an RC channel associated with a bytecode_rc mode
+ */
+#define BYTECODE_RC_CHANNEL 4
+
 
 /**
  * \def ENABLE_SERIAL_INPUT
@@ -86,7 +104,7 @@ extern "C" {
  * Index of the pin corresponding to the voltmeter. Comment this out if
  * you don't have a voltmeter.
  */
-#define VOLTMETER_PIN 5
+//#define VOLTMETER_PIN 5
 
 /**
  * \def VOLTMETER_ACCURACY
@@ -95,14 +113,14 @@ extern "C" {
  * measurements to take on the voltmeter pin before a single measured
  * value is stored in our voltmeter class.
  */
-#define VOLTMETER_ACCURACY 5
+//#define VOLTMETER_ACCURACY 5
 
 /**
  * \def LIGHT_COEFF
  * 
  * Correction coefficient for the LED brightness. Ignored if we have no voltmeter.
  */
-#define LIGHT_COEFF 0.8
+//#define LIGHT_COEFF 0.8
 
 /**
  * \def SERIAL_BAUD_RATE
@@ -176,7 +194,8 @@ extern "C" {
  * \def GREEN_LED_MAX_VOLTAGE
  * Maximum voltage where the green LED gives "quasi-white"
  */
-#define GREEN_LED_MAX_VOLTAGE 10.10
+//#define GREEN_LED_MAX_VOLTAGE 10.10
+#define GREEN_LED_MAX_VOLTAGE 12.00
 
 /**
  * \def BLUE_LED_MIN_VOLTAGE
@@ -188,7 +207,8 @@ extern "C" {
  * \def BLUE_LED_MAX_VOLTAGE
  * Maximum voltage where the blue LED gives "quasi-white"
  */
-#define BLUE_LED_MAX_VOLTAGE 9.10
+//#define BLUE_LED_MAX_VOLTAGE 9.10
+#define BLUE_LED_MAX_VOLTAGE 12.00
 
 #ifdef __cplusplus
 }

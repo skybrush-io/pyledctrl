@@ -23,5 +23,5 @@ void LEDStrip::calculateVoltageCompensationRanges() {
 }
 	
 byte LEDStrip::normalizeVoltage(float voltage) const {
-	return static_cast<byte>(254 * voltage / BOARD_MAX_INPUT_VOLTAGE);
+	return static_cast<byte>(255 * voltage / BOARD_MAX_INPUT_VOLTAGE);
 }

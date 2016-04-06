@@ -170,8 +170,8 @@ void PWMSignalSource::attachInterruptHandler() const {
 }
 
 u8 PWMSignalSource::channelValue(u8 channelIndex) const {
-  // TODO
-  return 0;
+  u8 convertedValue = (u8)((float)pwmSignalSource_highTime/100);
+  return convertedValue;
 }
 
 void PWMSignalSource_interruptHandler() {
