@@ -228,7 +228,7 @@ public:
    *          yet
    */
   s8 value() const {
-    return m_state > 0 ? (m_state & 3) : -1;
+    return m_state == EdgeDetectorState::SIGNAL_HIGH ? 1 : (m_state == EdgeDetectorState::SIGNAL_LOW ? 0 : -1);
   }
 
 private:

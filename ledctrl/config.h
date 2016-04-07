@@ -74,7 +74,7 @@ extern "C" {
 /**
  * \def MAIN_SWITCH_CHANNEL
  * 
- * RC channel corresponding to the main switch
+ * Zero-indexed RC channel corresponding to the main switch
  * Comment this out if you do not want to have
  * an RC channel associated with a main switch
  */
@@ -83,7 +83,7 @@ extern "C" {
 /**
  * \def BYTECODE_RC_CHANNEL
  *
- * RC channel corresponding to the bytecode_rc mode (color selection through
+ * Zero-indexed RC channel corresponding to the bytecode_rc mode (color selection through
  * rc sticks). Comment this out if you do not want to have
  * an RC channel associated with a bytecode_rc mode
  */

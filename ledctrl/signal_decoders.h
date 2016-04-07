@@ -20,11 +20,11 @@ class SignalSource {
     virtual ~SignalSource() {}
     
     /**
-     * Returns a noise-filtered, accurate value of the given channel.
+     * Returns a noise-filtered value of the given channel.
      * 
      * \param  channelIndex  index of the channel to read.
      */
-    virtual volatile u8 accurateChannelValue(u8 channelIndex) const = 0;
+    virtual volatile u8 filteredChannelValue(u8 channelIndex) const = 0;
     
     /**
      * Returns the current value of the given channel.
@@ -68,7 +68,7 @@ class PPMSignalSource : public SignalSource {
       assert(interruptIndex >= 0 && interruptIndex < 2);
     }
 
-    volatile u8 accurateChannelValue(u8 channelIndex) const;
+    volatile u8 filteredChannelValue(u8 channelIndex) const;
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;
@@ -120,7 +120,7 @@ class PWMSignalSource : public SignalSource {
       m_pinIndex = interruptIndex + 2;
     }
 
-    volatile u8 accurateChannelValue(u8 channelIndex) const;
+    volatile u8 filteredChannelValue(u8 channelIndex) const;
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;
@@ -167,7 +167,7 @@ class DummySignalSource : public SignalSource {
       delete m_pins;
     }
     
-    volatile u8 accurateChannelValue(u8 channelIndex) const;
+    volatile u8 filteredChannelValue(u8 channelIndex) const;
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;

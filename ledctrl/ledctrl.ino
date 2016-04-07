@@ -202,12 +202,12 @@ void setup() {
 void loop() {
 
 #ifdef BYTECODE_RC_CHANNEL
-  // Feed the edge detector of the bytecode rc channel signal
+  // Feed the bytecode rc channel signal to the edge detector
   bytecodeRCEdgeDetector.feedAnalogSignal(signalSource.channelValue(BYTECODE_RC_CHANNEL));
 #endif
 
 #ifdef MAIN_SWITCH_CHANNEL
-  // Feed the edge detector of the main switch channel signal
+  // Feed the mmain switch channel signal to the edge detector
   mainSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(MAIN_SWITCH_CHANNEL));
   if (mainSwitchEdgeDetector.value() == 0) {
     // Turn off the LEDs

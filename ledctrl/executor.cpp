@@ -322,21 +322,21 @@ void CommandExecutor::handleFadeToColorFromChannelsCommand() {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.red = 0;
     } else {
-      color.red = m_pSignalSource->channelValue(channelIndices[0]);
+      color.red = m_pSignalSource->filteredChannelValue(channelIndices[0]);
     }
     
     if (channelIndices[1] > numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.green = 0;
     } else {
-      color.green = m_pSignalSource->channelValue(channelIndices[1]);
+      color.green = m_pSignalSource->filteredChannelValue(channelIndices[1]);
     }
     
     if (channelIndices[2] > numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.blue = 0;
     } else {
-      color.blue = m_pSignalSource->channelValue(channelIndices[2]);
+      color.blue = m_pSignalSource->filteredChannelValue(channelIndices[2]);
     }
   }
   
@@ -474,21 +474,21 @@ void CommandExecutor::handleSetColorFromChannelsCommand() {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.red = 0;
     } else {
-      color.red = m_pSignalSource->channelValue(channelIndices[0]);
+      color.red = m_pSignalSource->filteredChannelValue(channelIndices[0]);
     }
     
     if (channelIndices[1] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.green = 0;
     } else {
-      color.green = m_pSignalSource->channelValue(channelIndices[1]);
+      color.green = m_pSignalSource->filteredChannelValue(channelIndices[1]);
     }
     
     if (channelIndices[2] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.blue = 0;
     } else {
-      color.blue = m_pSignalSource->channelValue(channelIndices[2]);
+      color.blue = m_pSignalSource->filteredChannelValue(channelIndices[2]);
     }
   }
   
