@@ -38,7 +38,7 @@ void CommandExecutor::executeActionOfTrigger(const Trigger* trigger) {
   assert(trigger != 0);
 
   TriggerAction action = trigger->action();
-  
+
   switch (action.type) {
     case TriggerActionType::RESUME:
       m_pBytecodeStore->resume();
@@ -57,7 +57,7 @@ void CommandExecutor::executeActionOfTrigger(const Trigger* trigger) {
 
 void CommandExecutor::executeNextCommand() {
   u8 commandCode;
-  
+
   if (m_ended) {
     return;
   }
@@ -87,19 +87,19 @@ void CommandExecutor::executeNextCommand() {
     case CMD_WAIT_UNTIL:      /* Waits until the internal clock of the executor reaches a given value */
       handleWaitUntilCommand();
       break;
-      
+
     case CMD_SET_COLOR:       /* Set the color of the LED strip and wait */
       handleSetColorCommand();
       break;
-      
+
     case CMD_SET_GRAY:        /* Set the color of the LED strip to a shade of gray and wait */
       handleSetGrayCommand();
       break;
-      
+
     case CMD_SET_BLACK:       /* Set the color of the LED strip to black and wait */
       handleSetBlackCommand();
       break;
-      
+
     case CMD_SET_WHITE:       /* Set the color of the LED strip to white and wait */
       handleSetWhiteCommand();
       break;
@@ -107,15 +107,15 @@ void CommandExecutor::executeNextCommand() {
     case CMD_FADE_TO_COLOR:   /* Fades the color of the LED strip */
       handleFadeToColorCommand();
       break;
-      
+
     case CMD_FADE_TO_GRAY:    /* Fades the color of the LED strip to a shade of gray */
       handleFadeToGrayCommand();
       break;
-      
+
     case CMD_FADE_TO_BLACK:   /* Fades the color of the LED strip to black */
       handleFadeToBlackCommand();
       break;
-      
+
     case CMD_FADE_TO_WHITE:   /* Fades the color of the LED strip to white */
       handleFadeToWhiteCommand();
       break;
@@ -123,7 +123,7 @@ void CommandExecutor::executeNextCommand() {
     case CMD_LOOP_BEGIN:      /* Marks the beginning of a loop */
       handleLoopBeginCommand();
       break;
-      
+
     case CMD_LOOP_END:        /* Marks the end of a loop */
       handleLoopEndCommand();
       break;
@@ -135,11 +135,11 @@ void CommandExecutor::executeNextCommand() {
     case CMD_SET_COLOR_FROM_CHANNELS:        /* Set color from the current values of some channels */
       handleSetColorFromChannelsCommand();
       break;
-      
+
     case CMD_FADE_TO_COLOR_FROM_CHANNELS:    /* Fade to color from the current values of some channels */
       handleFadeToColorFromChannelsCommand();
       break;
-      
+
     default:
       /* Unknown command code, stop execution and set an error condition */
       SET_ERROR(Errors::INVALID_COMMAND_CODE);
@@ -150,7 +150,7 @@ void CommandExecutor::executeNextCommand() {
 void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
   EasingMode easingMode = EASING_LINEAR;
   unsigned long duration = handleDelayByte();
-  
+
   m_ledStripFader.endColor = color;
   m_transition.setEasingMode(easingMode);
   m_transition.start(duration, m_currentCommandStartTime);
@@ -174,7 +174,7 @@ Trigger* CommandExecutor::findTriggerForChannelIndex(u8 channelIndex) {
 
 unsigned long CommandExecutor::handleDelayByte() {
   unsigned long duration = nextDuration();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Delay: "));
   Serial.print(duration);
@@ -187,7 +187,7 @@ unsigned long CommandExecutor::handleDelayByte() {
 
 EasingMode CommandExecutor::handleEasingModeByte() {
   u8 easingModeByte = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Easing mode: "));
   Serial.println(easingModeByte);
@@ -244,7 +244,7 @@ unsigned long CommandExecutor::step() {
 
   // Check the state of the signals being watched in the triggers
   checkAndFireTriggers();
-  
+
   // Handle the active transition
   if (m_transition.active()) {
     if (!m_transition.step(m_ledStripFader, now)) {
@@ -259,7 +259,7 @@ unsigned long CommandExecutor::step() {
     m_currentCommandStartTime = now;
     executeNextCommand();
   }
-  
+
   return m_nextWakeupTime;
 }
 
@@ -277,11 +277,11 @@ void CommandExecutor::handleFadeToBlackCommand() {
 
 void CommandExecutor::handleFadeToColorCommand() {
   rgb_color_t color;
-  
+
   color.red = nextByte();
   color.green = nextByte();
   color.blue = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.print(color.red);
@@ -302,7 +302,7 @@ void CommandExecutor::handleFadeToColorFromChannelsCommand() {
   channelIndices[0] = nextByte();
   channelIndices[1] = nextByte();
   channelIndices[2] = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.print(channelIndices[0]);
@@ -311,43 +311,43 @@ void CommandExecutor::handleFadeToColorFromChannelsCommand() {
   Serial.print(' ');
   Serial.println(channelIndices[2]);
 #endif
-  
+
   if (m_pSignalSource == 0) {
     SET_ERROR(Errors::OPERATION_NOT_SUPPORTED);
     color.red = color.green = color.blue = 0;
   } else {
     numChannels = m_pSignalSource->numChannels();
-    
-    if (channelIndices[0] > numChannels) {
+
+    if (channelIndices[0] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.red = 0;
     } else {
       color.red = m_pSignalSource->filteredChannelValue(channelIndices[0]);
     }
-    
-    if (channelIndices[1] > numChannels) {
+
+    if (channelIndices[1] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.green = 0;
     } else {
       color.green = m_pSignalSource->filteredChannelValue(channelIndices[1]);
     }
-    
-    if (channelIndices[2] > numChannels) {
+
+    if (channelIndices[2] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.blue = 0;
     } else {
       color.blue = m_pSignalSource->filteredChannelValue(channelIndices[2]);
     }
   }
-  
+
   fadeColorOfLEDStrip(color);
 }
 
 void CommandExecutor::handleFadeToGrayCommand() {
   rgb_color_t color;
-  
+
   color.red = color.green = color.blue = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.println(color.red);
@@ -362,7 +362,7 @@ void CommandExecutor::handleFadeToWhiteCommand() {
 
 void CommandExecutor::handleJumpCommand() {
   unsigned long address = nextVarint();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.println(address);
@@ -386,7 +386,7 @@ void CommandExecutor::handleLoopBeginCommand() {
     stop();
     return;
   }
-  
+
 #ifdef DEBUG
   Serial.print(F(" Starting loop #"));
   Serial.print(m_loopStack.size());
@@ -400,7 +400,7 @@ void CommandExecutor::handleLoopBeginCommand() {
 
 void CommandExecutor::handleLoopEndCommand() {
   bytecode_location_t jumpTo = m_loopStack.end();
-  
+
 #ifdef DEBUG
   if (jumpTo == BYTECODE_LOCATION_NOWHERE) {
     Serial.print(F(" Loop #"));
@@ -428,11 +428,11 @@ void CommandExecutor::handleSetBlackCommand() {
 
 void CommandExecutor::handleSetColorCommand() {
   rgb_color_t color;
-  
+
   color.red = nextByte();
   color.green = nextByte();
   color.blue = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.print(color.red);
@@ -454,7 +454,7 @@ void CommandExecutor::handleSetColorFromChannelsCommand() {
   channelIndices[0] = nextByte();
   channelIndices[1] = nextByte();
   channelIndices[2] = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.print(channelIndices[0]);
@@ -469,21 +469,21 @@ void CommandExecutor::handleSetColorFromChannelsCommand() {
     color.red = color.green = color.blue = 0;
   } else {
     numChannels = m_pSignalSource->numChannels();
-    
+
     if (channelIndices[0] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.red = 0;
     } else {
       color.red = m_pSignalSource->filteredChannelValue(channelIndices[0]);
     }
-    
+
     if (channelIndices[1] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.green = 0;
     } else {
       color.green = m_pSignalSource->filteredChannelValue(channelIndices[1]);
     }
-    
+
     if (channelIndices[2] >= numChannels) {
       SET_ERROR(Errors::INVALID_CHANNEL_INDEX);
       color.blue = 0;
@@ -491,16 +491,16 @@ void CommandExecutor::handleSetColorFromChannelsCommand() {
       color.blue = m_pSignalSource->filteredChannelValue(channelIndices[2]);
     }
   }
-  
+
   handleDelayByte();
   setColorOfLEDStrip(color);
 }
 
 void CommandExecutor::handleSetGrayCommand() {
   rgb_color_t color;
-  
+
   color.red = color.green = color.blue = nextByte();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.println(color.red);
@@ -549,7 +549,7 @@ void CommandExecutor::handleTriggeredJumpCommand() {
 
   // Also extract the channel index
   channelIndex = triggerParams & 0x0F;
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.println(triggerParams);
@@ -581,7 +581,7 @@ void CommandExecutor::handleTriggeredJumpCommand() {
 
 void CommandExecutor::handleWaitUntilCommand() {
   unsigned long deadline = nextVarint();
-  
+
 #ifdef DEBUG
   Serial.print(F(" Arguments: "));
   Serial.println(deadline);

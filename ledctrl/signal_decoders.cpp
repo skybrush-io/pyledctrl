@@ -2,6 +2,12 @@
 #include "signal_decoders.h"
 
 /**
+ * \def SIGNAL_TIMEOUT_US
+ * Defines a timeout value in [us] for the signal source to be treated as inactive.
+ */
+#define SIGNAL_TIMEOUT_US 1000000L
+
+/**
  * \def PPM_NUMBER_OF_EDGES
  * Defines how many edges there are in a single PPM signal period (8 channels:
  * 8 rising edge and 1 rising edge in the next cycle, which indicates the next
@@ -18,8 +24,9 @@
 /**
  * \def PPM_SAMPLE_COUNT
  * Defines how many samples will be used to calculate the filtered PPM signals.
+ * Actually, the current channel reading will be excluded...
  */
-#define PPM_SAMPLE_COUNT 5
+#define PPM_SAMPLE_COUNT 6
 
 /**
  * Stores the index of the current PPM channel.
@@ -61,10 +68,13 @@ volatile u8 PPMSignalSource::filteredChannelValue(u8 channelIndex) const {
   long filteredValue = 0;
 
   for (i = 0; i < PPM_SAMPLE_COUNT; i++) {
+      // skip current measurement as it can be half ready...
+      if (i == ppmCurrentSampleIndex) continue;
+      // add all the rest to the averaging
       filteredValue += ppmSignalSource_periods[channelIndex][i];
   }
 
-  return rescalePeriodLengthToByte(filteredValue / PPM_SAMPLE_COUNT);
+  return rescalePeriodLengthToByte(filteredValue / (PPM_SAMPLE_COUNT-1));
 }
 
 void PPMSignalSource::attachInterruptHandler() const {
@@ -72,6 +82,7 @@ void PPMSignalSource::attachInterruptHandler() const {
 }
 
 u8 PPMSignalSource::channelValue(u8 channelIndex) const {
+  // we use the last entire frame as the latest correct reading
   return rescalePeriodLengthToByte(ppmSignalSource_periods[channelIndex][ppmLastSampleIndex]);
 }
 
@@ -122,7 +133,13 @@ void PPMSignalSource::dumpDebugInformation() const {
 }
 
 u8 PPMSignalSource::numChannels() const {
-  return PPM_NUMBER_OF_EDGES-1;
+  return PPM_NUMBER_OF_EDGES;
+}
+
+bool PPMSignalSource::isActive() const {
+  if (micros() - ppmSignalSource_lastTime < SIGNAL_TIMEOUT_US)
+    return true;
+  return false;
 }
 
 u8 PPMSignalSource::rescalePeriodLengthToByte(long periodLength) {
@@ -151,7 +168,7 @@ static volatile u8 currentPWMPinIndex = 0;
 static volatile long pwmSignalSource_lastTime;
 
 /**
- * Stores the length of the last full period. 
+ * Stores the length of the last full period.
  */
 static volatile long pwmSignalSource_lastPeriodLength;
 
@@ -161,12 +178,12 @@ static volatile long pwmSignalSource_lastPeriodLength;
 static volatile long pwmSignalSource_periodStartTime;
 
 /**
- * Stores the length of the "high" part of the last full period. 
+ * Stores the length of the "high" part of the last full period.
  */
 static volatile long pwmSignalSource_highTime;
 
 /**
- * Stores the length of the "low" part of the last full period. 
+ * Stores the length of the "low" part of the last full period.
  */
 static volatile long pwmSignalSource_lowTime;
 
@@ -187,19 +204,25 @@ u8 PWMSignalSource::channelValue(u8 channelIndex) const {
 
 void PWMSignalSource_interruptHandler() {
   long currentTime = micros();
-  
+
   if (bitRead(PIND, currentPWMPinIndex) == HIGH) {
     pwmSignalSource_lastPeriodLength = currentTime - pwmSignalSource_periodStartTime;
     pwmSignalSource_highTime = currentTime - pwmSignalSource_lastTime;
   } else {
     pwmSignalSource_lowTime = currentTime - pwmSignalSource_lastTime;
   }
-  
+
   pwmSignalSource_lastTime = currentTime;
 }
 
 u8 PWMSignalSource::numChannels() const {
   return 0;    // TODO: update when we have proper PWM decoding
+}
+
+bool PWMSignalSource::isActive() const {
+  if (micros() - pwmSignalSource_lastTime < SIGNAL_TIMEOUT_US)
+    return true;
+  return false;
 }
 
 void PWMSignalSource::dumpDebugInformation() const {
@@ -213,7 +236,7 @@ void PWMSignalSource::dumpDebugInformation() const {
     Serial.println("  [not ok]");
   }
 }
-    
+
 /*======================================================================================*/
 
 volatile u8 DummySignalSource::filteredChannelValue(u8 channelIndex) const {
@@ -227,7 +250,7 @@ u8 DummySignalSource::channelValue(u8 channelIndex) const {
 
 void DummySignalSource::dumpDebugInformation() const {
   int i, n = numChannels();
-  
+
   for (i = 0; i < n; i++) {
     Serial.print(" #");
     Serial.print(i);
@@ -239,4 +262,8 @@ void DummySignalSource::dumpDebugInformation() const {
 
 u8 DummySignalSource::numChannels() const {
   return m_numChannels;
+}
+
+bool DummySignalSource::isActive() const {
+  return true;
 }

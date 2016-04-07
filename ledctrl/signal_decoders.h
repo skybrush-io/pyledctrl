@@ -18,14 +18,14 @@ class SignalSource {
      * Destructor.
      */
     virtual ~SignalSource() {}
-    
+
     /**
      * Returns a noise-filtered value of the given channel.
-     * 
+     *
      * \param  channelIndex  index of the channel to read.
      */
     virtual volatile u8 filteredChannelValue(u8 channelIndex) const = 0;
-    
+
     /**
      * Returns the current value of the given channel.
      *
@@ -42,6 +42,11 @@ class SignalSource {
      * Returns the number of channels for this signal source.
      */
     virtual u8 numChannels() const = 0;
+
+    /**
+     * Returns whether signal source is active or is OFF for at least 1s.
+     */
+    virtual bool isActive() const = 0;
 };
 
 /**
@@ -72,6 +77,7 @@ class PPMSignalSource : public SignalSource {
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;
+    bool isActive() const;
 
     /**
      * Attaches the necessary interrupt handler that will handle the PPM signal source.
@@ -102,16 +108,16 @@ class PWMSignalSource : public SignalSource {
      * Index of the interrupt that will notify us when the signal changes.
      */
     u8 m_interruptIndex;
-    
+
     /**
      * Index of the pin on which the signal is read.
      */
     u8 m_pinIndex;
-    
+
   public:
     /**
      * Constructor.
-     * 
+     *
      * \param  pinIndex  index of the pin on which the signal is read
      */
     explicit PWMSignalSource(u8 interruptIndex) : SignalSource(), m_interruptIndex(interruptIndex) {
@@ -124,6 +130,7 @@ class PWMSignalSource : public SignalSource {
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;
+    bool isActive() const;
 
     /**
      * Attaches the necessary interrupt handler that will handle the PPM signal source.
@@ -149,11 +156,11 @@ class DummySignalSource : public SignalSource {
      * Index of the pin corresponding to each of the channels.
      */
     u8* m_pins;
-    
+
   public:
     /**
      * Constructor.
-     * 
+     *
      * \param  numChannels  the number of channels in the source
      * \param  pins         the pins corresponding to each of the channels
      */
@@ -166,11 +173,12 @@ class DummySignalSource : public SignalSource {
     ~DummySignalSource() {
       delete m_pins;
     }
-    
+
     volatile u8 filteredChannelValue(u8 channelIndex) const;
     u8 channelValue(u8 channelIndex) const;
     void dumpDebugInformation() const;
     u8 numChannels() const;
+    bool isActive() const;
 };
 
 #endif
