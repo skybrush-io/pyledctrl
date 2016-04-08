@@ -30,42 +30,44 @@ extern "C" {
 
 /**
  * \def DEBUG
- * 
+ *
  * Define this if you need debugging information on the serial console.
  */
 #define DEBUG 1
 
 /**
  * \def RED_PWM_PIN
- * 
+ *
  * Index of the PWM pin corresponding to the red LEDs.
  */
 #define RED_PWM_PIN 6
+#define RED_PWM_PIN 11 // timer2
 
 /**
  * \def GREEN_PWM_PIN
- * 
+ *
  * Index of the PWM pin corresponding to the green LEDs.
  */
 #define GREEN_PWM_PIN 9
 
 /**
  * \def BLUE_PWM_PIN
- * 
+ *
  * Index of the PWM pin corresponding to the blue LEDs.
  */
 #define BLUE_PWM_PIN 5
+#define BLUE_PWM_PIN 3 // timer2
 
 /**
  * \def WHITE_PWM_PIN
- * 
+ *
  * Index of the PWM pin corresponding to the WHITE LEDs.
  */
 #define WHITE_PWM_PIN 10
 
 /**
  * \def MAIN_SWITCH_PIN
- * 
+ *
  * Analog input corresponding to the main switch.
  * If you have a switch-button, you should define this; otherwise comment this out.
  */
@@ -73,7 +75,7 @@ extern "C" {
 
 /**
  * \def MAIN_SWITCH_CHANNEL
- * 
+ *
  * Zero-indexed RC channel corresponding to the main switch
  * Comment this out if you do not want to have
  * an RC channel associated with a main switch
@@ -92,7 +94,7 @@ extern "C" {
 
 /**
  * \def ENABLE_SERIAL_INPUT
- * 
+ *
  * Whether the LED controller should listen for incoming commands on the
  * serial port.
  */
@@ -100,7 +102,7 @@ extern "C" {
 
 /**
  * \def VOLTMETER_PIN
- * 
+ *
  * Index of the pin corresponding to the voltmeter. Comment this out if
  * you don't have a voltmeter.
  */
@@ -117,14 +119,14 @@ extern "C" {
 
 /**
  * \def LIGHT_COEFF
- * 
+ *
  * Correction coefficient for the LED brightness. Ignored if we have no voltmeter.
  */
 //#define LIGHT_COEFF 0.8
 
 /**
  * \def SERIAL_BAUD_RATE
- * 
+ *
  * Baud rate of the serial port where we will listen for incoming commands
  * and where we will send debug messages.
  */
@@ -132,14 +134,14 @@ extern "C" {
 
 /**
  * \def MAX_LOOP_DEPTH
- * 
+ *
  * Maximum number of nested loops that the command executor will be able to handle.
  */
 #define MAX_LOOP_DEPTH 4
 
 /**
  * \def MAX_TRIGGER_COUNT
- * 
+ *
  * Maximum number of triggers that the command executor will be able to handle.
  */
 #define MAX_TRIGGER_COUNT 4
@@ -160,7 +162,7 @@ extern "C" {
  * \def RC_INTERRUPT
  * Define this to the index of the interrupt to use for reading the RC controller
  * signal.
- * 
+ *
  * The Arduino Nano has two interrupt pins; interrupt 0 is on digital pin 2,
  * while interrupt 1 is on digital pin 3.
  */
@@ -174,7 +176,7 @@ extern "C" {
 
 /**
  * \def RED_LED_MIN_VOLTAGE
- * Minimum (threshold) voltage where the red LED opens 
+ * Minimum (threshold) voltage where the red LED opens
  */
 #define RED_LED_MIN_VOLTAGE 0.0
 
@@ -186,7 +188,7 @@ extern "C" {
 
 /**
  * \def GREEN_LED_MIN_VOLTAGE
- * Minimum (threshold) voltage where the green LED opens 
+ * Minimum (threshold) voltage where the green LED opens
  */
 #define GREEN_LED_MIN_VOLTAGE 0.0
 
@@ -199,7 +201,7 @@ extern "C" {
 
 /**
  * \def BLUE_LED_MIN_VOLTAGE
- * Minimum (threshold) voltage where the blue LED opens 
+ * Minimum (threshold) voltage where the blue LED opens
  */
 #define BLUE_LED_MIN_VOLTAGE 0.0
 
