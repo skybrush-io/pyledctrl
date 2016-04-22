@@ -137,9 +137,7 @@ u8 PPMSignalSource::numChannels() const {
 }
 
 bool PPMSignalSource::isActive() const {
-  if (micros() - ppmSignalSource_lastTime < SIGNAL_TIMEOUT_US)
-    return true;
-  return false;
+  return (micros() - ppmSignalSource_lastTime < SIGNAL_TIMEOUT_US);
 }
 
 u8 PPMSignalSource::rescalePeriodLengthToByte(long periodLength) {
@@ -220,9 +218,7 @@ u8 PWMSignalSource::numChannels() const {
 }
 
 bool PWMSignalSource::isActive() const {
-  if (micros() - pwmSignalSource_lastTime < SIGNAL_TIMEOUT_US)
-    return true;
-  return false;
+  return (micros() - pwmSignalSource_lastTime < SIGNAL_TIMEOUT_US);
 }
 
 void PWMSignalSource::dumpDebugInformation() const {

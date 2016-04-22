@@ -128,16 +128,16 @@ void bytecodeRCCallback(EdgeDetector* detector, long time, void* data) {
  */
 void setup() {
 //---------------------------------------------- Set PWM frequency for D5 & D6 -------------------------------
- 
+
 //TCCR0B = TCCR0B & B11111000 | B00000001;    // set timer 0 divisor to     1 for PWM frequency of 62500.00 Hz
 //TCCR0B = TCCR0B & B11111000 | B00000010;    // set timer 0 divisor to     8 for PWM frequency of  7812.50 Hz
 //TCCR0B = TCCR0B & B11111000 | B00000011;    // set timer 0 divisor to    64 for PWM frequency of   976.56 Hz (The DEFAULT)
 //TCCR0B = TCCR0B & B11111000 | B00000100;    // set timer 0 divisor to   256 for PWM frequency of   244.14 Hz (recommended for LED use but Timer0 is used by time functions...)
 //TCCR0B = TCCR0B & B11111000 | B00000101;    // set timer 0 divisor to  1024 for PWM frequency of    61.04 Hz
- 
- 
+
+
 //---------------------------------------------- Set PWM frequency for D9 & D10 ------------------------------
- 
+
 //TCCR1B = TCCR1B & B11111000 | B00000001;    // set timer 1 divisor to     1 for PWM frequency of 31372.55 Hz
 //TCCR1B = TCCR1B & B11111000 | B00000010;    // set timer 1 divisor to     8 for PWM frequency of  3921.16 Hz
 //TCCR1B = TCCR1B & B11111000 | B00000011;    // set timer 1 divisor to    64 for PWM frequency of   490.20 Hz (The DEFAULT)
@@ -145,16 +145,16 @@ void setup() {
 //TCCR1B = TCCR1B & B11111000 | B00000101;    // set timer 1 divisor to  1024 for PWM frequency of    30.64 Hz
 
 //---------------------------------------------- Set PWM frequency for D3 & D11 ------------------------------
- 
+
 //TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 1 divisor to     1 for PWM frequency of 31372.55 Hz
 //TCCR2B = TCCR2B & B11111000 | B00000010;    // set timer 1 divisor to     8 for PWM frequency of  3921.16 Hz
 //TCCR2B = TCCR2B & B11111000 | B00000011;    // set timer 1 divisor to    32 for PWM frequency of   980.40 Hz
 //TCCR2B = TCCR2B & B11111000 | B00000100;    // set timer 1 divisor to    64 for PWM frequency of   490.20 Hz (The DEFAULT)
-//TCCR2B = TCCR2B & B11111000 | B00000101;    // set timer 1 divisor to   128 for PWM frequency of   245.10 Hz 
+//TCCR2B = TCCR2B & B11111000 | B00000101;    // set timer 1 divisor to   128 for PWM frequency of   245.10 Hz
   TCCR2B = TCCR2B & B11111000 | B00000110;    // set timer 1 divisor to   256 for PWM frequency of   122.55 Hz (recommended for LED use, keep in mind that tone() won't be available)
 //TCCR2B = TCCR2B & B11111000 | B00000111;    // set timer 1 divisor to  1024 for PWM frequency of    30.64 Hz
 
-  
+
   // Wait 100 milliseconds. This is necessary to give some time to PCB's circuit
   // to prepare itself (e.g., condensators need some time to discharge)
   delay(100);
@@ -165,7 +165,7 @@ void setup() {
 
   // Set up the error handler as early as possible
   ErrorHandler::instance().setErrorLED(&builtinLed);
-  
+
 #ifdef VOLTMETER_PIN
   // Attach the voltage meter to the LED strip
   ledStrip.setVoltmeter(&voltmeter);
@@ -175,7 +175,7 @@ void setup() {
   // Attach to the PPM/PWM interrupts if needed
   signalSource.attachInterruptHandler();
 #endif
-  
+
   // Load the bytecode into the executor. We have to do it here and not
   // before the +READY prompt because errors might already happen here
   // (e.g., we are trying to load bytecode from the EEPROM but there is
@@ -189,7 +189,7 @@ void setup() {
 #ifdef ENABLE_SERIAL_INPUT
   // Inform the serial protocol parser about the executor so the parser
   // can manipulate it. This is not really nice; a better solution would
-  // be to let the parser forward the information about the parsed 
+  // be to let the parser forward the information about the parsed
   // command to a callback function, and we could then provide a callback
   // function here in the main file so the parser does not have to "know"
   // about the executor directly.
@@ -271,7 +271,7 @@ void loop() {
 
 #ifdef ENABLE_SERIAL_INPUT
 /**
- * Handler function that is called between iterations of the main loop if 
+ * Handler function that is called between iterations of the main loop if
  * there is data to be read from the serial port.
  */
 void serialEvent() {
