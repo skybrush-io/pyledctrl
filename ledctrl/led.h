@@ -1,6 +1,6 @@
 /**
- * \file led_strip.h
- * \brief Handling of a single LED attached to the Arduino.
+ * \file led.h
+ * \brief Handling of a single-coloured LED attached to the Arduino.
  */
 
 #ifndef LED_H

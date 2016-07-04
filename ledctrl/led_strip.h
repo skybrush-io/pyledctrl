@@ -18,6 +18,7 @@
 #include "utils.h"
 #include "voltmeter.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 /**
 * \brief Represents an RGB LED strip attached to the Arduino on three pins,
@@ -41,6 +42,17 @@ private:
   u8 m_bluePin;
 
   /**
+   * Index of the white pin of the LED.
+   */
+  u8 m_whitePin;
+
+  /**
+   * Should we use the white LED in the color mixing?
+   */
+  u8 m_useWhiteLED;
+
+
+  /**
    * Pointer to an optional voltage meter that the LED strip may use for non-linear
    * brightness compensation.
    */
@@ -60,9 +72,11 @@ public:
    * \param  redPin    index of the red pin
    * \param  greenPin  index of the green pin
    * \param  bluePin   index of the blue pin
+   * \param  whitePin   index of the white pin
    */
-  LEDStrip(u8 redPin, u8 greenPin, u8 bluePin)
-    : m_redPin(redPin), m_greenPin(greenPin), m_bluePin(bluePin) {
+  LEDStrip(u8 redPin, u8 greenPin, u8 bluePin, u8 whitePin, u8 useWhiteLED)
+    : m_redPin(redPin), m_greenPin(greenPin), m_bluePin(bluePin),
+      m_whitePin(whitePin), m_useWhiteLED(useWhiteLED) {
     initialize();
   }
 
@@ -95,7 +109,6 @@ public:
    * \param  blue   the blue component of the strip.
    */
   void setColor(u8 red, u8 green, u8 blue) const {
-    byte value;
     float compensator;
 
     compensator = m_pVoltmeter ? m_pVoltmeter->lastReading() : 1;
@@ -107,17 +120,32 @@ public:
 
     // Calculate the linearized and voltage compensated lighting value that
     // will actually be written to the pin
-    byte compensatedRed = calculateVoltageCompensatedValue(red,
-                          m_pwmIntervals.red_duty_range, compensator);
-	  LED_PIN_WRITE(m_redPin, compensatedRed);
+    u8 white, cRed, cGreen, cBlue, cWhite;
 
-    byte compensatedGreen = calculateVoltageCompensatedValue(green,
-                            m_pwmIntervals.green_duty_range, compensator);
-	  LED_PIN_WRITE(m_greenPin, compensatedGreen);
+    if (!m_useWhiteLED) {
+      white = 0;
+    } else {
+      white = MIN(MIN(red, green), blue);
+      red -= white;
+      green -= white;
+      blue -= white;
+    }
 
-    byte compensatedBlue = calculateVoltageCompensatedValue(blue,
-                           m_pwmIntervals.blue_duty_range, compensator);
-	  LED_PIN_WRITE(m_bluePin, compensatedBlue);
+    cRed = calculateVoltageCompensatedValue(red,
+            m_pwmIntervals.red_duty_range, compensator);
+    cGreen = calculateVoltageCompensatedValue(green,
+            m_pwmIntervals.green_duty_range, compensator);
+    cBlue = calculateVoltageCompensatedValue(blue,
+            m_pwmIntervals.blue_duty_range, compensator);
+    LED_PIN_WRITE(m_redPin, cRed);
+    LED_PIN_WRITE(m_greenPin, cGreen);
+    LED_PIN_WRITE(m_bluePin, cBlue);
+
+    if (m_whitePin) {
+      cWhite = calculateVoltageCompensatedValue(white,
+              m_pwmIntervals.white_duty_range, compensator);
+      LED_PIN_WRITE(m_whitePin, cWhite);
+    }
   }
 
   /**

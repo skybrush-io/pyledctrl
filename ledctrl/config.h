@@ -40,8 +40,8 @@ extern "C" {
  *
  * Index of the PWM pin corresponding to the red LEDs.
  */
-#define RED_PWM_PIN 6
-#define RED_PWM_PIN 11 // timer2
+#define RED_PWM_PIN 6 
+#define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
 
 /**
  * \def GREEN_PWM_PIN
@@ -56,14 +56,20 @@ extern "C" {
  * Index of the PWM pin corresponding to the blue LEDs.
  */
 #define BLUE_PWM_PIN 5
-#define BLUE_PWM_PIN 3 // timer2
+#define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
 
 /**
  * \def WHITE_PWM_PIN
  *
  * Index of the PWM pin corresponding to the WHITE LEDs.
+ * If you have no white LED, set it to zero.
  */
 #define WHITE_PWM_PIN 10
+
+/**
+ * \def set to 1 if you want to use white led in the color mixing, 0 if not
+ */
+#define USE_WHITE_LED 1
 
 /**
  * \def MAIN_SWITCH_PIN
@@ -211,6 +217,18 @@ extern "C" {
  */
 //#define BLUE_LED_MAX_VOLTAGE 9.10
 #define BLUE_LED_MAX_VOLTAGE 12.00
+
+/**
+ * \def WHITE_LED_MIN_VOLTAGE
+ * Minimum (threshold) voltage where the white LED opens
+ */
+#define WHITE_LED_MIN_VOLTAGE 0.0
+
+/**
+ * \def WHITE_LED_MAX_VOLTAGE
+ * Maximum voltage where the white LED gives "quasi-white"
+ */
+#define WHITE_LED_MAX_VOLTAGE 12.00
 
 #ifdef __cplusplus
 }

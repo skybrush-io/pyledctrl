@@ -19,7 +19,8 @@ LED builtinLed;
 /**
  * The LED strip attached to the board.
  */
-LEDStrip ledStrip(RED_PWM_PIN, GREEN_PWM_PIN, BLUE_PWM_PIN);
+LEDStrip ledStrip(RED_PWM_PIN, GREEN_PWM_PIN, BLUE_PWM_PIN,
+        WHITE_PWM_PIN, USE_WHITE_LED);
 
 #ifdef MAIN_SWITCH_PIN
 /**

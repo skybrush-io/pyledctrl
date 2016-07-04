@@ -25,13 +25,14 @@ typedef struct {
 } byte_range_t;
 
 /**
- * Structure storing PWM limit voltages corresponding to the R, G and B pins of
+ * Structure storing PWM limit voltages corresponding to the R, G, B and W pins of
  * a LED strip.
  */
 typedef struct {
   byte_range_t red_duty_range;
   byte_range_t green_duty_range;
   byte_range_t blue_duty_range;
+  byte_range_t white_duty_range;
 } color_pwm_intervals_t;
 
 #ifdef __cplusplus
