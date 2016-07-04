@@ -5,15 +5,15 @@
  * \def SIGNAL_TIMEOUT_US
  * Defines a timeout value in [us] for the signal source to be treated as inactive.
  */
-#define SIGNAL_TIMEOUT_US 1000000L
+#define SIGNAL_TIMEOUT_US 250000L
 
 /**
- * \def PPM_NUMBER_OF_EDGES
- * Defines how many edges there are in a single PPM signal period (8 channels:
- * 8 rising edge and 1 rising edge in the next cycle, which indicates the next
- * period and the end of the current one).
+ * \def PPM_NUMBER_OF_CHANNELS
+ * Defines how many channels there are in a single PPM signal period
+ * (8 channels: 8 rising edge and 1 rising edge in the next cycle,
+ * which indicates the next period and the end of the current one).
  */
-#define PPM_NUMBER_OF_EDGES 8
+#define PPM_NUMBER_OF_CHANNELS 8
 
 /**
  * \def PPM_MINIMUM_FRAME_GAP_LENGTH_US
@@ -54,14 +54,14 @@ static volatile long ppmSignalSource_lastFullPeriodStartTime;
  * Stores the lengths of the periods corresponding to the individual channels
  * in the last PPM_SAMPLE_COUNT full periods of the PPM signal.
  */
-static volatile long ppmSignalSource_periods[PPM_NUMBER_OF_EDGES][PPM_SAMPLE_COUNT];
+static volatile long ppmSignalSource_periods[PPM_NUMBER_OF_CHANNELS][PPM_SAMPLE_COUNT];
 
 /**
  * Second index of the the ppmSignalSource_periods variable corresponding to
- * the last readout
+ * the current and last full (usable) readouts
  */
 static volatile u8 ppmCurrentSampleIndex = 0;
-static volatile u8 ppmLastSampleIndex = 0;
+static volatile u8 ppmLastFullSampleIndex = 0;
 
 volatile u8 PPMSignalSource::filteredChannelValue(u8 channelIndex) const {
   u8 i;
@@ -83,30 +83,42 @@ void PPMSignalSource::attachInterruptHandler() const {
 
 u8 PPMSignalSource::channelValue(u8 channelIndex) const {
   // we use the last entire frame as the latest correct reading
-  return rescalePeriodLengthToByte(ppmSignalSource_periods[channelIndex][ppmLastSampleIndex]);
+  return rescalePeriodLengthToByte(ppmSignalSource_periods[channelIndex][ppmLastFullSampleIndex]);
 }
 
 void PPMSignalSource_interruptHandler() {
   long currentTime = micros();
   long periodLength = currentTime - ppmSignalSource_lastTime;
-  // in PPM mode we detect signal periods between rising edges,
-  // and there should be 8 rising edges in one channel scan burst
-  // each interrupt callback corresponds to one channel starting point
+  // in PPM mode we detect signal periods between rising edges.
+  // There should be numCh+1 rising edges in one channel scan burst.
+  // Each interrupt callback corresponds to one channel starting point and
+  // one extra is for termination of the last channel.
   ppmSignalSource_currentChannel++;
   // The first one after a long empty period is the starting time
   // of the first channel in the next PPM sample/frame
-  if (ppmSignalSource_currentChannel >= PPM_NUMBER_OF_EDGES ||
+  if (ppmSignalSource_currentChannel >= PPM_NUMBER_OF_CHANNELS ||
       periodLength >= PPM_MINIMUM_FRAME_GAP_LENGTH_US) {
-    // reset channel index
+    if (ppmSignalSource_currentChannel >= PPM_NUMBER_OF_CHANNELS) {
+      // step to next ppm sample index and store last as full good
+      ppmLastFullSampleIndex = ppmCurrentSampleIndex;
+      if (++ppmCurrentSampleIndex >= PPM_SAMPLE_COUNT)
+        ppmCurrentSampleIndex = 0;
+    } else {
+#ifdef DEBUG
+      Serial.print(" Bad ending channel: ");
+      Serial.print(ppmSignalSource_currentChannel);
+      Serial.print(" Bad period length: ");
+      Serial.println(periodLength);
+#endif
+    }
+    // reset channel index in both cases:
+    //   - everything is all right, we filled all channels
+    //   - something was wrong, long gap detected unexpectedly
     ppmSignalSource_currentChannel = -1;
 #ifdef DEBUG
     ppmSignalSource_fullPeriodLength = currentTime - ppmSignalSource_lastFullPeriodStartTime;
     ppmSignalSource_lastFullPeriodStartTime = currentTime;
 #endif
-    // step to next ppm sample index
-    ppmLastSampleIndex = ppmCurrentSampleIndex;
-    if (++ppmCurrentSampleIndex >= PPM_SAMPLE_COUNT)
-        ppmCurrentSampleIndex = 0;
   // store period in the proper channel and sample index
   } else {
     ppmSignalSource_periods[ppmSignalSource_currentChannel][ppmCurrentSampleIndex] = periodLength;
@@ -118,7 +130,7 @@ void PPMSignalSource_interruptHandler() {
 void PPMSignalSource::dumpDebugInformation() const {
   int i;
 
-  for (i = 0; i < PPM_NUMBER_OF_EDGES; i++) {
+  for (i = 0; i < PPM_NUMBER_OF_CHANNELS; i++) {
     Serial.print(" #");
     Serial.print(i);
     Serial.print(": ");
@@ -133,7 +145,7 @@ void PPMSignalSource::dumpDebugInformation() const {
 }
 
 u8 PPMSignalSource::numChannels() const {
-  return PPM_NUMBER_OF_EDGES;
+  return PPM_NUMBER_OF_CHANNELS;
 }
 
 bool PPMSignalSource::isActive() const {
