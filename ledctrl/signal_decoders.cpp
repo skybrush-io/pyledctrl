@@ -18,8 +18,18 @@
 /**
  * \def PPM_MINIMUM_FRAME_GAP_LENGTH_US
  * Length of a frame gap in the PPM signal (in microseconds).
+ *
+ * Measured values on FrSky V8R7II:
+ *
+ *   base voltage:                    low (0V)
+ *   spike voltage:                   high (3.3V)
+ *   spike type:                      rising+falling
+ *   spike width:                     ~100 us
+ *   interval between channel spikes: ~1(low) - 2(high) ms.
+ *   interval between frames spikes:  ~5 ms.
+ *
  */
-#define PPM_MINIMUM_FRAME_GAP_LENGTH_US 4000
+#define PPM_MINIMUM_FRAME_GAP_LENGTH_US 3000
 
 /**
  * \def PPM_SAMPLE_COUNT
