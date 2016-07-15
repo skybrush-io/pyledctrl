@@ -33,14 +33,14 @@ extern "C" {
  *
  * Define this if you need debugging information on the serial console.
  */
-#define DEBUG 1
+//#define DEBUG 1
 
 /**
  * \def RED_PWM_PIN
  *
  * Index of the PWM pin corresponding to the red LEDs.
  */
-#define RED_PWM_PIN 6 
+#define RED_PWM_PIN 6 // NanoLED v1.0
 #define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
 
 /**
@@ -55,7 +55,7 @@ extern "C" {
  *
  * Index of the PWM pin corresponding to the blue LEDs.
  */
-#define BLUE_PWM_PIN 5
+#define BLUE_PWM_PIN 5 // NanoLED v1.0
 #define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
 
 /**
@@ -69,7 +69,7 @@ extern "C" {
 /**
  * \def set to 1 if you want to use white led in the color mixing, 0 if not
  */
-#define USE_WHITE_LED 1
+#define USE_WHITE_LED 0
 
 /**
  * \def MAIN_SWITCH_PIN

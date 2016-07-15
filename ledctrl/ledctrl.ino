@@ -77,7 +77,7 @@ CommandExecutor executor(&ledStrip);
 #elif BYTECODE_INDEX == 6
 #  include "bytecode_test.h"
 #elif BYTECODE_INDEX == 7
-#  include "show_1.h"
+#  include "show_5.h"
 #else
 #  error "Invalid BYTECODE_INDEX value"
 #endif
