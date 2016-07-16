@@ -8,8 +8,8 @@ from pyledctrl.compiler.errors import CompilerError, \
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import \
     SunliteSceneToPythonSourceCompilationStage, \
-    PythonSourceToASTCompilationStage, ASTToBytecodeCompilationStage, \
-    ASTToProgmemHeaderCompilationStage
+    PythonSourceToASTFileCompilationStage, ASTFileToBytecodeCompilationStage, \
+    ASTFileToProgmemHeaderCompilationStage
 from pyledctrl.utils import TemporaryDirectory
 
 
@@ -88,7 +88,7 @@ class BytecodeCompiler(object):
         if ext == ".led":
             ast_file = self._create_intermediate_filename(output_file, ".ast")
             plan.add_step(
-                PythonSourceToASTCompilationStage(input_file, ast_file)
+                PythonSourceToASTFileCompilationStage(input_file, ast_file)
             )
         elif ext == ".sce":
             if "{}" not in output_file:
@@ -101,7 +101,7 @@ class BytecodeCompiler(object):
                 input_file, led_file_template)
             plan.add_step(preprocessing_stage)
             for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
-                stage = PythonSourceToASTCompilationStage(
+                stage = PythonSourceToASTFileCompilationStage(
                     intermediate_file,
                     ast_file_template.replace("{}", id),
                     id=id
@@ -112,12 +112,12 @@ class BytecodeCompiler(object):
 
         # Add the stages based on the extension of the output file
         if output_ext == ".h":
-            output_stage_factory = ASTToProgmemHeaderCompilationStage
+            output_stage_factory = ASTFileToProgmemHeaderCompilationStage
         else:
-            output_stage_factory = ASTToBytecodeCompilationStage
+            output_stage_factory = ASTFileToBytecodeCompilationStage
 
         # We need to generate an output file for each AST file.
-        for stage in plan.iter_steps(PythonSourceToASTCompilationStage):
+        for stage in plan.iter_steps(PythonSourceToASTFileCompilationStage):
             if stage.id is not None:
                 real_output_file = output_file.replace("{}", stage.id)
             else:

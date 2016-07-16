@@ -38,7 +38,20 @@ class CompilationStage(object):
         raise NotImplementedError
 
 
-class FileBasedCompilationStage(CompilationStage):
+class FileToObjectCompilationStage(CompilationStage):
+    """Abstract compilation phase that turns a set of input files into an
+    in-memory object. This phase is executed unconditionally.
+    """
+
+    @property
+    def input_files(self):
+        raise []
+
+    def should_run(self):
+        return True
+
+
+class FileToFileCompilationStage(CompilationStage):
     """Abstract compilation phase that turns a set of input files into a set of
     output files. The phase is not executed if all the input files are older than
     all the output files.
@@ -70,21 +83,22 @@ class FileBasedCompilationStage(CompilationStage):
         return oldest_input >= youngest_output
 
 
-class PythonSourceToASTCompilationStage(FileBasedCompilationStage):
+class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
     """Compilation stage that turns a Python source file into an abstract
-    syntax tree representation of the LED controller program."""
+    syntax tree representation of the LED controller program and saves this
+    representation to permanent storage."""
 
     def __init__(self, input, output, id=None):
-        super(PythonSourceToASTCompilationStage, self).__init__()
+        super(PythonSourceToASTFileCompilationStage, self).__init__()
         self._input = input
         self._output = output
         self.id = id
 
-    @FileBasedCompilationStage.input_files.getter
+    @FileToFileCompilationStage.input_files.getter
     def input_files(self):
         return [self._input]
 
-    @FileBasedCompilationStage.output_files.getter
+    @FileToFileCompilationStage.output_files.getter
     def output_files(self):
         return [self._output]
 
@@ -110,12 +124,12 @@ class PythonSourceToASTCompilationStage(FileBasedCompilationStage):
         return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class ASTToOutputCompilationStage(FileBasedCompilationStage):
+class ASTFileToOutputCompilationStage(FileToFileCompilationStage):
     """Abstract compilation stage that turns a pickled abstract syntax tree
     into some output file."""
 
     def __init__(self, input, output):
-        super(ASTToOutputCompilationStage, self).__init__()
+        super(ASTFileToOutputCompilationStage, self).__init__()
         self._input = input
         self._output = output
 
@@ -136,16 +150,16 @@ class ASTToOutputCompilationStage(FileBasedCompilationStage):
         match = re.match("# Format: (.*)", line.decode("utf-8"))
         return match.group(1).lower() if match else None
 
-    @FileBasedCompilationStage.input_files.getter
+    @FileToFileCompilationStage.input_files.getter
     def input_files(self):
         return [self._input]
 
-    @FileBasedCompilationStage.output_files.getter
+    @FileToFileCompilationStage.output_files.getter
     def output_files(self):
         return [self._output]
 
 
-class ASTToBytecodeCompilationStage(ASTToOutputCompilationStage):
+class ASTFileToBytecodeCompilationStage(ASTFileToOutputCompilationStage):
     """Compilation stage that turns a pickled abstract syntax tree from a
     file into a bytecode file that can be uploaded to the Arduino using
     ``ledctrl upload``."""
@@ -156,7 +170,7 @@ class ASTToBytecodeCompilationStage(ASTToOutputCompilationStage):
             output.write(ast.to_bytecode())
 
 
-class ASTToProgmemHeaderCompilationStage(ASTToOutputCompilationStage):
+class ASTFileToProgmemHeaderCompilationStage(ASTFileToOutputCompilationStage):
     """Compilation stage that turns a pickled abstract syntax tree from a
     file into a header file that can be compiled into the ``ledctrl`` source code
     with an ``#include`` directive."""
@@ -189,7 +203,7 @@ class ASTToProgmemHeaderCompilationStage(ASTToOutputCompilationStage):
             output.write(self.FOOTER)
 
 
-class SunliteSceneToPythonSourceCompilationStage(FileBasedCompilationStage):
+class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
     def __init__(self, input, output_template=None):
         super(SunliteSceneToPythonSourceCompilationStage, self).__init__()
 
@@ -203,11 +217,11 @@ class SunliteSceneToPythonSourceCompilationStage(FileBasedCompilationStage):
         self._outputs = None
         self._outputs_by_ids = None
 
-    @FileBasedCompilationStage.input_files.getter
+    @FileToFileCompilationStage.input_files.getter
     def input_files(self):
         return [self._input]
 
-    @FileBasedCompilationStage.output_files.getter
+    @FileToFileCompilationStage.output_files.getter
     def output_files(self):
         if self._outputs is None:
             self._validate_outputs()
