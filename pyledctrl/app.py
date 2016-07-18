@@ -52,6 +52,30 @@ def connect(port=None, baud=DEFAULT_BAUD):
         error("No such port: {0}".format(port), fatal=True)
 
 
+@pyledctrl.command(shortopts=dict(output="o"))
+def dump(filename, output=None, keep=False):
+    """\
+    Dumps the LED lighting sequence of a LedCtrl source file.
+
+    The output of this command will be a tab-separated list of timestamps
+    (in seconds), red, green and blue components (between 0 and 255, inclusive)
+    and a Boolean flag that denotes whether the entry represents an abrupt
+    change or a fade.
+
+    :param filename: The name of the source file to compile.
+    :param output: The name of the output file. When omitted, it will be
+        the standard output.
+    """
+    if output is None:
+        output = sys.stdout
+    else:
+        output = open(output, "w")
+
+    compiler = BytecodeCompiler(keep_intermediate_files=False)
+    compiler.compile(filename)
+    print(repr(compiler.output))
+
+
 @pyledctrl.command(shortopts=dict(port="p", baud="b"))
 def upload(filename, port=None, baud=DEFAULT_BAUD):
     """\

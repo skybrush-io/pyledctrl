@@ -83,6 +83,32 @@ class FileToFileCompilationStage(CompilationStage):
         return oldest_input >= youngest_output
 
 
+class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
+    """Compilation stage that turns a Python source file into an abstract
+    syntax tree representation of the LED controller program in memory.
+    """
+
+    def __init__(self, input):
+        super(PythonSourceToASTObjectCompilationStage, self).__init__()
+        self._input = input
+        self._output = None
+
+    @FileToObjectCompilationStage.input_files.getter
+    def input_files(self):
+        return [self._input]
+
+    @property
+    def output(self):
+        return self._output
+
+    def run(self):
+        context = ExecutionContext()
+        with open(self._input) as fp:
+            code = compile(fp.read(), self.input_files[0], "exec")
+            context.evaluate(code, add_end_command=True)
+            self._output = context.ast
+
+
 class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
     """Compilation stage that turns a Python source file into an abstract
     syntax tree representation of the LED controller program and saves this
