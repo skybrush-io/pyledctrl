@@ -7,9 +7,6 @@ set_color("black", duration=0.1)
 set_color("white", duration=0.1)
 set_color("black", duration=0.1)
 
-for i in xrange(0,256):
-    set_color(i,0,0,0.5)
-
 with loop():
 	for color in "blue black red black green black yellow black cyan black magenta black white black".split():
 		fade_to_color(color, duration=FADE_DURATION)

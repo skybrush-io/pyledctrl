@@ -117,10 +117,7 @@ class BytecodeCompiler(object):
                 plan.add_step(preprocessing_stage)
                 for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
                     stage = PythonSourceToASTObjectCompilationStage(
-                        intermediate_file,
-                        ast_file_template.replace("{}", id),
-                        id=id
-                    )
+                        intermediate_file)
                     in_memory_output_stages.append(stage)
                     plan.add_step(stage)
             else:

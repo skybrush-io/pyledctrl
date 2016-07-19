@@ -5,12 +5,14 @@ Main application class for PyLedCtrl
 from __future__ import print_function
 
 import baker
+import csv
 import os
 import subprocess
 import sys
 
 from pyledctrl.compiler import BytecodeCompiler
 from pyledctrl.config import DEFAULT_BAUD
+from pyledctrl.executor import Executor
 from pyledctrl.upload import BytecodeUploader
 from pyledctrl.utils import error, get_serial_port_filename, \
     get_serial_connection
@@ -71,9 +73,26 @@ def dump(filename, output=None, keep=False):
     else:
         output = open(output, "w")
 
+    writer = csv.writer(output, dialect="excel-tab")
+
+    def state_to_row(state):
+        """Converts an ExecutorState_ object to the row that we want to
+        write into the output file.
+        """
+        return ["%g" % state.timestamp,
+                state.color.red, state.color.green, state.color.blue,
+                state.is_fade]
+
     compiler = BytecodeCompiler(keep_intermediate_files=False)
     compiler.compile(filename)
-    print(repr(compiler.output))
+    syntax_trees = compiler.output
+
+    for syntax_tree in syntax_trees:
+        executor = Executor()
+        writer.writerow(state_to_row(executor.state))
+        for state in executor.execute(syntax_tree):
+            writer.writerow(state_to_row(state))
+        writer.writerow([])
 
 
 @pyledctrl.command(shortopts=dict(port="p", baud="b"))
