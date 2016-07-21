@@ -7,7 +7,6 @@ import shutil
 import sys
 import tempfile
 
-from groundctrl.serial_port import SerialPort
 from itertools import islice
 from pyledctrl.config import DEFAULT_BAUD
 
@@ -59,6 +58,9 @@ def get_serial_connection(port, baud=None):
         port
     :param baud: the baud rate, ``None`` uses the default baud rate
     """
+    # Lazy import. This is important since groundctrl is not a strict
+    # dependency of pyledctrl
+    from groundctrl.serial_port import SerialPort
     return SerialPort(port=get_serial_port_filename(port),
                       baud=baud or DEFAULT_BAUD)
 
@@ -101,13 +103,6 @@ class _TemporaryDirectory(object):
     def __init__(self, suffix="", prefix=tempfile.template, dir=None, keep=False):
         self.name = tempfile.mkdtemp(suffix, prefix, dir)
         self.keep = keep
-
-    @classmethod
-    def _cleanup(cls, name, warn_message=None):
-        if not self.keep:
-            shutil.rmtree(name)
-        if warn_message is not None:
-            warnings.warn(warn_message, ResourceWarning)
 
     def __repr__(self):
         return "<{} {!r}>".format(self.__class__.__name__, self.name)
