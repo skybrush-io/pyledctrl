@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "commands.h"
 #include "serial_protocol.h"
 #include "version.h"
@@ -327,7 +328,12 @@ void SerialProtocolParser::feed(int character) {
     case BINARY_LENGTH_2:
       m_nextMessageLength = m_nextMessageLength * 256 + character;
       m_remainingMessageLength = m_nextMessageLength;
-      m_state = (m_remainingMessageLength > 0) ? BINARY_DATA : START;
+      if (m_remainingMessageLength > 0) {
+        m_state = BINARY_DATA;
+      } else {
+        finishExecutionOfCurrentCommand();
+        m_state = START;
+      }
       break;
 
     case BINARY_DATA:
