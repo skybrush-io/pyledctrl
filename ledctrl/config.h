@@ -107,6 +107,15 @@ extern "C" {
 #define ENABLE_SERIAL_INPUT 1
 
 /**
+ * \def ENABLE_STARTUP_SIGNAL
+ * 
+ * When this macro is defined, the LED controller will first wait for the
+ * string "?READY?" followed by a newline character on the serial console
+ * before it will enter the main loop or parse any other serial input.
+ */
+// #define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
+
+/**
  * \def VOLTMETER_PIN
  *
  * Index of the pin corresponding to the voltmeter. Comment this out if
