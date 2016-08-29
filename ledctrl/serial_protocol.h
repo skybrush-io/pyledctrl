@@ -27,6 +27,7 @@ namespace SerialProtocolCommand {
     VERSION     = 'v',      ///< Prints the version number
     EXECUTE     = 'x',      ///< Executes some bytecode command immediately, overwriting the bytecode store (text version)
     EXECUTE_BIN = 'X',      ///< Executes some bytecode command immediately, overwriting the bytecode store (binary version)
+    QUERY       = '?',      ///< Run a status query. Body is ignored; controller always responds with "+READY."
   };
 }
 
@@ -56,12 +57,18 @@ public:
    * Returns whether the command has at least one argument.
    */
   bool hasArguments() const;
+
+  /**
+   * Returns whether the command ignores everything between the command character and the
+   * end of the line.
+   */
+  bool ignoresArguments() const;
   
   /**
    * Returns whether the command expects its arguments in text or binary mode.
    */
   bool needsBinaryMode() const;
-
+  
 } SerialCommandInfo;
 
 /**
@@ -80,6 +87,7 @@ namespace SerialProtocolParserState {
     BINARY_LENGTH_2,         ///< Waiting for second byte of message length in binary mode
     BINARY_DATA,             ///< Waiting for command arguments in binary mode
     COMMAND_WITH_NO_ARGS,    ///< Waiting for newline character at the end of a command with no args
+    COMMAND_WITH_IGNORED_ARGS,  ///< Waiting for newline character at the end of a command with ignored args
     TRAP                     ///< Error state; waits for the next newline
   };
 }

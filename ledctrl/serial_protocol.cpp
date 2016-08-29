@@ -6,8 +6,9 @@
 using namespace SerialProtocolParserState;
 using namespace SerialProtocolCommand;
 
-#define CMD_FLAG_NO_ARGS 1
-#define CMD_FLAG_BINARY  2
+#define CMD_FLAG_NO_ARGS     1
+#define CMD_FLAG_BINARY      2
+#define CMD_FLAG_IGNORE_ARGS 4
 
 bool SerialCommandInfo::needsBinaryMode() const {
   return flags & CMD_FLAG_BINARY;
@@ -15,6 +16,10 @@ bool SerialCommandInfo::needsBinaryMode() const {
 
 bool SerialCommandInfo::hasArguments() const {
   return !(flags & CMD_FLAG_NO_ARGS);
+}
+
+bool SerialCommandInfo::ignoresArguments() const {
+  return flags & CMD_FLAG_IGNORE_ARGS;
 }
 
 const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
@@ -57,6 +62,10 @@ const SerialCommandInfo SERIAL_COMMAND_INFO[] = {
   {
     /* .commandCode = */ EXECUTE_BIN,
     /* .flags = */ CMD_FLAG_BINARY
+  },
+  {
+    /* .commandCode = */ QUERY,
+    /* .flags = */ CMD_FLAG_IGNORE_ARGS,
   },
   /* sentinel element, this must always be the last one */
   {
@@ -194,6 +203,11 @@ void SerialProtocolParser::finishExecutionOfCurrentCommand() {
         bytecodeStore->resume();
       }
       break;
+
+    case QUERY:
+      Serial.println("+READY");
+      suppressOk = true;
+      break;
       
     default:
       m_currentErrorCode = Errors::OPERATION_NOT_IMPLEMENTED;
@@ -277,6 +291,9 @@ void SerialProtocolParser::feed(int character) {
           if (!commandInfo->hasArguments()) {
             // Command has no arguments
             m_state = COMMAND_WITH_NO_ARGS;
+          } else if (commandInfo->ignoresArguments()) {
+            // Command arguments should be ignored
+            m_state = COMMAND_WITH_IGNORED_ARGS;
           } else if (commandInfo->needsBinaryMode()) {
             // This will be a binary message
             m_state = BINARY_LENGTH_1;
@@ -359,6 +376,16 @@ void SerialProtocolParser::feed(int character) {
         // Move to the trap state since we should have not received anything
         // but a newline
         m_state = TRAP;
+      }
+      break;
+    
+    case COMMAND_WITH_IGNORED_ARGS:
+      if (character == '\n' || character == '\r') {
+        // Got a newline, execute the command and start parsing the next command
+        finishExecutionOfCurrentCommand();
+        m_state = START;
+      } else {
+        // Stay in this state; nothing to do
       }
       break;
     
