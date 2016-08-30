@@ -13,12 +13,22 @@ extern "C" {
 #endif
 
 /**
+ * Use only one from the following definitions to define board version
+ * NANOLED_VERSION_1 corresponds to version v1.0
+ * NANOLED_VERSION_2 corresponts to versions 2.0 and 2.1
+ */
+//#define NANOLED_VERSION_1
+#define NANOLED_VERSION_2
+
+/**
  * \def ENABLE_IS_LOW
  *
- * Define if enable of LED is at LOW/zero PWM (NanoLED v2 based on XL4001)
- * Do not define if it is at HIGH/max PWM (NanoLED v1 based on pure led strip)
+ * Define if enable of LED is at LOW/zero PWM (NanoLED v2.0 based on XL4001)
+ * Do not define if it is at HIGH/max PWM (NanoLED v1.0 based on pure led strip)
  */
+#ifdef NANOLED_VERSION_2
 #define ENABLE_IS_LOW
+#endif
 
 /**
  * \def MAX_PWM
@@ -41,7 +51,9 @@ extern "C" {
  * Index of the PWM pin corresponding to the red LEDs.
  */
 #define RED_PWM_PIN 6 // NanoLED v1.0
+#ifdef NANOLED_VERSION_2
 #define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
+#endif
 
 /**
  * \def GREEN_PWM_PIN
@@ -56,7 +68,9 @@ extern "C" {
  * Index of the PWM pin corresponding to the blue LEDs.
  */
 #define BLUE_PWM_PIN 5 // NanoLED v1.0
+#ifdef NANOLED_VERSION_2
 #define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
+#endif
 
 /**
  * \def WHITE_PWM_PIN
@@ -107,7 +121,7 @@ extern "C" {
 #define ENABLE_SERIAL_INPUT 1
 
 /**
- * \def ENABLE_STARTUP_SIGNAL
+* \def ENABLE_STARTUP_SIGNAL
  * 
  * When this macro is defined, the LED controller will first wait for the
  * string "?READY?" followed by a newline character on the serial console
