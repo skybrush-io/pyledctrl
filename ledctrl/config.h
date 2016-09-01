@@ -118,7 +118,7 @@ extern "C" {
  * Whether the LED controller should listen for incoming commands on the
  * serial port.
  */
-#define ENABLE_SERIAL_INPUT 1
+#define ENABLE_SERIAL_INPUT 0
 
 /**
 * \def ENABLE_STARTUP_SIGNAL
