@@ -12,8 +12,10 @@ from functools import partial
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError, \
     InvalidASTFormatError
-from pyledctrl.parsers.sunlite import SunliteSuiteParser
-from pyledctrl.utils import first, grouper, iterbytes
+from pyledctrl.compiler.utils import get_timestamp_of, TimestampWrapper
+from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
+    SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
+from pyledctrl.utils import first, grouper
 from textwrap import dedent
 
 
@@ -38,48 +40,113 @@ class CompilationStage(object):
         raise NotImplementedError
 
 
-class FileToObjectCompilationStage(CompilationStage):
-    """Abstract compilation phase that turns a set of input files into an
-    in-memory object. This phase is executed unconditionally.
+class FileSourceMixin(object):
+    """Mixin class for compilation stages that assume that the source of
+    the compilation stage is a set of files.
     """
 
     @property
     def input_files(self):
-        raise []
+        raise NotImplementedError
+
+    @property
+    def oldest_input_file_timestamp(self):
+        """Returns the timestamp of the oldest input file or positive
+        infinity if there are no input files. Raises an error if at least one
+        input file is missing (i.e. does not exist).
+        """
+        input_files = self.input_files
+        if not input_files:
+            return float('inf')
+        if any(not os.path.exists(filename) for filename in input_files):
+            raise ValueError("a required input file is missing")
+        return max(os.path.getmtime(filename) for filename in input_files)
+
+
+class FileTargetMixin(object):
+    """Mixin class for compilation stages that assume that the target of
+    the compilation stage is a set of files.
+    """
+
+    @property
+    def output_files(self):
+        raise NotImplementedError
+
+    @property
+    def youngest_output_file_timestamp(self):
+        """Returns the timestamp of the youngest output file, positive
+        infinity if there are no output files, or negative infinity if at
+        least one output file is missing (i.e. does not exist).
+        """
+        output_files = self.output
+        if not output_files:
+            return float('-inf')
+        if any(not os.path.exists(filename) for filename in output_files):
+            return float('inf')
+        return min(os.path.getmtime(filename) for filename in output_files)
+
+
+class ObjectTargetMixin(object):
+    """Mixin class for compilation stages that assume that the target of
+    the compilation stage is an in-memory object.
+    """
+
+    @property
+    def output(self):
+        raise NotImplementedError
+
+
+class FileToObjectCompilationStage(CompilationStage, FileSourceMixin, ObjectTargetMixin):
+    """Abstract compilation phase that turns a set of input files into an
+    in-memory object. This phase is executed unconditionally.
+    """
 
     def should_run(self):
         return True
 
 
-class FileToFileCompilationStage(CompilationStage):
+class ObjectToFileCompilationStage(CompilationStage, FileTargetMixin):
+    """Abstract compilation phase that turns an in-memory object into a set of
+    output files. This phase is executed unconditionally if the in-memory
+    object is not timestamped (i.e. does not have a ``timestamp`` property);
+    otherwise it is executed if the timestamp of the input object is larger
+    than the timestamps of any of the output objects.
+    """
+
+    @property
+    def input(self):
+        """Returns the input object or the input stage on which this stage
+        depends.
+        """
+        raise NotImplementedError
+
+    @property
+    def input_object(self):
+        """Returns the input object on which this stage depends. If the stage
+        depends on the output of another stage, this property will return the
+        output object of the other stage.
+        """
+        inp = self.input
+        if isinstance(inp, ObjectTargetMixin):
+            return inp.output
+        else:
+            return inp
+
+    def should_run(self):
+        input_timestamp = get_timestamp_of(self.input_object,
+                                           default_value=float('inf'))
+        return input_timestamp >= self.youngest_output_file_timestamp
+
+
+class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMixin):
     """Abstract compilation phase that turns a set of input files into a set of
     output files. The phase is not executed if all the input files are older than
     all the output files.
     """
 
-    @property
-    def input_files(self):
-        raise []
-
-    @property
-    def output_files(self):
-        raise []
-
     def should_run(self):
-        input_files, output_files = self.input_files, self.output_files
-
-        if not output_files:
-            return False
-        if any(not os.path.exists(output) for output in output_files):
-            return True
-        if not input_files:
-            return False
-        if any(not os.path.exists(input) for input in input_files):
-            # Just return True so we will execute, and then we will bail out
-            return True
-
-        youngest_output = min(os.path.getmtime(output) for output in output_files)
-        oldest_input = max(os.path.getmtime(input) for input in input_files)
+        youngest_output = self.youngest_output_file_timestamp
+        oldest_input = self.oldest_input_file_timestamp
         return oldest_input >= youngest_output
 
 
@@ -97,7 +164,7 @@ class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
     def input_files(self):
         return [self._input]
 
-    @property
+    @FileToObjectCompilationStage.output.getter
     def output(self):
         return self._output
 
@@ -106,7 +173,9 @@ class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
         with open(self._input) as fp:
             code = compile(fp.read(), self.input_files[0], "exec")
             context.evaluate(code, add_end_command=True)
-            self._output = context.ast
+            self._output = TimestampWrapper.wrap(
+                context.ast, self.oldest_input_file_timestamp
+            )
 
 
 class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
@@ -221,20 +290,18 @@ class ASTFileToProgmemHeaderCompilationStage(ASTFileToOutputCompilationStage):
         ast = self.get_ast()
         with open(self._output, "w") as output:
             output.write(self.HEADER)
-            with open(self._input, "rb") as fp:
-                for bytes_in_row in grouper(ast.to_bytecode(), 16):
-                    output.write("  {0},\n".format(
-                        ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
-                    ))
+            for bytes_in_row in grouper(ast.to_bytecode(), 16):
+                output.write("  {0},\n".format(
+                    ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
+                ))
             output.write(self.FOOTER)
 
 
-class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
+class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationStage):
     def __init__(self, input, output_template=None):
-        super(SunliteSceneToPythonSourceCompilationStage, self).__init__()
+        super(ParsedSunliteScenesToPythonSourceCompilationStage, self).__init__()
 
         self._input = input
-        self._parsed_input = None
 
         if output_template is None:
             base, _ = os.path.splitext(input)
@@ -243,11 +310,11 @@ class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
         self._outputs = None
         self._outputs_by_ids = None
 
-    @FileToFileCompilationStage.input_files.getter
-    def input_files(self):
-        return [self._input]
+    @ObjectToFileCompilationStage.input.getter
+    def input(self):
+        return self._input
 
-    @FileToFileCompilationStage.output_files.getter
+    @ObjectToFileCompilationStage.output_files.getter
     def output_files(self):
         if self._outputs is None:
             self._validate_outputs()
@@ -263,22 +330,10 @@ class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
         """Calculates the list of output files."""
         self._outputs_by_ids = {
             fx.id: self._output_template.replace("{}", fx.id)
-            for fx in self.parsed_input.fxs
+            for _, _, input_file in self.input_object
+            for fx in input_file.fxs
         }
         self._outputs = sorted(self._outputs_by_ids.values())
-
-    @property
-    def parsed_input(self):
-        """Returns the parsed input file as a pyledctrl.parsers.sunlite.SceneFile
-        object."""
-        if self._parsed_input is None:
-            self._parsed_input = self._parse()
-        return self._parsed_input
-
-    def _parse(self):
-        """Parses the input file and returns the parsed representation."""
-        with open(self._input, "rb") as fp:
-            return SunliteSuiteParser().parse(fp)
 
     def _merge_channels(self, channels):
         """Merges multiple channels into a common timeline. Yields pairs
@@ -301,13 +356,64 @@ class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
             yield time, (channel.timeline.steps[index] for channel in channels)
 
     def run(self):
-        for fx in self.parsed_input.fxs:
+        # input_object is a sequence containing [(shift, scene_file)] pairs
+        # such that the given scene_file has to be inserted into the 'global'
+        # timeline with the given shift from t=0
+
+        self.fx_map = {}
+
+        for shift, size, scene_file in self.input_object:
+            self._process_single_scene_file(scene_file, shift=shift,
+                                            trim=size)
+
+        for fx_id in sorted(self.fx_map.keys()):
+            fx = self.fx_map[fx_id]
             output_file = self.output_files_by_ids[fx.id]
             with open(output_file, "w") as fp:
-                self._process_single_fx(fx, fp)
+                self._dump_fx_to_file(fx, fp)
 
-    def _process_single_fx(self, fx, fp):
-        """Processes a single FX component from the Sunlite Suite stage file
+        self.fx_map = None
+
+    def _process_single_scene_file(self, scene_file, shift=0, trim=None):
+        """Processes the contents of a single Sunlite Suite scene file that is
+        placed on the global timeline with the given shift.
+
+        Parameters:
+            scene_file (SceneFile): the parsed Sunlite Suite scene file
+            shift (int): the index of the frame where the parsed Sunlite Suite
+                scene file starts on the global timeline
+            trim (Optional[int]): the index of the frame in the parsed Sunlite
+                Suite scene file where the processing ends. The part of the
+                timeline in the input file after the trim position is ignored.
+                If the trim position does not have an exact value specification
+                for the channels, the surrounding values will be interpolated
+                linearly. ``None`` means not to trim the input file.
+        """
+        for fx_in_scene_file in scene_file.fxs:
+            # Get the FX object that we will merge the FX from the scene file into
+            fx = self.fx_map.get(fx_in_scene_file.id)
+            if fx is None:
+                fx = FX()
+                fx.id = fx_in_scene_file.id
+                self.fx_map[fx.id] = fx
+
+            # Compare the list of channels in our FX object and in the FX object
+            # from the scene file. If there are any channels in the FX of the file
+            # that we don't have, create them with our global timeline.
+            for channel in fx_in_scene_file.channels:
+                for extra_channel_index in xrange(len(fx.channels), channel.index+1):
+                    fx.add_channel(EasyStepTimeline())
+
+            # Okay, great. Now we need to merge the timeline and steps of each
+            # channel in the FX of the scene file into our FX, shifted appropriately
+            for channel_in_scene_file in fx_in_scene_file.channels:
+                timeline = channel_in_scene_file.timeline
+                our_channel = fx.channels[channel_in_scene_file.index]
+                our_timeline = our_channel.timeline
+                our_timeline.merge_from(timeline.looped(until=trim).shifted(by=shift))
+
+    def _dump_fx_to_file(self, fx, fp):
+        """Processes a single FX component from the merged Sunlite Suite stage files
         and writes the corresponding bytecode into the given file-like object.
 
         :param fx: the FX component object
@@ -342,3 +448,55 @@ class SunliteSceneToPythonSourceCompilationStage(FileToFileCompilationStage):
             else:
                 raise InvalidDurationError(prev_time.fade + " frames")
             prev_time = time
+
+
+class SunliteSceneParsingStage(FileToObjectCompilationStage):
+    def __init__(self, input, shift=0):
+        super(SunliteSceneParsingStage, self).__init__()
+
+        self._input = input
+        self._output = None
+        self._shift = float(shift)
+
+    @FileToObjectCompilationStage.input_files.getter
+    def input_files(self):
+        return [self._input]
+
+    @FileToObjectCompilationStage.output.getter
+    def output(self):
+        return self._output
+
+    def _parse(self):
+        """Parses the input file and returns the parsed representation."""
+        with open(self._input, "rb") as fp:
+            result = SunliteSuiteSceneFileParser().parse(fp)
+        if self._shift:
+            result.shift(self._shift)
+        return result
+
+    def run(self):
+        self._output = self._parse()
+
+
+class SunliteSwitchParsingStage(FileToObjectCompilationStage):
+    def __init__(self, input):
+        super(SunliteSwitchParsingStage, self).__init__()
+
+        self._input = input
+        self._output = None
+
+    @FileToObjectCompilationStage.input_files.getter
+    def input_files(self):
+        return [self._input]
+
+    @FileToObjectCompilationStage.output.getter
+    def output(self):
+        return self._output
+
+    def _parse(self):
+        """Parses the input file and returns the parsed representation."""
+        with open(self._input, "rb") as fp:
+            return SunliteSuiteSwitchFileParser().parse(fp)
+
+    def run(self):
+        self._output = self._parse()

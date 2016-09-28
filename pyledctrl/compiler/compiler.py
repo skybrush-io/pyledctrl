@@ -7,9 +7,11 @@ from pyledctrl.compiler.errors import CompilerError, \
     UnsupportedInputFileFormatError
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import \
-    SunliteSceneToPythonSourceCompilationStage, \
+    ParsedSunliteScenesToPythonSourceCompilationStage, \
     PythonSourceToASTFileCompilationStage, \
     PythonSourceToASTObjectCompilationStage, \
+    SunliteSceneParsingStage, \
+    SunliteSwitchParsingStage, \
     ASTFileToBytecodeCompilationStage, \
     ASTFileToProgmemHeaderCompilationStage
 from pyledctrl.utils import TemporaryDirectory
@@ -63,10 +65,8 @@ class BytecodeCompiler(object):
 
     def _compile(self, input_file, output_file, force):
         plan = Plan()
-        in_memory_output_stages = \
-            self._collect_stages(input_file, output_file, plan)
-        plan.execute(force=force)
-        self.output = [stage.output for stage in in_memory_output_stages]
+        self._collect_stages(input_file, output_file, plan)
+        self.output = plan.execute(force=force)
 
     def _collect_stages(self, input_file, output_file, plan):
         """Collects the compilation stages that will turn the given input
@@ -102,52 +102,17 @@ class BytecodeCompiler(object):
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
-        in_memory_output_stages = []
-        if ast_only:
-            if ext == ".led":
-                stage = PythonSourceToASTObjectCompilationStage(input_file)
-                in_memory_output_stages.append(stage)
-                plan.add_step(stage)
-            elif ext == ".sce":
-                led_file_template = self._create_intermediate_filename(
-                    "stage{}_" + input_file, ".led"
-                )
-                preprocessing_stage = SunliteSceneToPythonSourceCompilationStage(
-                    input_file, led_file_template)
-                plan.add_step(preprocessing_stage)
-                for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
-                    stage = PythonSourceToASTObjectCompilationStage(
-                        intermediate_file)
-                    in_memory_output_stages.append(stage)
-                    plan.add_step(stage)
-            else:
-                raise UnsupportedInputFileFormatError(ext)
-
+        if ext == ".led":
+            self._add_stages_for_input_led_file(input_file, output_file, plan,
+                                                ast_only)
+        elif ext == ".sce":
+            self._add_stages_for_input_sce_file(input_file, output_file, plan,
+                                                ast_only)
+        elif ext == ".ses":
+            self._add_stages_for_input_ses_file(input_file, output_file, plan,
+                                                ast_only)
         else:
-            if ext == ".led":
-                ast_file = self._create_intermediate_filename(output_file, ".ast")
-                plan.add_step(
-                    PythonSourceToASTFileCompilationStage(input_file, ast_file)
-                )
-            elif ext == ".sce":
-                if "{}" not in output_file:
-                    raise CompilerError("output file needs to include {} placeholder "
-                                        "for the FX id when compiling a Sunlite "
-                                        "Suite scene file")
-                ast_file_template = self._create_intermediate_filename(output_file, ".ast")
-                led_file_template = self._create_intermediate_filename(output_file, ".led")
-                preprocessing_stage = SunliteSceneToPythonSourceCompilationStage(
-                    input_file, led_file_template)
-                plan.add_step(preprocessing_stage)
-                for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
-                    stage = PythonSourceToASTFileCompilationStage(
-                        intermediate_file,
-                        ast_file_template.replace("{}", id),
-                        id=id
-                    )
-                    plan.add_step(stage)
-            else:
-                raise UnsupportedInputFileFormatError(ext)
+            raise UnsupportedInputFileFormatError(ext)
 
         # Add the stages based on the extension of the output file
         if output_ext is None:
@@ -166,7 +131,113 @@ class BytecodeCompiler(object):
             new_stage = output_stage_factory(stage.output, real_output_file)
             plan.insert_step(new_stage, after=stage)
 
-        return in_memory_output_stages
+    def _add_stages_for_input_led_file(self, input_file, output_file, plan,
+                                       ast_only):
+        if ast_only:
+            stage = PythonSourceToASTObjectCompilationStage(input_file)
+            plan.add_step(stage, output=True)
+        else:
+            ast_file = self._create_intermediate_filename(output_file, ".ast")
+            plan.add_step(
+                PythonSourceToASTFileCompilationStage(input_file, ast_file)
+            )
+
+    def _add_stages_for_input_sce_file(self, input_file, output_file, plan,
+                                       ast_only):
+        parsing_stage = SunliteSceneParsingStage(input_file)
+        parsing_stage.run()
+
+        if ast_only:
+            led_file_template = self._create_intermediate_filename(
+                "stage{}_" + input_file, ".led"
+            )
+        else:
+            if "{}" not in output_file:
+                raise CompilerError("output file needs to include {} placeholder "
+                                    "for the FX id when compiling a Sunlite "
+                                    "Suite scene file")
+            ast_file_template = self._create_intermediate_filename(output_file, ".ast")
+            led_file_template = self._create_intermediate_filename(output_file, ".led")
+
+        preprocessing_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
+            [(0, None, parsing_stage.output)], led_file_template
+        )
+        plan.add_step(preprocessing_stage)
+
+        for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
+            if ast_only:
+                stage = PythonSourceToASTObjectCompilationStage(intermediate_file)
+                plan.add_step(stage, output=True)
+            else:
+                stage = PythonSourceToASTFileCompilationStage(
+                    intermediate_file,
+                    ast_file_template.replace("{}", id),
+                    id=id
+                )
+                plan.add_step(stage)
+
+    def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
+                                       ast_only):
+        # Get the directory in which the input .ses file is contained --
+        # we will assume that all the .sce files that the .ses file refers to
+        # are in the same directory
+        dirname = os.path.dirname(input_file)
+
+        # Parse the .ses file, and find all the .sce files that we depend on
+        ses_parsing_stage = SunliteSwitchParsingStage(input_file)
+        ses_parsing_stage.run()
+        parsed_ses_file = ses_parsing_stage.output
+        sce_dependencies = dict(
+            (file_id, os.path.join(dirname, filename) + ".sce")
+            for file_id, filename in parsed_ses_file.files.iteritems()
+        )
+
+        # Parse each .sce file into an in-memory object
+        for sce_file_id in list(sce_dependencies.keys()):
+            filename = sce_dependencies[sce_file_id]
+            sce_parsing_stage = SunliteSceneParsingStage(filename)
+            sce_parsing_stage.run()
+            sce_dependencies[sce_file_id] = sce_parsing_stage.output
+
+        # Calculate the final scene ordering
+        scene_order = [
+            (button.position, button.size, sce_dependencies[button.name])
+            for button in parsed_ses_file.buttons
+        ]
+
+        # Create filename templates for the LED and AST files
+        if ast_only:
+            led_file_template = self._create_intermediate_filename(
+                "stage{}_" + input_file, ".led"
+            )
+        else:
+            if "{}" not in output_file:
+                raise CompilerError("output file needs to include {} placeholder "
+                                    "for the FX id when compiling a Sunlite "
+                                    "Suite scene file")
+            ast_file_template = self._create_intermediate_filename(output_file, ".ast")
+            led_file_template = self._create_intermediate_filename(output_file, ".led")
+
+        # Add the preprocessing stage that merges multiple Sunlite Suite scene
+        # files into .led (Python) source files, sorted by FX IDs
+        preprocessing_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
+            scene_order, led_file_template
+        )
+        plan.add_step(preprocessing_stage)
+
+        # For each intermediate .led (Python) file created in the preprocessing
+        # stage, add a stage to compile the corresponding .ast file
+        for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
+            if ast_only:
+                stage = PythonSourceToASTObjectCompilationStage(intermediate_file)
+                plan.add_step(stage, output=True)
+            else:
+                stage = PythonSourceToASTFileCompilationStage(
+                    intermediate_file,
+                    ast_file_template.replace("{}", id),
+                    id=id
+                )
+                plan.add_step(stage)
 
     def _create_intermediate_filename(self, output_file, ext):
         """Creates an intermediate filename or filename template from the

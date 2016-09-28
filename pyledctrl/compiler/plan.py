@@ -10,11 +10,21 @@ class Plan(object):
 
     def __init__(self):
         self._steps = []
+        self._output_steps = set()
 
-    def add_step(self, step):
+    def add_step(self, step, output=False):
         """Adds the given step to the plan after any other step that has been
-        added previously."""
+        added previously.
+
+        Parameters:
+            step (CompilationStage): the step to add
+            output (bool): whether to mark the step as an output step. The
+                results of steps marked as an output step will be returned
+                by the ``execute()`` method.
+        """
         self._steps.append(step)
+        if output:
+            self._mark_as_output(step)
 
     def execute(self, force=False):
         """Executes the steps of the plan.
@@ -26,11 +36,14 @@ class Plan(object):
         :raises CompilerError: in case of a compilation error
         """
         last_step = self._steps[-1] if self._steps else None
+        result = []
         for step in self.iter_steps():
             if force or step == last_step or step.should_run():
                 step.run()
+                if step in self._output_steps:
+                    result.append(step.output)
 
-    def insert_step(self, step, before=None, after=None):
+    def insert_step(self, step, before=None, after=None, output=False):
         """Inserts the given step before or after some other step that is
         already part of the compilation plan.
 
@@ -43,6 +56,7 @@ class Plan(object):
         :type before: CompilationStage or None
         :param after: the step after which the new step is to be inserted
         :type after: CompilationStage or None
+        :param output: whether to mark the step as an output step
         """
         if (before is None) == (after is None):
             raise ValueError("exactly one of before=... and after=... must be None")
@@ -50,6 +64,8 @@ class Plan(object):
         if before is None:
             index += 1
         self._steps.insert(index, step)
+        if output:
+            self._mark_as_output(step)
 
     def iter_steps(self, cls=None):
         """Iterates over the steps of this compilation plan.
@@ -62,3 +78,10 @@ class Plan(object):
             return iter(self._steps)
         else:
             return (step for step in self._steps if isinstance(step, cls))
+
+    def _mark_as_output(self, step):
+        """Marks the given compilation step as an output step. The results of
+        the output steps will be returned by the ``execute()`` method of the
+        plan.
+        """
+        self._output_steps.add(step)
