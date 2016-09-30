@@ -1,5 +1,8 @@
 """Utility objects and functions for the compiler."""
 
+from time import time
+
+
 def get_timestamp_of(obj, default_value=None):
     """Returns the timestamp of the given object if it is timestamped; returns
     the given default value otherwise.
@@ -41,7 +44,7 @@ class TimestampWrapper(object):
         """
         if timestamp is None:
             timestamp = time()
-        result = cls(wrapped, timestamp)
+        return cls(wrapped, timestamp)
 
     def __init__(self, wrapped, timestamp):
         self._wrapped = wrapped
@@ -49,9 +52,3 @@ class TimestampWrapper(object):
 
     def __getattr__(self, attr):
         return getattr(self._wrapped, attr)
-
-    def __hasattr__(self, attr):
-        return hasattr(self._wrapped, attr)
-
-    def __setattr__(self, attr, value):
-        return setattr(self._wrapped, attr, value)
