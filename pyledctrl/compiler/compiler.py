@@ -13,6 +13,7 @@ from pyledctrl.compiler.stages import \
     SunliteSceneParsingStage, \
     SunliteSwitchParsingStage, \
     ASTFileToBytecodeCompilationStage, \
+    ASTFileToLEDFileCompilationStage, \
     ASTFileToProgmemHeaderCompilationStage
 from pyledctrl.utils import TemporaryDirectory
 
@@ -114,11 +115,16 @@ class BytecodeCompiler(object):
         else:
             raise UnsupportedInputFileFormatError(ext)
 
+        # At this point the input has been converted into an abstract syntax
+        # tree (AST). It's time to add an optimization stage.
+
         # Add the stages based on the extension of the output file
         if output_ext is None:
             output_stage_factory = None
         elif output_ext == ".h":
             output_stage_factory = ASTFileToProgmemHeaderCompilationStage
+        elif output_ext == ".oled":
+            output_stage_factory = ASTFileToLEDFileCompilationStage
         else:
             output_stage_factory = ASTFileToBytecodeCompilationStage
 

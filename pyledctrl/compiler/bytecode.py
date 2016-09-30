@@ -79,7 +79,7 @@ def end():
 
 
 def fade_to_black(duration=None, easing=None):
-    duration = _to_duration(duration)
+    duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
     return ast.FadeToBlackCommand(duration=duration)
@@ -90,7 +90,7 @@ def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
         red, green, blue = parse_color(red)
     if red == green and green == blue:
         return fade_to_gray(red, duration, easing)
-    duration = _to_duration(duration)
+    duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
     return ast.FadeToColorCommand(color=ast.RGBColor(red, green, blue),
@@ -103,14 +103,14 @@ def fade_to_gray(value, duration=None, easing=None):
     elif value == 255:
         return fade_to_white(duration, easing)
     else:
-        duration = _to_duration(duration)
+        duration = ast.Duration.from_seconds(duration)
         easing = ast.EasingMode.get(easing)
         _check_easing_is_supported(easing)
         return ast.FadeToGrayCommand(value=value, duration=duration)
 
 
 def fade_to_white(duration=None, easing=None):
-    duration = _to_duration(duration)
+    duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
     return ast.FadeToWhiteCommand(duration=duration)
@@ -129,7 +129,7 @@ def nop():
 
 
 def set_black(duration=None):
-    return ast.SetBlackCommand(duration=_to_duration(duration))
+    return ast.SetBlackCommand(duration=ast.Duration.from_seconds(duration))
 
 
 def set_color(red, green=None, blue=None, duration=None):
@@ -138,7 +138,7 @@ def set_color(red, green=None, blue=None, duration=None):
     if red == green and green == blue:
         return set_gray(red, duration)
     return ast.SetColorCommand(color=ast.RGBColor(red, green, blue),
-                               duration=_to_duration(duration))
+                               duration=ast.Duration.from_seconds(duration))
 
 
 def set_gray(value, duration=None):
@@ -147,21 +147,12 @@ def set_gray(value, duration=None):
     elif value == 255:
         return set_white(duration)
     else:
-        return ast.SetGrayCommand(duration=_to_duration(duration))
+        return ast.SetGrayCommand(duration=ast.Duration.from_seconds(duration))
 
 
 def set_white(duration=None):
-    return ast.SetWhiteCommand(duration=_to_duration(duration))
+    return ast.SetWhiteCommand(duration=ast.Duration.from_seconds(duration))
 
 
 def sleep(duration):
-    return ast.SleepCommand(duration=_to_duration(duration))
-
-
-def _to_duration(seconds):
-    """Converts the given duration (specified in seconds) into the number
-    of frames (assuming 50 frames per second); this is the format that is
-    expected by the bytecode."""
-    if seconds is None:
-        seconds = 0
-    return int(seconds * 50.0)
+    return ast.SleepCommand(duration=ast.Duration.from_seconds(duration))

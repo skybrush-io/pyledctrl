@@ -265,6 +265,17 @@ class ASTFileToBytecodeCompilationStage(ASTFileToOutputCompilationStage):
             output.write(ast.to_bytecode())
 
 
+class ASTFileToLEDFileCompilationStage(ASTFileToOutputCompilationStage):
+    """Compilation stage that turns a pickled abstract syntax tree from a
+    file back into a (functionally equivalent) ``.led`` file.
+    """
+
+    def run(self):
+        ast = self.get_ast()
+        with open(self._output, "w") as output:
+            output.write(ast.to_led_source())
+
+
 class ASTFileToProgmemHeaderCompilationStage(ASTFileToOutputCompilationStage):
     """Compilation stage that turns a pickled abstract syntax tree from a
     file into a header file that can be compiled into the ``ledctrl`` source code

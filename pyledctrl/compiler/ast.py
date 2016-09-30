@@ -66,6 +66,8 @@ therefore are enclosed in quotes)::
     varuint = ? varint-encoded representation of an unsigned integer ?
 """
 
+from __future__ import division
+
 from future_builtins import zip
 from pyledctrl.utils import first
 from struct import Struct
@@ -190,8 +192,10 @@ class _NodeMeta(type):
     @classmethod
     def _add_setter_for_literal(cls, field, literal_type):
         field_var = "_" + field
+
         def getter(self):
             return getattr(self, field_var)
+
         def setter(self, value):
             if not isinstance(value, literal_type):
                 value = literal_type(value)
@@ -207,14 +211,14 @@ class _NodeMeta(type):
             return __init__
 
         # Class is not abstract, so we need a real constructor
-        node_superclass = first(parent for parent in parents \
+        node_superclass = first(parent for parent in parents
                                 if issubclass(parent, Node))
         node_superclass_is_abstract = not hasattr(node_superclass, "_fields")
         num_fields = len(fields)
 
         def __init__(self, *args, **kwds):
             if not node_superclass_is_abstract:
-                node_superclass.__init__()
+                node_superclass.__init__(self)
             if args:
                 if num_fields < len(args):
                     raise TypeError("__init__() takes at most {0} "
@@ -288,6 +292,14 @@ class Node(object):
         is defined."""
         return dict(self.iter_fields())
 
+    def to_led_source(self):
+        """Converts the node back into the ``.led`` source format.
+
+        Returns:
+            str: the ``.led`` source format representation of the node
+        """
+        raise NotImplementedError
+
     def transform_child_nodes(self):
         """Returns a generator that yields all field values that are subclasses
         of nodes and allows the user to replace the nodes with transformed ones
@@ -324,7 +336,7 @@ class Node(object):
 
     def __repr__(self):
         kvpairs = ["{0}={1!r}".format(arg_name, getattr(self, arg_name))
-                    for arg_name in self._fields]
+                   for arg_name in self._fields]
         return "{0.__class__.__name__}({1})".format(self, ", ".join(kvpairs))
 
 
@@ -360,6 +372,9 @@ class UnsignedByte(Byte):
 
     def to_bytecode(self):
         return self._struct.pack(self.value)
+
+    def to_led_source(self):
+        return str(self.value)
 
     @property
     def value(self):
@@ -400,6 +415,9 @@ class Varuint(Literal):
     def to_bytecode(self):
         return self._to_varuint(self.value)
 
+    def to_led_source(self):
+        return str(self.value)
+
     @property
     def value(self):
         return self._value
@@ -431,6 +449,52 @@ class RGBColor(Node):
     def to_bytecode(self):
         return b"".join(field.to_bytecode() for _, field in self.iter_fields())
 
+    def to_led_source(self):
+        return "{0}, {1}, {2}".format(
+            self.red.to_led_source(),
+            self.green.to_led_source(),
+            self.blue.to_led_source()
+        )
+
+
+class Duration(Varuint):
+    """Node that represents a duration."""
+
+    _fields = Varuint._fields
+    FPS = 50
+
+    @classmethod
+    def from_frames(cls, frames):
+        result = cls()
+        result.value_in_frames = frames
+        return result
+
+    @classmethod
+    def from_seconds(cls, seconds):
+        result = cls()
+        result.value_in_seconds = seconds
+        return result
+
+    @property
+    def value_in_frames(self):
+        return self.value * self.FPS
+
+    @value_in_frames.setter
+    def value_in_frames(self, value):
+        self.value = value / self.FPS
+
+    @property
+    def value_in_seconds(self):
+        return self.value
+
+    @value_in_seconds.setter
+    def value_in_seconds(self, value):
+        self.value = value
+
+    def to_bytecode(self):
+        return self._to_varuint(int(self.value_in_frames))
+
+
 
 class StatementSequence(Node):
     """Node that represents a sequence of statements."""
@@ -451,6 +515,9 @@ class StatementSequence(Node):
     def to_bytecode(self):
         return b"".join(node.to_bytecode() for node in self.statements)
 
+    def to_led_source(self):
+        return "\n".join(statement.to_led_source()
+                         for statement in self.statements)
 
 class Statement(Node):
     """Node that represents a single statement (e.g., a bytecode command or
@@ -472,12 +539,14 @@ class Command(Statement):
         parts.extend(field.to_bytecode() for _, field in self.iter_fields())
         return b"".join(parts)
 
-
 class EndCommand(Command):
     """Node that represents the ``END`` command in the bytecode."""
 
     code = CommandCode.END
     _fields = ()
+
+    def to_led_source(self):
+        return "end()"
 
 
 class NopCommand(Command):
@@ -485,6 +554,9 @@ class NopCommand(Command):
 
     code = CommandCode.NOP
     _fields = ()
+
+    def to_led_source(self):
+        return "nop()"
 
 
 class SleepCommand(Command):
@@ -495,6 +567,9 @@ class SleepCommand(Command):
     _defaults = {
         "duration": Varuint
     }
+
+    def to_led_source(self):
+        return "sleep(duration={0})".format(self.duration.to_led_source())
 
 
 class WaitUntilCommand(Command):
@@ -517,6 +592,11 @@ class SetColorCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "set_color({0}, duration={1})".format(
+            self.color.to_led_source(), self.duration.to_led_source()
+        )
+
 
 class SetGrayCommand(Command):
     """Node that represents a ``SET_GRAY`` command in the bytecode."""
@@ -528,6 +608,11 @@ class SetGrayCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "set_gray({0}, duration={1})".format(
+            self.value.to_led_source(), self.duration.to_led_source()
+        )
+
 
 class SetBlackCommand(Command):
     """Node that represents a ``SET_BLACK`` command in the bytecode."""
@@ -538,6 +623,9 @@ class SetBlackCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "set_black(duration={0})".format(self.duration.to_led_source())
+
 
 class SetWhiteCommand(Command):
     """Node that represents a ``SET_WHITE`` command in the bytecode."""
@@ -547,6 +635,9 @@ class SetWhiteCommand(Command):
     _defaults = {
         "duration": Varuint
     }
+
+    def to_led_source(self):
+        return "set_white(duration={0})".format(self.duration.to_led_source())
 
 
 class FadeToColorCommand(Command):
@@ -559,6 +650,11 @@ class FadeToColorCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "fade_to_color({0}, duration={1})".format(
+            self.color.to_led_source(), self.duration.to_led_source()
+        )
+
 
 class FadeToGrayCommand(Command):
     """Node that represents a ``FADE_TO_GRAY`` command in the bytecode."""
@@ -570,6 +666,11 @@ class FadeToGrayCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "fade_to_gray({0}, duration={1})".format(
+            self.value.to_led_source(), self.duration.to_led_source()
+        )
+
 
 class FadeToBlackCommand(Command):
     """Node that represents a ``FADE_TO_BLACK`` command in the bytecode."""
@@ -580,6 +681,11 @@ class FadeToBlackCommand(Command):
         "duration": Varuint
     }
 
+    def to_led_source(self):
+        return "fade_to_black(duration={0})".format(
+            self.duration.to_led_source()
+        )
+
 
 class FadeToWhiteCommand(Command):
     """Node that represents a ``FADE_TO_WHITE`` command in the bytecode."""
@@ -589,6 +695,11 @@ class FadeToWhiteCommand(Command):
     _defaults = {
         "duration": Varuint
     }
+
+    def to_led_source(self):
+        return "fade_to_white(duration={0})".format(
+            self.duration.to_led_source()
+        )
 
 
 class ResetTimerCommand(Command):
