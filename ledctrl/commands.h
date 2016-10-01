@@ -7,6 +7,7 @@
 #define COMMANDS_H
 
 #include <Arduino.h>
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {

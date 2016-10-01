@@ -7,6 +7,7 @@
 #define LED_H
 
 #include <Arduino.h>
+#include "types.h"
 #include "utils.h"
 
 /**

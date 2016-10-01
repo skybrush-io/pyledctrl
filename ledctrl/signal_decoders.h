@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include "config.h"
+#include "types.h"
 
 /**
  * Abstract superclass for signal sources.

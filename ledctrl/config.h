@@ -17,8 +17,8 @@ extern "C" {
  * NANOLED_VERSION_1 corresponds to version v1.0
  * NANOLED_VERSION_2 corresponts to versions 2.0 and 2.1
  */
-//#define NANOLED_VERSION_1
-#define NANOLED_VERSION_2
+#define NANOLED_VERSION_1
+//#define NANOLED_VERSION_2
 
 /**
  * \def ENABLE_IS_LOW
