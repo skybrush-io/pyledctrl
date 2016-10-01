@@ -1,5 +1,7 @@
 """Compilation plan being used in the bytecode compiler."""
 
+from tqdm import tqdm
+
 __all__ = ["Plan"]
 
 
@@ -37,8 +39,12 @@ class Plan(object):
         """
         last_step = self._steps[-1] if self._steps else None
         result = []
-        for step in self.iter_steps():
+        bar_format = "{desc}{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}"
+        progress_bar = tqdm(self._steps, bar_format=bar_format)
+        for step in progress_bar:
             if force or step == last_step or step.should_run():
+                message = self._get_message_for_step(step)
+                progress_bar.write(message)
                 step.run()
                 if step in self._output_steps:
                     result.append(step.output)
@@ -78,6 +84,17 @@ class Plan(object):
             return iter(self._steps)
         else:
             return (step for step in self._steps if isinstance(step, cls))
+
+    def _get_message_for_step(self, step):
+        """Returns the message to be shown on the console when the given step
+        is being executed.
+        """
+        class_name = step.__class__.__name__
+        step_id = getattr(step, "id", None)
+        if step_id is not None:
+            return "Executing {0} (id={1})...".format(class_name, step_id)
+        else:
+            return "Executing {0}...".format(class_name, step_id)
 
     def _mark_as_output(self, step):
         """Marks the given compilation step as an output step. The results of

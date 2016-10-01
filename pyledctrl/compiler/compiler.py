@@ -13,7 +13,8 @@ from pyledctrl.compiler.stages import \
     SunliteSwitchParsingStage, \
     ASTObjectToBytecodeCompilationStage, \
     ASTObjectToLEDFileCompilationStage, \
-    ASTObjectToProgmemHeaderCompilationStage
+    ASTObjectToProgmemHeaderCompilationStage, \
+    ASTOptimizationStage
 from pyledctrl.utils import TemporaryDirectory
 
 
@@ -114,9 +115,6 @@ class BytecodeCompiler(object):
         else:
             raise UnsupportedInputFileFormatError(ext)
 
-        # At this point the input has been converted into an abstract syntax
-        # tree (AST). It's time to add an optimization stage.
-
         # Add the stages based on the extension of the output file
         if output_ext is None:
             output_stage_factory = None
@@ -133,8 +131,13 @@ class BytecodeCompiler(object):
                 real_output_file = output_file.replace("{}", stage.id)
             else:
                 real_output_file = output_file
-            new_stage = output_stage_factory(stage, real_output_file)
-            plan.insert_step(new_stage, after=stage)
+
+            optimization_stage = ASTOptimizationStage(stage)
+            plan.insert_step(optimization_stage, after=stage)
+
+            output_stage = output_stage_factory(optimization_stage,
+                                                real_output_file)
+            plan.insert_step(output_stage, after=optimization_stage)
 
     def _add_stages_for_input_led_file(self, input_file, output_file, plan,
                                        ast_only):

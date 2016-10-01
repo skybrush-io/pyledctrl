@@ -88,8 +88,6 @@ def fade_to_black(duration=None, easing=None):
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
-    if red == green and green == blue:
-        return fade_to_gray(red, duration, easing)
     duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
@@ -98,15 +96,10 @@ def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
 
 
 def fade_to_gray(value, duration=None, easing=None):
-    if value == 0:
-        return fade_to_black(duration, easing)
-    elif value == 255:
-        return fade_to_white(duration, easing)
-    else:
-        duration = ast.Duration.from_seconds(duration)
-        easing = ast.EasingMode.get(easing)
-        _check_easing_is_supported(easing)
-        return ast.FadeToGrayCommand(value=value, duration=duration)
+    duration = ast.Duration.from_seconds(duration)
+    easing = ast.EasingMode.get(easing)
+    _check_easing_is_supported(easing)
+    return ast.FadeToGrayCommand(value=value, duration=duration)
 
 
 def fade_to_white(duration=None, easing=None):
@@ -135,19 +128,12 @@ def set_black(duration=None):
 def set_color(red, green=None, blue=None, duration=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
-    if red == green and green == blue:
-        return set_gray(red, duration)
     return ast.SetColorCommand(color=ast.RGBColor(red, green, blue),
                                duration=ast.Duration.from_seconds(duration))
 
 
 def set_gray(value, duration=None):
-    if value == 0:
-        return set_black(duration)
-    elif value == 255:
-        return set_white(duration)
-    else:
-        return ast.SetGrayCommand(duration=ast.Duration.from_seconds(duration))
+    return ast.SetGrayCommand(duration=ast.Duration.from_seconds(duration))
 
 
 def set_white(duration=None):

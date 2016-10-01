@@ -52,3 +52,7 @@ class TimestampWrapper(object):
 
     def __getattr__(self, attr):
         return getattr(self._wrapped, attr)
+
+    @property
+    def wrapped(self):
+        return self._wrapped

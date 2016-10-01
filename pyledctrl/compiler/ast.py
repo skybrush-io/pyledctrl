@@ -317,11 +317,12 @@ class Node(object):
             elif isinstance(value, NodeList):
                 index, length = 0, len(value)
                 while index < length:
-                    new_node = yield value[index]
+                    old_node = value[index]
+                    new_node = yield old_node
                     if new_node is None:
                         del value[index]
                         length -= 1
-                    elif new_node is node:
+                    elif new_node is old_node:
                         index += 1
                     else:
                         value[index] = new_node
@@ -441,6 +442,24 @@ class RGBColor(Node):
         "green": UnsignedByte,
         "blue": UnsignedByte
     }
+
+    @property
+    def is_black(self):
+        """Returns ``True`` if the color is black."""
+        return self.red.value == 0 and self.green.value == 0 and \
+            self.blue.value == 0
+
+    @property
+    def is_gray(self):
+        """Returns ``True`` if the color is a shade of gray."""
+        return self.red.value == self.green.value and \
+            self.green.value == self.blue.value
+
+    @property
+    def is_white(self):
+        """Returns ``True`` if the color is white."""
+        return self.red.value == 255 and self.green.value == 255 and \
+            self.blue.value == 255
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
@@ -758,13 +777,35 @@ class LoopBlock(Statement):
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
-        return sum((node.length_in_bytes for node in self.body.statements),
-                   2 + self.iterations.length_in_bytes)
+        if not self.body.statements or self.iterations.value <= 0:
+            return 0
+        body_length = sum(node.length_in_bytes for node in self.body.statements)
+        if self.iterations.value == 1:
+            return body_length
+        else:
+            return body_length + 2 + self.iterations.length_in_bytes
 
     def to_bytecode(self):
-        return CommandCode.LOOP_BEGIN + self.iterations.to_bytecode() + \
-            b"".join(node.to_bytecode() for node in self.body.statements) + \
-            CommandCode.LOOP_END
+        if not self.body.statements or self.iterations.value <= 0:
+            return b""
+
+        body = b"".join(node.to_bytecode() for node in self.body.statements)
+        if self.iterations.value == 1:
+            return body
+        else:
+            return CommandCode.LOOP_BEGIN + self.iterations.to_bytecode() + \
+                body + CommandCode.LOOP_END
+
+    def to_led_source(self):
+        if not self.body.statements or self.iterations.value <= 0:
+            return ""
+
+        body = self.body.to_led_source()
+        if self.iterations.value == 1:
+            return body
+        else:
+            body = body.replace("\n", "\n    ")
+        return "with loop(iterations={0}):\n    {1}".format(self.iterations, body)
 
 
 class NodeVisitor(object):
@@ -835,6 +876,10 @@ class NodeTransformer(NodeVisitor):
     replaced by the returned AST node (which may of course be the same as the
     original visited node)."""
 
+    def __init__(self):
+        super(NodeTransformer, self).__init__()
+        self.changed = False
+
     def generic_visit(self, node):
         """This visitor method is called for nodes for which no specific
         visitor method of the form ``self.visit_{classname}`` exists in this
@@ -851,8 +896,14 @@ class NodeTransformer(NodeVisitor):
             try:
                 child_node = generator.send(new_node)
                 new_node = self._visit(child_node)
+                if new_node is not child_node:
+                    self.changed = True
             except StopIteration:
-                return
+                return node
+
+    def visit(self, node):
+        self.changed = False
+        return super(NodeTransformer, self).visit(node)
 
 
 iter_fields = Node.iter_fields

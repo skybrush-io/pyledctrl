@@ -12,6 +12,8 @@ from functools import partial
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError, \
     InvalidASTFormatError
+from pyledctrl.compiler.optimisation import CompositeASTOptimiser, \
+    ColorCommandShortener, LoopDetector
 from pyledctrl.compiler.utils import get_timestamp_of, TimestampWrapper
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
@@ -86,31 +88,9 @@ class FileTargetMixin(object):
         return min(os.path.getmtime(filename) for filename in output_files)
 
 
-class ObjectTargetMixin(object):
-    """Mixin class for compilation stages that assume that the target of
+class ObjectSourceMixin(object):
+    """Mixin class for compilation stages that assume that the source of
     the compilation stage is an in-memory object.
-    """
-
-    @property
-    def output(self):
-        raise NotImplementedError
-
-
-class FileToObjectCompilationStage(CompilationStage, FileSourceMixin, ObjectTargetMixin):
-    """Abstract compilation phase that turns a set of input files into an
-    in-memory object. This phase is executed unconditionally.
-    """
-
-    def should_run(self):
-        return True
-
-
-class ObjectToFileCompilationStage(CompilationStage, FileTargetMixin):
-    """Abstract compilation phase that turns an in-memory object into a set of
-    output files. This phase is executed unconditionally if the in-memory
-    object is not timestamped (i.e. does not have a ``timestamp`` property);
-    otherwise it is executed if the timestamp of the input object is larger
-    than the timestamps of any of the output objects.
     """
 
     @property
@@ -128,14 +108,65 @@ class ObjectToFileCompilationStage(CompilationStage, FileTargetMixin):
         """
         inp = self.input
         if isinstance(inp, ObjectTargetMixin):
-            return inp.output
+            return inp.output_object
         else:
             return inp
+
+
+class ObjectTargetMixin(object):
+    """Mixin class for compilation stages that assume that the target of
+    the compilation stage is an in-memory object.
+    """
+
+    @property
+    def output(self):
+        raise NotImplementedError
+
+    @property
+    def output_object(self):
+        """Returns the output object of this stage. If the output object
+        happens to be the same as the input object, and the input
+        depends on the output of another stage, this property will return the
+        output object of the other stage.
+        """
+        output = self.output
+        if isinstance(output, ObjectTargetMixin):
+            return output.output_object
+        else:
+            return output
+
+
+class FileToObjectCompilationStage(CompilationStage, FileSourceMixin, ObjectTargetMixin):
+    """Abstract compilation phase that turns a set of input files into an
+    in-memory object. This phase is executed unconditionally.
+    """
+
+    def should_run(self):
+        return True
+
+
+class ObjectToFileCompilationStage(CompilationStage, ObjectSourceMixin,
+                                   FileTargetMixin):
+    """Abstract compilation phase that turns an in-memory object into a set of
+    output files. This phase is executed unconditionally if the in-memory
+    object is not timestamped (i.e. does not have a ``timestamp`` property);
+    otherwise it is executed if the timestamp of the input object is larger
+    than the timestamps of any of the output objects.
+    """
 
     def should_run(self):
         input_timestamp = get_timestamp_of(self.input_object,
                                            default_value=float('inf'))
         return input_timestamp >= self.youngest_output_file_timestamp
+
+
+class ObjectToObjectCompilationStage(CompilationStage, ObjectSourceMixin, ObjectTargetMixin):
+    """Abstract compilation phase that transforms an in-memory object into
+    another in-memory object. This phase is executed unconditionally.
+    """
+
+    def should_run(self):
+        return True
 
 
 class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMixin):
@@ -220,39 +251,35 @@ class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
         return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class ASTFileToOutputCompilationStage(FileToFileCompilationStage):
-    """Abstract compilation stage that turns a pickled abstract syntax tree
-    into some output file."""
+class ASTOptimizationStage(ObjectToObjectCompilationStage):
+    """Compilation stage that takes an in-memory abstract syntax tree and
+    optimises it in-place.
+    """
 
-    def __init__(self, input, output):
-        super(ASTFileToOutputCompilationStage, self).__init__()
-        self._input = input
-        self._output = output
+    def __init__(self, ast):
+        super(ObjectToObjectCompilationStage, self).__init__()
+        self._ast = ast
+        self.optimiser = self._construct_optimiser()
 
-    def get_ast(self):
-        """Returns the abstract syntax tree from the input file."""
-        with open(self._input, "rb") as fp:
-            ast_format = self._get_ast_format(fp.readline())
-            if ast_format == "pickle":
-                return self._get_ast_pickle(fp)
-            else:
-                raise InvalidASTFormatError(self._input, ast_format)
+    @ObjectToObjectCompilationStage.input.getter
+    def input(self):
+        return self._ast
 
-    def _get_ast_pickle(self, fp):
-        return pickle.load(fp)
+    @ObjectToObjectCompilationStage.output.getter
+    def output(self):
+        return self._ast
 
-    @staticmethod
-    def _get_ast_format(line):
-        match = re.match("# Format: (.*)", line.decode("utf-8"))
-        return match.group(1).lower() if match else None
+    def _construct_optimiser(self):
+        """Constructs and returns the optimiser that this stage will use to
+        optimise the AST.
+        """
+        optimiser = CompositeASTOptimiser()
+        optimiser.add_optimiser(ColorCommandShortener())
+        optimiser.add_optimiser(LoopDetector())
+        return optimiser
 
-    @FileToFileCompilationStage.input_files.getter
-    def input_files(self):
-        return [self._input]
-
-    @FileToFileCompilationStage.output_files.getter
-    def output_files(self):
-        return [self._output]
+    def run(self):
+        self.optimiser.optimise(self.input_object)
 
 
 class ASTObjectToOutputCompilationStage(ObjectToFileCompilationStage):
@@ -309,15 +336,6 @@ def _write_progmem_header_from_ast_to_file(ast, filename):
         output.write(FOOTER)
 
 
-class ASTFileToBytecodeCompilationStage(ASTFileToOutputCompilationStage):
-    """Compilation stage that turns a pickled abstract syntax tree from a
-    file into a bytecode file that can be uploaded to the Arduino using
-    ``ledctrl upload``."""
-
-    def run(self):
-        _write_bytecode_from_ast_to_file(self.get_ast(), self._output)
-
-
 class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree from a
     file into a bytecode file that can be uploaded to the Arduino using
@@ -327,15 +345,6 @@ class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
         _write_bytecode_from_ast_to_file(self.input_object, self._output_file)
 
 
-class ASTFileToLEDFileCompilationStage(ASTFileToOutputCompilationStage):
-    """Compilation stage that turns a pickled abstract syntax tree back into a
-    (functionally equivalent) ``.led`` file.
-    """
-
-    def run(self):
-        _write_led_source_from_ast_to_file(self.get_ast(), self._output)
-
-
 class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree back into a
     (functionally equivalent) ``.led`` file.
@@ -343,15 +352,6 @@ class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
 
     def run(self):
         _write_led_source_from_ast_to_file(self.input_object, self._output_file)
-
-
-class ASTFileToProgmemHeaderCompilationStage(ASTFileToOutputCompilationStage):
-    """Compilation stage that turns a pickled abstract syntax tree from a
-    file into a header file that can be compiled into the ``ledctrl`` source code
-    with an ``#include`` directive."""
-
-    def run(self):
-        _write_progmem_header_from_ast_to_file(self.get_ast(), self._output)
 
 
 class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage):
@@ -491,7 +491,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # steps, they could be merged, but the compiler won't do this.
         # In the next version, we should generate an AST (abstract syntax
         # tree) at this compilation stage and then set up a set of AST
-        # optimizers that make the bytecode more efficient
+        # optimisers that make the bytecode more efficient
 
         prev_time = None
         for time, steps_by_channels in self._merge_channels(fx.channels):
