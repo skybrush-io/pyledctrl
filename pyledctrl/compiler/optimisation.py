@@ -37,6 +37,13 @@ class ASTOptimiser(object):
             raise TypeError("optimisation not supported for {0!r}".format(obj))
 
 
+class NullASTOptimiser(ASTOptimiser):
+    """Null optimiser that does not transform the AST at all."""
+
+    def optimise_ast(self, obj):
+        return False
+
+
 class CompositeASTOptimiser(ASTOptimiser):
     """Composite AST optimiser that uses multiple "child optimisers" and
     returns if none of the child optimisers can modify the AST any more.
@@ -158,21 +165,13 @@ class LoopDetector(ASTOptimiser):
             first, second = start_index, start_index + loop_body_length
             num_matches = 0
             while second < num_statements and \
-                    self._statements_match(statements[first], statements[second]):
+                    statements[first].is_equivalent_to(statements[second]):
                 first += 1
                 second += 1
 
             # Don't detect more than 255 iterations because we cannot represent
             # more than 255 anyway
             return min((second - start_index) // loop_body_length, 255)
-
-        def _statements_match(self, first, second):
-            """Returns whether two statements (AST nodes) match each other.
-            Two AST nodes match if they are of the same class and are resolved
-            to the same bytecode.
-            """
-            return first.__class__ is second.__class__ and \
-                first.to_bytecode() == second.to_bytecode()
 
         def visit_StatementSequence(self, node):
             body = node.statements
@@ -194,7 +193,7 @@ class LoopDetector(ASTOptimiser):
                 max_end = min(num_statements, index + self.max_loop_len)
                 for end in xrange(index+1, max_end):
                     end_statement = body[end]
-                    if self._statements_match(statement, end_statement):
+                    if statement.is_equivalent_to(end_statement):
                         # A potential loop starts at index with a body
                         # length of end-index. Check how long the loop
                         # would be.
@@ -226,3 +225,32 @@ class LoopDetector(ASTOptimiser):
         transformer = self.Transformer()
         transformer.visit(ast)
         return transformer.changed
+
+
+def create_optimiser_for_level(level=2):
+    """Creates an AST optimiser for the given optimisation level.
+
+    Currently we have the following optimisation levels:
+
+        - 0: don't optimise the AST at all
+
+        - 1: perform only basic optimisations
+
+        - 2: perform more aggressive optimisations to make the generated
+          bytecode smaller (default)
+
+    Parameters:
+        level (int): the optimisation level
+
+    Returns:
+        ASTOptimiser: the AST optimiser to use for the given optimisation level
+    """
+    if level <= 0:
+        return NullASTOptimiser()
+
+    result = CompositeASTOptimiser()
+    if level >= 1:
+        result.add_optimiser(ColorCommandShortener())
+    if level >= 2:
+        result.add_optimiser(LoopDetector())
+    return result

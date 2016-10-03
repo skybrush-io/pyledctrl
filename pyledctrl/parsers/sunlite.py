@@ -133,7 +133,7 @@ class EasyStepTimeline(object):
         """Creates a deep copy of this timeline into another."""
         result = self.__class__()
         result.instants = [instant.copy() for instant in self.instants]
-        result.steps = [step.copy() for step in self.steps]
+        result.steps = list(self.steps)
         return result
 
     def copy_instants_from(self, timeline):
@@ -220,7 +220,7 @@ class EasyStepTimeline(object):
         to_insert = []
         while start + shift < end:
             to_insert.extend(
-                (instant.shifted(by=shift), value.copy())
+                (instant.shifted(by=shift), value)
                 for instant, value in to_repeat
             )
             shift += total_length
@@ -269,13 +269,13 @@ class EasyStepTimeline(object):
                 self.instants.pop()
                 self.steps.pop()
             self.instants.extend(instant.copy() for instant in other.instants)
-            self.steps.extend(step.copy() for step in other.steps)
+            self.steps.extend(other.steps)
         else:
             other_end = len(other.instants)
             if other.has_instants and self_range[0] == other_range[1]:
                 other_end -= 1
             self.instants[0:0] = [instant.copy() for instant in other.instants[:other_end]]
-            self.steps[0:0] = [step.copy() for step in other.steps[:other_end]]
+            self.steps[0:0] = other.steps
 
     @property
     def range(self):
@@ -363,6 +363,8 @@ class Time(object):
     in the ``time`` property.
     """
 
+    __slots__ = ("time", "fade", "wait", "tag")
+
     def __init__(self, time=0, fade=0, wait=0):
         self.tag = None
         self.time = time
@@ -379,9 +381,11 @@ class Time(object):
         result.tag = tag
         return result
 
-    def copy(self):
-        """Returns a deep copy of the time step."""
-        return self.__class__(time=self.time, fade=self.fade, wait=self.wait)
+    def copy(self, shift_by=0):
+        """Returns a deep copy of the time step, optionally shifted by a given
+        number of frames"""
+        return self.__class__(time=self.time + shift_by,
+                              fade=self.fade, wait=self.wait)
 
     @property
     def end_of_wait(self):
@@ -403,9 +407,7 @@ class Time(object):
     def shifted(self, by):
         """Returns a copy of the time step after shifting it on the time axis by
         the given amount."""
-        result = self.copy()
-        result.shift(by)
-        return result
+        return self.copy(shift_by=by)
 
     @property
     def total_duration(self):
@@ -424,20 +426,27 @@ class Time(object):
 
 
 class Step(object):
-    """Represents a ``<Step>`` tag from an ``<EasyStep>`` timeline object."""
+    """Represents a ``<Step>`` tag from an ``<EasyStep>`` timeline object.
+
+    This type is immutable.
+    """
+
+    __slots__ = ("_value", )
 
     def __init__(self, value=0):
-        self.value = value
-        self.tag = None
-
-    def copy(self):
-        return self.__class__(value=self.value)
+        self._value = value
 
     @classmethod
     def from_xml(cls, tag):
         result = cls(value=int(tag.get("L")))
-        result.tag = tag
         return result
+
+    def updated(self, value):
+        return self.__class__(value=value)
+
+    @property
+    def value(self):
+        return self._value
 
     def __repr__(self):
         return "{0.__class__.__name__}(value={0.value!r})".format(self)

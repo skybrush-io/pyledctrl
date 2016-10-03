@@ -12,8 +12,6 @@ from functools import partial
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError, \
     InvalidASTFormatError
-from pyledctrl.compiler.optimisation import CompositeASTOptimiser, \
-    ColorCommandShortener, LoopDetector
 from pyledctrl.compiler.utils import get_timestamp_of, TimestampWrapper
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
@@ -251,15 +249,22 @@ class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
         return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class ASTOptimizationStage(ObjectToObjectCompilationStage):
+class ASTOptimisationStage(ObjectToObjectCompilationStage):
     """Compilation stage that takes an in-memory abstract syntax tree and
     optimises it in-place.
     """
 
-    def __init__(self, ast):
+    def __init__(self, ast, optimiser):
+        """Constructor.
+
+        Parameters:
+            ast (Node): the root of the abstract syntax tree that the
+                compiler will optimise.
+            optimiser (ASTOptimiser): the optimiser to use
+        """
         super(ObjectToObjectCompilationStage, self).__init__()
         self._ast = ast
-        self.optimiser = self._construct_optimiser()
+        self.optimiser = optimiser
 
     @ObjectToObjectCompilationStage.input.getter
     def input(self):
@@ -268,15 +273,6 @@ class ASTOptimizationStage(ObjectToObjectCompilationStage):
     @ObjectToObjectCompilationStage.output.getter
     def output(self):
         return self._ast
-
-    def _construct_optimiser(self):
-        """Constructs and returns the optimiser that this stage will use to
-        optimise the AST.
-        """
-        optimiser = CompositeASTOptimiser()
-        optimiser.add_optimiser(ColorCommandShortener())
-        optimiser.add_optimiser(LoopDetector())
-        return optimiser
 
     def run(self):
         self.optimiser.optimise(self.input_object)
@@ -327,7 +323,7 @@ def _write_progmem_header_from_ast_to_file(ast, filename):
         PROGMEMBytecodeStore bytecodeStore(_bytecode);
         """)
 
-    with open(self.filename, "w") as output:
+    with open(filename, "w") as output:
         output.write(HEADER)
         for bytes_in_row in grouper(ast.to_bytecode(), 16):
             output.write("  {0},\n".format(
@@ -473,10 +469,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             # Okay, great. Now we need to merge the timeline and steps of each
             # channel in the FX of the scene file into our FX, shifted appropriately
             for channel_in_scene_file in fx_in_scene_file.channels:
-                timeline = channel_in_scene_file.timeline
+                timeline = channel_in_scene_file.timeline.looped(until=trim)
+                timeline.shift(by=shift)
+
                 our_channel = fx.channels[channel_in_scene_file.index]
                 our_timeline = our_channel.timeline
-                our_timeline.merge_from(timeline.looped(until=trim).shifted(by=shift))
+                our_timeline.merge_from(timeline)
 
     def _dump_fx_to_file(self, fx, fp):
         """Processes a single FX component from the merged Sunlite Suite stage files

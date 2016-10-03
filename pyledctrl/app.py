@@ -20,8 +20,8 @@ from pyledctrl.utils import error, get_serial_port_filename, \
 pyledctrl = baker.Baker()
 
 
-@pyledctrl.command(shortopts=dict(output="o", keep="k"))
-def compile(filename, output=None, keep=False):
+@pyledctrl.command(shortopts=dict(output="o", keep="k", optimisation="O"))
+def compile(filename, output=None, keep=False, optimisation=2):
     """\
     Compiles a LedCtrl source file to a bytecode file.
 
@@ -31,11 +31,15 @@ def compile(filename, output=None, keep=False):
         ``.bin``.
     :param keep: Whether to keep intermediate files generated during
         compilation.
+    :param optimisation: The optimisation level to use. 0 = no optimisation,
+        1 = only basic optimisations, 2 = aggressive optimisation (default).
     """
     if output is None:
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
+
     compiler = BytecodeCompiler(keep_intermediate_files=keep)
+    compiler.optimisation_level = optimisation
     compiler.compile(filename, output)
 
 

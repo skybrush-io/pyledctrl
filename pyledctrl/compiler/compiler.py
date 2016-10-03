@@ -5,6 +5,7 @@ import os
 
 from pyledctrl.compiler.errors import CompilerError, \
     UnsupportedInputFileFormatError
+from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import \
     ParsedSunliteScenesToPythonSourceCompilationStage, \
@@ -14,7 +15,7 @@ from pyledctrl.compiler.stages import \
     ASTObjectToBytecodeCompilationStage, \
     ASTObjectToLEDFileCompilationStage, \
     ASTObjectToProgmemHeaderCompilationStage, \
-    ASTOptimizationStage
+    ASTOptimisationStage
 from pyledctrl.utils import TemporaryDirectory
 
 
@@ -39,6 +40,9 @@ class BytecodeCompiler(object):
     def __init__(self, keep_intermediate_files=False):
         self.keep_intermediate_files = keep_intermediate_files
         self._tmpdir = None
+        self._optimiser = None
+        self._optimisation_level = 0
+        self.optimisation_level = 2
 
     def compile(self, input_file, output_file=None, force=True):
         """Runs the compiler.
@@ -63,6 +67,29 @@ class BytecodeCompiler(object):
                 result = self._compile(input_file, output_file, force)
                 self._tmpdir = None
             return result
+
+    @property
+    def optimisation_level(self):
+        """The optimisation level that the compiler will use.
+
+        Currently we have the following optimisation levels:
+
+            - 0: don't optimise the AST at all
+
+            - 1: perform only basic optimisations
+
+            - 2: perform more aggressive optimisations to make the generated
+            bytecode smaller (default)
+        """
+        return self._optimisation_level
+
+    @optimisation_level.setter
+    def optimisation_level(self, value):
+        if self._optimisation_level == value:
+            return
+
+        self._optimisation_level = value
+        self._optimiser = create_optimiser_for_level(value)
 
     def _compile(self, input_file, output_file, force):
         plan = Plan()
@@ -132,7 +159,7 @@ class BytecodeCompiler(object):
             else:
                 real_output_file = output_file
 
-            optimization_stage = ASTOptimizationStage(stage)
+            optimization_stage = ASTOptimisationStage(stage, self._optimiser)
             plan.insert_step(optimization_stage, after=stage)
 
             output_stage = output_stage_factory(optimization_stage,

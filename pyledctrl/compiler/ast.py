@@ -69,8 +69,26 @@ therefore are enclosed in quotes)::
 from __future__ import division
 
 from future_builtins import zip
-from pyledctrl.utils import first
+from pyledctrl.utils import first, memoize
 from struct import Struct
+
+
+@memoize
+def _to_varuint(value):
+    """Converts the given numeric value into its varuint representation."""
+    if value < 0:
+        raise ValueError("negative varuints are not supported")
+    elif value < 128:
+        result = [value]
+    else:
+        result = []
+        while value > 0:
+            if value < 128:
+                result.append(value)
+            else:
+                result.append((value & 0x7F) + 0x80)
+            value >>= 7
+    return bytes(bytearray(result))
 
 
 class CommandCode(object):
@@ -158,7 +176,8 @@ class _NodeMeta(type):
     This metaclass adds the following functionality to node classes
     automatically if the class has a ``_fields`` property that describes the
     fields of the node and optionally a ``_defaults`` property that contains
-    the default value for some or all of the fields:
+    the default value for some or all of the fields, and an ``_immutable``
+    property that contains the names of the fields that are immutable.
 
         - Creates an ``__init__`` method that accepts the fields as positional
           or keyword arguments and throws an exception if fields without
@@ -174,20 +193,34 @@ class _NodeMeta(type):
     def __new__(cls, name, parents, dct):
         fields = dct.get("_fields")
         defaults = dct.get("_defaults")
+        immutables = dct.get("_immutable")
         if "__init__" not in dct:
             dct["__init__"] = cls._create_init_method(parents, fields, defaults)
-        cls._add_setters_for_literals(defaults, dct)
+        cls._add_setters_for_literals(defaults, dct, immutables, name)
         return super(_NodeMeta, cls).__new__(cls, name, parents, dct)
 
     @classmethod
-    def _add_setters_for_literals(cls, defaults, dct):
+    def _add_setters_for_literals(cls, defaults, dct, immutables, name):
         if not defaults:
             return
+        immutables = frozenset(immutables or [])
         for field, default in defaults.items():
             if field in dct:
                 continue
-            if issubclass(default, Literal):
+
+            if field in immutables:
+                dct[field] = cls._add_getter_for_immutable_field(field)
+            elif issubclass(default, Literal):
                 dct[field] = cls._add_setter_for_literal(field, default)
+
+    @classmethod
+    def _add_getter_for_immutable_field(cls, field):
+        field_var = "_" + field
+
+        def getter(self):
+            return getattr(self, field_var)
+
+        return property(getter)
 
     @classmethod
     def _add_setter_for_literal(cls, field, literal_type):
@@ -200,6 +233,7 @@ class _NodeMeta(type):
             if not isinstance(value, literal_type):
                 value = literal_type(value)
             setattr(self, field_var, value)
+
         return property(getter, setter)
 
     @classmethod
@@ -265,9 +299,16 @@ class Node(object):
 
     def iter_fields(self):
         """Returns an iterator that yields ``(field_name, field_value)`` pairs
-        for each child of the node."""
+        for each field of the node."""
         for name in self._fields:
             yield name, getattr(self, name)
+
+    def iter_field_values(self):
+        """Returns an iterator that yields the values of each field of the node,
+        in the order defined in the ``_fields`` property.
+        """
+        for name in self._fields:
+            yield getattr(self, name)
 
     @property
     def length_in_bytes(self):
@@ -365,14 +406,23 @@ class UnsignedByte(Byte):
     _defaults = {
         "value": 0
     }
-    _struct = Struct("B")
+
+    def __init__(self, value=0):
+        self._set_value(value)
+        self.bytecode = chr(self.value)
+
+    def equals(self, other):
+        """Compares this byte with another byte to decide whether they
+        are the same.
+        """
+        return self._value == other._value
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
-        return self._struct.size
+        return 1
 
     def to_bytecode(self):
-        return self._struct.pack(self.value)
+        return self.bytecode
 
     def to_led_source(self):
         return str(self.value)
@@ -381,8 +431,7 @@ class UnsignedByte(Byte):
     def value(self):
         return self._value
 
-    @value.setter
-    def value(self, value):
+    def _set_value(self, value):
         if value < 0 or value > 255:
             raise ValueError("value must be between 0 and 255 (inclusive)")
         self._value = value
@@ -395,26 +444,24 @@ class Varuint(Literal):
     _defaults = {
         "value": 0
     }
+    _immutable = _fields
 
-    @staticmethod
-    def _to_varuint(value):
-        """Converts the given numeric value into its varuint representation."""
-        result = []
-        if value < 0:
-            raise ValueError("negative varuints are not supported")
-        elif value == 0:
-            result = [0]
-        else:
-            while value > 0:
-                if value < 128:
-                    result.append(value)
-                else:
-                    result.append((value & 0x7F) + 0x80)
-                value >>= 7
-        return bytes(bytearray(result))
+    def __init__(self, value=0):
+        self._set_value(int(value))
+        self._bytecode = _to_varuint(value)
+
+    def equals(self, other):
+        """Compares this byte with another byte to decide whether they
+        are the same.
+        """
+        return self._value == other._value
+
+    @Node.length_in_bytes.getter
+    def length_in_bytes(self):
+        return len(self._bytecode)
 
     def to_bytecode(self):
-        return self._to_varuint(self.value)
+        return self._bytecode
 
     def to_led_source(self):
         return str(self.value)
@@ -423,8 +470,7 @@ class Varuint(Literal):
     def value(self):
         return self._value
 
-    @value.setter
-    def value(self, value):
+    def _set_value(self, value):
         if value < 0:
             raise ValueError("value must be non-negative")
         elif value >= 2**28:
@@ -436,37 +482,63 @@ class Varuint(Literal):
 class RGBColor(Node):
     """Node that represents an RGB color."""
 
-    _fields = ["red", "green", "blue"]
+    _fields = ("red", "green", "blue")
     _defaults = {
         "red": UnsignedByte,
         "green": UnsignedByte,
         "blue": UnsignedByte
     }
+    _immutable = _fields
+    _instance_cache = {}
+    _struct = Struct("BBB")
+
+    def __init__(self, red, green, blue):
+        self._red = UnsignedByte(red)
+        self._green = UnsignedByte(green)
+        self._blue = UnsignedByte(blue)
+
+    @classmethod
+    def cached(cls, red, green, blue):
+        key = red, green, blue
+        result = cls._instance_cache.get(key)
+        if result is None:
+            cls._instance_cache[key] = result = cls(red, green, blue)
+        return result
+
+    def equals(self, other):
+        """Compares this color with another RGBColor to decide whether they
+        are the same.
+        """
+        return self._red.value == other._red.value and \
+            self._green.value == other._green.value and \
+            self._blue.value == other._blue.value
 
     @property
     def is_black(self):
         """Returns ``True`` if the color is black."""
-        return self.red.value == 0 and self.green.value == 0 and \
-            self.blue.value == 0
+        return self._red.value == 0 and self._green.value == 0 and \
+            self._blue.value == 0
 
     @property
     def is_gray(self):
         """Returns ``True`` if the color is a shade of gray."""
-        return self.red.value == self.green.value and \
-            self.green.value == self.blue.value
+        return self._red.value == self._green.value and \
+            self._green.value == self._blue.value
 
     @property
     def is_white(self):
         """Returns ``True`` if the color is white."""
-        return self.red.value == 255 and self.green.value == 255 and \
-            self.blue.value == 255
+        return self._red.value == 255 and self._green.value == 255 and \
+            self._blue.value == 255
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
         return 3
 
     def to_bytecode(self):
-        return b"".join(field.to_bytecode() for _, field in self.iter_fields())
+        return self._struct.pack(self.red.value,
+                                 self.green.value,
+                                 self.blue.value)
 
     def to_led_source(self):
         return "{0}, {1}, {2}".format(
@@ -481,38 +553,38 @@ class Duration(Varuint):
 
     _fields = Varuint._fields
     FPS = 50
+    _instance_cache = {}
+
+    def __init__(self, value=0):
+        # Don't remove this constructor -- it prevents NodeMeta from generating
+        # one for Duration
+        super(Duration, self).__init__(value)
 
     @classmethod
     def from_frames(cls, frames):
-        result = cls()
-        result.value_in_frames = frames
+        result = cls._instance_cache.get(frames)
+        if result is None:
+            result = cls(value=frames)
+            cls._instance_cache[frames] = result
         return result
 
     @classmethod
     def from_seconds(cls, seconds):
-        result = cls()
-        result.value_in_seconds = seconds
-        return result
+        return cls.from_frames(int(seconds * cls.FPS))
 
     @property
     def value_in_frames(self):
-        return self.value * self.FPS
-
-    @value_in_frames.setter
-    def value_in_frames(self, value):
-        self.value = value / self.FPS
+        return self.value
 
     @property
     def value_in_seconds(self):
-        return self.value
-
-    @value_in_seconds.setter
-    def value_in_seconds(self, value):
-        self.value = value
+        return self.value / self.FPS
 
     def to_bytecode(self):
-        return self._to_varuint(int(self.value_in_frames))
+        return _to_varuint(int(self.value))
 
+    def to_led_source(self):
+        return str(self.value_in_seconds)
 
 
 class StatementSequence(Node):
@@ -541,7 +613,24 @@ class StatementSequence(Node):
 class Statement(Node):
     """Node that represents a single statement (e.g., a bytecode command or
     a loop block)."""
-    pass
+
+    def is_equivalent_to(self, other):
+        """Returns whether this statement is semantically equivalent to
+        some other statement.
+        """
+        return self is other or (
+            self.__class__ is other.__class__ and \
+            self._is_equivalent_to_inner(other)
+        )
+
+    def _is_equivalent_to_inner(self, other):
+        """Compares two statements of *exactly* the same class to decide
+        whether they are semantically equivalent.
+
+        This class is meant to be overridden in subclasses. The default
+        implementation compares the bytecode of the statements.
+        """
+        return self.to_bytecode() == other.to_bytecode()
 
 
 class Command(Statement):
@@ -551,11 +640,11 @@ class Command(Statement):
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
-        return sum((field.length_in_bytes for _, field in self.iter_fields()), 1)
+        return sum((field.length_in_bytes for field in self.iter_field_values()), 1)
 
     def to_bytecode(self):
         parts = [self.code]
-        parts.extend(field.to_bytecode() for _, field in self.iter_fields())
+        parts.extend(field.to_bytecode() for field in self.iter_field_values())
         return b"".join(parts)
 
 class EndCommand(Command):
@@ -608,8 +697,19 @@ class SetColorCommand(Command):
     _fields = ("color", "duration")
     _defaults = {
         "color": RGBColor,
-        "duration": Varuint
+        "duration": Duration
     }
+    _immutable = _fields
+
+    def __init__(self, color, duration):
+        assert isinstance(color, RGBColor)
+        assert isinstance(duration, Duration)
+        self._color = color
+        self._duration = duration
+
+    def _is_equivalent_to_inner(self, other):
+        return self._color.equals(other._color) and \
+            self._duration.equals(other._duration)
 
     def to_led_source(self):
         return "set_color({0}, duration={1})".format(
@@ -627,6 +727,10 @@ class SetGrayCommand(Command):
         "duration": Varuint
     }
 
+    def _is_equivalent_to_inner(self, other):
+        return self._value.equals(other._value) and \
+            self._duration.equals(other._duration)
+
     def to_led_source(self):
         return "set_gray({0}, duration={1})".format(
             self.value.to_led_source(), self.duration.to_led_source()
@@ -642,6 +746,9 @@ class SetBlackCommand(Command):
         "duration": Varuint
     }
 
+    def _is_equivalent_to_inner(self, other):
+        return self._duration.equals(other._duration)
+
     def to_led_source(self):
         return "set_black(duration={0})".format(self.duration.to_led_source())
 
@@ -654,6 +761,9 @@ class SetWhiteCommand(Command):
     _defaults = {
         "duration": Varuint
     }
+
+    def _is_equivalent_to_inner(self, other):
+        return self._duration.equals(other._duration)
 
     def to_led_source(self):
         return "set_white(duration={0})".format(self.duration.to_led_source())
@@ -668,6 +778,17 @@ class FadeToColorCommand(Command):
         "color": RGBColor,
         "duration": Varuint
     }
+    _immutable = _fields
+
+    def __init__(self, color, duration):
+        assert isinstance(color, RGBColor)
+        assert isinstance(duration, Duration)
+        self._color = color
+        self._duration = duration
+
+    def _is_equivalent_to_inner(self, other):
+        return self._color.equals(other._color) and \
+            self._duration.equals(other._duration)
 
     def to_led_source(self):
         return "fade_to_color({0}, duration={1})".format(
@@ -685,6 +806,10 @@ class FadeToGrayCommand(Command):
         "duration": Varuint
     }
 
+    def _is_equivalent_to_inner(self, other):
+        return self._value.equals(other._value) and \
+            self._duration.equals(other._duration)
+
     def to_led_source(self):
         return "fade_to_gray({0}, duration={1})".format(
             self.value.to_led_source(), self.duration.to_led_source()
@@ -700,6 +825,9 @@ class FadeToBlackCommand(Command):
         "duration": Varuint
     }
 
+    def _is_equivalent_to_inner(self, other):
+        return self._duration.equals(other._duration)
+
     def to_led_source(self):
         return "fade_to_black(duration={0})".format(
             self.duration.to_led_source()
@@ -714,6 +842,9 @@ class FadeToWhiteCommand(Command):
     _defaults = {
         "duration": Varuint
     }
+
+    def _is_equivalent_to_inner(self, other):
+        return self._duration.equals(other._duration)
 
     def to_led_source(self):
         return "fade_to_white(duration={0})".format(
@@ -907,6 +1038,7 @@ class NodeTransformer(NodeVisitor):
 
 
 iter_fields = Node.iter_fields
+iter_field_values = Node.iter_field_values
 iter_child_nodes = Node.iter_child_nodes
 
 

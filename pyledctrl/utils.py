@@ -84,6 +84,21 @@ def iterbytes(fp):
         yield b
 
 
+def memoize(func):
+    """Single-argument memoization decorator for a function. Caches the results
+    of the function in a dictionary.
+    """
+
+    class memodict(dict):
+        __slots__ = ()
+
+        def __missing__(self, key):
+            self[key] = ret = func(key)
+            return ret
+
+    return memodict().__getitem__
+
+
 class _TemporaryDirectory(object):
     """Create and return a temporary directory.  This has the same
     behaviour as mkdtemp but can be used as a context manager.

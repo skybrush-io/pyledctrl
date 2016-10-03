@@ -88,11 +88,11 @@ def fade_to_black(duration=None, easing=None):
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
+    color = ast.RGBColor.cached(red, green, blue)
     duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
     _check_easing_is_supported(easing)
-    return ast.FadeToColorCommand(color=ast.RGBColor(red, green, blue),
-                                  duration=duration)
+    return ast.FadeToColorCommand(color=color, duration=duration)
 
 
 def fade_to_gray(value, duration=None, easing=None):
@@ -128,7 +128,7 @@ def set_black(duration=None):
 def set_color(red, green=None, blue=None, duration=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
-    return ast.SetColorCommand(color=ast.RGBColor(red, green, blue),
+    return ast.SetColorCommand(color=ast.RGBColor.cached(red, green, blue),
                                duration=ast.Duration.from_seconds(duration))
 
 
