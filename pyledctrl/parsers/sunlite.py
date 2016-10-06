@@ -10,14 +10,15 @@ class SceneFile(object):
     """Represents a parsed Sunlite Suite scene file (with extension
     ``.sce``)."""
 
-    def __init__(self):
+    def __init__(self, filename=None):
+        self.filename = filename
         self.tag = None
         self.timeline = None
         self.fxs = []
 
     @classmethod
-    def from_xml(cls, tag):
-        result = cls()
+    def from_xml(cls, tag, filename=None):
+        result = cls(filename=filename)
         result.tag = tag
 
         # Parse the global timeline
@@ -124,6 +125,9 @@ class EasyStepTimeline(object):
         self.tag = None
         self.clear()
 
+    def _assert_instants_and_steps_consistent(self):
+        assert len(self.instants) == len(self.steps)
+
     def clear(self):
         """Clears the timeline, i.e. removes all instants and steps."""
         self.instants = []
@@ -138,8 +142,24 @@ class EasyStepTimeline(object):
 
     def copy_instants_from(self, timeline):
         """Copies the time instants from another timeline, replacing any time
-        instants in this object."""
+        instants in this object.
+
+        The timeline from where the instants are copied must contain _exactly_
+        as many time instants as the number of steps in this object, or
+        at most one more (in which case the last step is repeated)."""
+        diff = len(timeline.instants) - len(self.steps)
+        if diff != 0 and diff != 1:
+            raise ValueError("number of time instants in assigned timeline is "
+                             "incompatible with the number of steps")
+        elif diff == 1:
+            if not self.steps:
+                self.steps.append(0)
+            else:
+                self.steps.append(self.steps[-1])
+        else:
+            pass
         self.instants = list(timeline.instants)
+        self._assert_instants_and_steps_consistent()
 
     @classmethod
     def from_xml(cls, tag):
@@ -185,6 +205,8 @@ class EasyStepTimeline(object):
             end (Optional[int]): the desired new frame count of the timeline.
                 ``None`` means not to loop at all.
         """
+        self._assert_instants_and_steps_consistent()
+
         if end is None:
             # There is nothing to repeat so we can return here
             return
@@ -202,6 +224,7 @@ class EasyStepTimeline(object):
 
             self.instants.append(Time(time=end))
             self.steps.append(self.steps[0].copy())
+            self._assert_instants_and_steps_consistent()
             return
 
         # We have at least two instants so we can loop sensibly.
@@ -235,6 +258,7 @@ class EasyStepTimeline(object):
         # Now trim the timeline to ensure that the timeline ends exactly at
         # the desired position
         self.trim(at=end)
+        self._assert_instants_and_steps_consistent()
 
     def looped(self, until):
         """Copies this timeline and loops the copy until the given frame count
@@ -255,6 +279,7 @@ class EasyStepTimeline(object):
         in this case, the steps from the second timeline will take precedence
         over the steps of the first timeline.
         """
+        self._assert_instants_and_steps_consistent()
         self_range = self.range
         other_range = other.range
         if self.has_instants and other.has_instants and \
@@ -276,6 +301,7 @@ class EasyStepTimeline(object):
                 other_end -= 1
             self.instants[0:0] = [instant.copy() for instant in other.instants[:other_end]]
             self.steps[0:0] = other.steps
+        self._assert_instants_and_steps_consistent()
 
     @property
     def range(self):
@@ -304,6 +330,7 @@ class EasyStepTimeline(object):
         corresponding value, the new value will be interpolated from the
         surrounding ones.
         """
+        self._assert_instants_and_steps_consistent()
         keys = [instant.time for instant in self.instants]
         pos = bisect(keys, at)
 
@@ -343,6 +370,7 @@ class EasyStepTimeline(object):
             # Insert the new value
             self.instants.insert(pos, Time(time=at))
             self.steps.insert(pos, Step(value=value))
+        self._assert_instants_and_steps_consistent()
 
     def trimmed(self, at):
         """Copies this timeline and trims the copy at the given frame."""
@@ -489,14 +517,15 @@ class SwitchFile(object):
     ``.ses``).
     """
 
-    def __init__(self):
+    def __init__(self, filename=None):
+        self.filename = filename
         self.tag = None
         self.files = {}
         self.buttons = []
 
     @classmethod
-    def from_xml(cls, tag):
-        result = cls()
+    def from_xml(cls, tag, filename=None):
+        result = cls(filename=filename)
         result.tag = tag
 
         # Parse the file entries
@@ -525,7 +554,7 @@ class SunliteSuiteSceneFileParser(object):
         """
         from lxml import etree
         tree = etree.parse(fp)
-        return SceneFile.from_xml(tree)
+        return SceneFile.from_xml(tree, filename=getattr(fp, "name", None))
 
 
 class SunliteSuiteSwitchFileParser(object):
@@ -540,4 +569,4 @@ class SunliteSuiteSwitchFileParser(object):
         """
         from lxml import etree
         tree = etree.parse(fp)
-        return SwitchFile.from_xml(tree)
+        return SwitchFile.from_xml(tree, filename=getattr(fp, "name", None))

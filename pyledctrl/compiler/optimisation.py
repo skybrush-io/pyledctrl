@@ -1,6 +1,5 @@
 """AST optimization routines for the ledctrl compiler."""
 
-from itertools import islice
 from operator import attrgetter
 from pyledctrl.compiler.ast import Node, NodeTransformer, \
     SetBlackCommand, SetGrayCommand, SetWhiteCommand, \
@@ -104,7 +103,8 @@ class ColorCommandShortener(ASTOptimiser):
             elif node.color.is_black:
                 return SetBlackCommand(duration=node.duration)
             elif node.color.is_gray:
-                return SetGrayCommand(value=node.red, duration=node.duration)
+                return SetGrayCommand(value=node.color.red,
+                                      duration=node.duration)
             else:
                 return node
 
@@ -122,7 +122,8 @@ class ColorCommandShortener(ASTOptimiser):
             elif node.color.is_black:
                 return FadeToBlackCommand(duration=node.duration)
             elif node.color.is_gray:
-                return FadeToGrayCommand(value=node.red, duration=node.duration)
+                return FadeToGrayCommand(value=node.color.red,
+                                         duration=node.duration)
             else:
                 return node
 
@@ -163,7 +164,6 @@ class LoopDetector(ASTOptimiser):
             """
             num_statements = len(statements)
             first, second = start_index, start_index + loop_body_length
-            num_matches = 0
             while second < num_statements and \
                     statements[first].is_equivalent_to(statements[second]):
                 first += 1
@@ -188,7 +188,6 @@ class LoopDetector(ASTOptimiser):
                 # We save each such potential loop in a list
                 potential_loops = []
                 statement = body[index]
-                statement_class = statement.__class__
                 end = index + 1
                 max_end = min(num_statements, index + self.max_loop_len)
                 for end in xrange(index+1, max_end):
