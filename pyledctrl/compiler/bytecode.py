@@ -3,8 +3,8 @@ abstract syntax tree fragments."""
 
 from pyledctrl.compiler import ast
 from pyledctrl.compiler.colors import parse_color
-from pyledctrl.compiler.errors import InvalidDurationError, \
-    MarkerNotResolvableError, FeatureNotImplementedError
+from pyledctrl.compiler.errors import MarkerNotResolvableError, \
+    FeatureNotImplementedError
 
 
 def _check_easing_is_supported(easing):
@@ -88,6 +88,7 @@ def fade_to_black(duration=None, easing=None):
 def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
+    red, green, blue = int(round(red)), int(round(green)), int(round(blue))
     color = ast.RGBColor.cached(red, green, blue)
     duration = ast.Duration.from_seconds(duration)
     easing = ast.EasingMode.get(easing)
@@ -128,6 +129,7 @@ def set_black(duration=None):
 def set_color(red, green=None, blue=None, duration=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
+    red, green, blue = int(round(red)), int(round(green)), int(round(blue))
     return ast.SetColorCommand(color=ast.RGBColor.cached(red, green, blue),
                                duration=ast.Duration.from_seconds(duration))
 
