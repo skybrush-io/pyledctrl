@@ -1,7 +1,6 @@
 """Compilation stages being used in the bytecode compiler."""
 
 import os
-import re
 
 try:
     import cPickle as pickle     # for Python 2.x
@@ -10,8 +9,7 @@ except ImportError:
 
 from functools import partial
 from pyledctrl.compiler.contexts import ExecutionContext
-from pyledctrl.compiler.errors import InvalidDurationError, \
-    InvalidASTFormatError
+from pyledctrl.compiler.errors import InvalidDurationError
 from pyledctrl.compiler.utils import get_timestamp_of, TimestampWrapper
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
