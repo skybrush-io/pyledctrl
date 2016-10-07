@@ -7,6 +7,7 @@ try:
 except ImportError:
     import pickle                # for Python 3.x
 
+from decimal import Decimal
 from functools import partial
 from operator import attrgetter
 from pyledctrl.compiler.ast import Comment
@@ -362,7 +363,7 @@ class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage
 class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationStage):
 
     # TODO: make this configurable
-    FPS = 100.0
+    FPS = Decimal(100)
 
     def __init__(self, input, output_template=None):
         super(ParsedSunliteScenesToPythonSourceCompilationStage, self).__init__()
@@ -517,16 +518,29 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # It is up to an optimization step that comes later.
 
         prev_time = None
+        timer = 0
         for time, steps_by_channels in self._merge_channels(fx.channels):
             r, g, b = tuple(step.value if step else 0
                             for step in steps_by_channels)
             params = dict(r=r, g=g, b=b)
 
+            # Print any necessary markers into the output file
+            while next_marker_time is not None and next_marker_time <= time.time:
+                marker = markers_by_time.pop()
+                comment = Comment(value=marker.value)
+                fp.write(comment.to_led_source() + "\n")
+                next_marker_time = markers_by_time[-1].time if markers_by_time else None
+
+            lines_and_times = []
             if prev_time is None:
                 # This is the first step; process time.wait only as time.fade
                 # will be processed in the next iteration
-                fp.write("set_color({r}, {g}, {b}, duration={dt})\n".format(
-                    dt=time.wait / self.FPS, **params))
+                lines_and_times.append((
+                    "set_color({r}, {g}, {b}, duration={dt})"\
+                    .format(dt=time.wait / self.FPS, **params),
+                    timer
+                ))
+                timer += time.wait
             else:
                 # This is not the first step. We need to check whether there is
                 # a "jump" in the timeline, which may happen if
@@ -537,29 +551,44 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                 diff = time.time - prev_time.end
                 if diff > 0:
-                    fp.write("sleep(duration={dt})\n".format(dt=diff / self.FPS))
+                    lines_and_times.append((
+                        "sleep(duration={dt})".format(dt=diff / self.FPS),
+                        timer
+                    ))
+                    timer += diff
                 elif diff < 0:
                     raise ValueError("timeline inconsistent; this is probably a bug")
 
                 if prev_time.fade == 0:
-                    fp.write("set_color({r}, {g}, {b}, duration={dt})\n".format(
-                        dt=time.wait / self.FPS, **params))
+                    lines_and_times.append((
+                        "set_color({r}, {g}, {b}, duration={dt})"\
+                        .format(dt=time.wait / self.FPS, **params),
+                        timer
+                    ))
+                    timer += time.wait
                 elif prev_time.fade > 0:
-                    fp.write("fade_to_color({r}, {g}, {b}, duration={dt})\n".format(
-                        dt=prev_time.fade / self.FPS, **params))
+                    lines_and_times.append((
+                        "fade_to_color({r}, {g}, {b}, duration={dt})"\
+                        .format(dt=prev_time.fade / self.FPS, **params),
+                        timer
+                    ))
+                    timer += prev_time.fade
                     if time.wait > 0:
-                        fp.write("sleep(duration={dt})\n".format(dt=time.wait / self.FPS))
+                        lines_and_times.append((
+                            "sleep(duration={dt})".format(dt=time.wait / self.FPS),
+                            timer
+                        ))
+                        timer += time.wait
                 else:
                     raise InvalidDurationError(prev_time.fade + " frames")
 
-            prev_time = time
+            for line, timestamp_of_line in lines_and_times:
+                if len(line) < 60:
+                    line += " " * (60 - len(line))
+                line += "# " + self._format_frame_count_as_time(timestamp_of_line)
+                fp.write(line + "\n")
 
-            # Print any necessary markers into the output file
-            while next_marker_time is not None and next_marker_time <= time.time:
-                marker = markers_by_time.pop()
-                comment = Comment(value=marker.value)
-                fp.write(comment.to_led_source())
-                next_marker_time = markers_by_time[-1].time if markers_by_time else None
+            prev_time = time
 
         if fx.name:
             comment = Comment(value="{0!r} ends here".format(fx.name))

@@ -652,7 +652,7 @@ class Comment(Statement):
         return b""
 
     def to_led_source(self):
-        return "\n{0}\ncomment({1!r})\n{0}\n\n".format("#" * 76, self.value)
+        return "\n{0}\ncomment({1!r})\n{0}\n".format("#" * 76, self.value)
 
 
 class Command(Statement):
