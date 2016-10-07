@@ -3,6 +3,7 @@
 from __future__ import division
 
 from bisect import bisect
+from functools import total_ordering
 from itertools import izip_longest
 
 
@@ -33,6 +34,7 @@ class SceneFile(object):
         # Attach the global timeline to the channels that have no timeline
         # on their own
         for fx in result.fxs:
+            fx.name = filename
             for channel in fx.channels:
                 if channel.timeline is None:
                     channel.timeline = result.timeline
@@ -54,6 +56,29 @@ class SceneFile(object):
                 timeline.shift(by=by)
 
 
+@total_ordering
+class Marker(object):
+    """Represents a marker that is placed at some time instant on a timeline.
+    The marker has an associated value that may be shown as a comment in the
+    generated ``.led`` file.
+    """
+
+    def __init__(self, time, value):
+        self.time = time
+        self.value = value
+
+    def __eq__(self, other):
+        return self.time, self.value == other.time, other.value
+
+    def __lt__(self, other):
+        return self.time < other.time or \
+            (self.time == other.time and self.value < other.value)
+
+    def __repr__(self):
+        return "{0.__class__.__name__}(time={0.time!r}, value={0.value!r})"\
+            .format(self)
+
+
 class FX(object):
     """Represents an FX object (``<Fx>`` tag) from a Sunlite Suite scene
     file."""
@@ -61,7 +86,9 @@ class FX(object):
     def __init__(self):
         self.tag = None
         self.channels = []
+        self._markers = []
         self.id = None
+        self.name = None
 
     @classmethod
     def from_xml(cls, tag):
@@ -89,6 +116,15 @@ class FX(object):
         new_channel.timeline = timeline
         self.channels.append(new_channel)
         return new_channel
+
+    def add_marker(self, time, value):
+        item = Marker(time=time, value=value)
+        index = bisect(self._markers, item)
+        self._markers.insert(index, item)
+
+    @property
+    def markers(self):
+        return self._markers
 
 
 class FXChannel(object):
@@ -414,6 +450,11 @@ class Time(object):
         number of frames"""
         return self.__class__(time=self.time + shift_by,
                               fade=self.fade, wait=self.wait)
+
+    @property
+    def end(self):
+        """The index of the frame when the this step ends."""
+        return self.time + self.total_duration
 
     @property
     def end_of_wait(self):

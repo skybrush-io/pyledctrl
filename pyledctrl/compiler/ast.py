@@ -11,6 +11,7 @@ therefore are enclosed in quotes)::
     program = statement-sequence;
     statement-sequence = { statement | statement-sequence };
     statement = command
+              | comment
               | loop-block;
     command = end-command
             | nop-command
@@ -28,6 +29,9 @@ therefore are enclosed in quotes)::
             | set-color-from-channels-command
             | fade-to-color-from-channels-command
             | jump-command;
+
+    (* Declaration of a comment block *)
+    comment = "";            (* resolves to empty bytecode *)
 
     (* Declarations of specific commands *)
     end-command = "CommandCode.END";
@@ -633,6 +637,24 @@ class Statement(Node):
         return self.to_bytecode() == other.to_bytecode()
 
 
+class Comment(Statement):
+    """Node that represents a comment (i.e. a string that appears in the
+    Python representation of the AST but is replaced by an empty byte
+    sequence in the bytecode)."""
+
+    _fields = ("value", )
+
+    @Node.length_in_bytes.getter
+    def length_in_bytes(self):
+        return 0
+
+    def to_bytecode(self):
+        return b""
+
+    def to_led_source(self):
+        return "\n{0}\ncomment({1!r})\n{0}\n\n".format("#" * 76, self.value)
+
+
 class Command(Statement):
     """Node that represents a single bytecode command."""
 
@@ -646,6 +668,7 @@ class Command(Statement):
         parts = [self.code]
         parts.extend(field.to_bytecode() for field in self.iter_field_values())
         return b"".join(parts)
+
 
 class EndCommand(Command):
     """Node that represents the ``END`` command in the bytecode."""

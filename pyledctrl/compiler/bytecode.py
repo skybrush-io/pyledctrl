@@ -74,6 +74,10 @@ class UnconditionalJumpMarker(JumpMarker):
     pass
 
 
+def comment(value):
+    return ast.Comment(value=value)
+
+
 def end():
     return ast.EndCommand()
 

@@ -91,6 +91,7 @@ class ExecutionContext(object):
     def _construct_globals(self):
         wrapper_for = self._create_bytecode_func_wrapper
         result = {
+            "comment": wrapper_for(bytecode.comment),
             "end": wrapper_for(bytecode.end),
             "fade_to_black": wrapper_for(bytecode.fade_to_black),
             "fade_to_color": wrapper_for(bytecode.fade_to_color),
