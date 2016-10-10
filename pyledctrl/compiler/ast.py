@@ -72,9 +72,11 @@ therefore are enclosed in quotes)::
 
 from __future__ import division
 
+from decimal import Decimal, Inexact, getcontext
 from future_builtins import zip
 from pyledctrl.utils import first, memoize
 from struct import Struct
+from warnings import warn
 
 
 @memoize
@@ -556,7 +558,7 @@ class Duration(Varuint):
     """Node that represents a duration."""
 
     _fields = Varuint._fields
-    FPS = 50
+    FPS = Decimal(50)
     _instance_cache = {}
 
     def __init__(self, value=0):
@@ -574,7 +576,29 @@ class Duration(Varuint):
 
     @classmethod
     def from_seconds(cls, seconds):
-        return cls.from_frames(int(seconds * cls.FPS))
+        # Okay, this is tricky. First of all, multiplication between a
+        # Decimal and a float is not supported, so we need to convert
+        # float seconds into Decimal as well. However, check this:
+        #
+        # >>> Decimal(0.2) * Decimal(50)
+        # Decimal('10.00000000000000055511151231')
+        #
+        # This is not what we want, but this is what we get because 0.2
+        # cannot be represented exactly as a float, so _internally_ it
+        # is stored as 0.200000000000000011102230246251565404236316680908203125.
+        # But we can cast the float value into a string, which rounds it off
+        # nicely, and then we can pass it to the Decimal() constructor.
+
+        seconds = Decimal(str(seconds))
+        frame_count = seconds * cls.FPS
+        getcontext().clear_flags()
+        frame_count_as_int = int(frame_count.to_integral_exact())
+        if getcontext().flags[Inexact]:
+            warn("Cannot convert {0} seconds into an integer number of frames "
+                 "at {1} FPS; this could be a problem in the ledctrl output"\
+                 .format(str(seconds), cls.FPS))
+
+        return cls.from_frames(frame_count_as_int)
 
     @property
     def value_in_frames(self):

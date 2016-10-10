@@ -27,6 +27,13 @@ class SceneFile(object):
         if timeline_tag is not None:
             result.timeline = EasyStepTimeline.from_xml(timeline_tag)
 
+        # Get the FPS setting
+        editor_tag = tag.find("./Editor")
+        if editor_tag is not None:
+            fps_attr = editor_tag.get("EasyTimeMesureTimer")
+            if fps_attr is not None:
+                result.timeline.fps = int(fps_attr)
+
         # Parse the FX objects
         result.fxs = [FX.from_xml(fx_tag)
                       for fx_tag in tag.findall("./Fxs/Fx")]
@@ -39,6 +46,7 @@ class SceneFile(object):
                 if channel.timeline is None:
                     channel.timeline = result.timeline
                 elif not channel.timeline.has_instants:
+                    channel.timeline.fps = result.timeline.fps
                     channel.timeline.copy_instants_from(result.timeline)
 
         return result
@@ -157,8 +165,9 @@ class EasyStepTimeline(object):
     when "something" happens with one of the lights in the file.
     """
 
-    def __init__(self):
+    def __init__(self, fps=None):
         self.tag = None
+        self.fps = fps
         self.clear()
 
     def _assert_instants_and_steps_consistent(self):
@@ -174,6 +183,7 @@ class EasyStepTimeline(object):
         result = self.__class__()
         result.instants = [instant.copy() for instant in self.instants]
         result.steps = list(self.steps)
+        result.fps = self.fps
         return result
 
     def copy_instants_from(self, timeline):
@@ -183,6 +193,9 @@ class EasyStepTimeline(object):
         The timeline from where the instants are copied must contain _exactly_
         as many time instants as the number of steps in this object, or
         at most one more (in which case the last step is repeated)."""
+        if self.fps != timeline.fps:
+            raise ValueError("the two timelines have different fps settings")
+
         diff = len(timeline.instants) - len(self.steps)
         if diff != 0 and diff != 1:
             raise ValueError("number of time instants in assigned timeline is "
@@ -226,9 +239,9 @@ class EasyStepTimeline(object):
         return len(self.instants) > 0
 
     def has_same_instants(self, other):
-        """Checks whether this timeline has exactly the same time instants as
-        some other timeline."""
-        return self.instants == other.instants
+        """Checks whether this timeline has exactly the same time instants and
+        fps setting as some other timeline."""
+        return self.instants == other.instants and self.fps == other.fps
 
     def iteritems(self):
         return izip_longest(self.instants, self.steps)
@@ -315,6 +328,11 @@ class EasyStepTimeline(object):
         in this case, the steps from the second timeline will take precedence
         over the steps of the first timeline.
         """
+        if self.fps != other.fps:
+            raise ValueError("cannot merge timelines with different fps "
+                             "settings ({0!r} and {1!r})"\
+                             .format(self.fps, other.fps))
+
         self._assert_instants_and_steps_consistent()
         self_range = self.range
         other_range = other.range
@@ -348,6 +366,38 @@ class EasyStepTimeline(object):
             return (0, 0)
         else:
             return (self.instants[0].time, self.instants[-1].time)
+
+    def scaled_to_fps(self, new_fps):
+        """Makes a copy of the timeline, adjusts the fps setting of the copy
+        to the given value and then updates the time instants of the copy to
+        keep the durations as measured in seconds intact.
+        """
+        copy = self.copy()
+        copy.scale_to_fps(new_fps)
+        return copy
+
+    def scale_to_fps(self, new_fps):
+        """Adjusts the fps setting of the timeline to the given value and then
+        updates the time instants to keep the durations as measured in seconds
+        intact.
+        """
+        factor, remainder = divmod(new_fps, self.fps)
+        if remainder != 0:
+            raise ValueError("cannot rescale timeline to new fps: new fps is "
+                             "not an integer multiple of the old fps")
+        if factor == 1:
+            return
+
+        for instant in self.instants:
+            instant.scale_fps(by=factor)
+        self.fps = new_fps
+
+    def shifted(self, by):
+        """Copies this timeline and shifts all the time steps in the copy by
+        the given amount."""
+        copy = self.copy()
+        copy.shift(by=by)
+        return copy
 
     def shift(self, by):
         """Shifts all the time steps in the timeline by the given amount."""
@@ -468,6 +518,13 @@ class Time(object):
         if value < self.time:
             raise ValueError("cannot set negative wait time")
         self.wait = value - self.time
+
+    def scale_fps(self, by):
+        """Multiplies the time values and durations by the given amount."""
+        assert by == int(by), "scale by must be integer"
+        self.time *= by
+        self.wait *= by
+        self.fade *= by
 
     def shift(self, by):
         """Shifts the time step on the time axis by the given amount."""

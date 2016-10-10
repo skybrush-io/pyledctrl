@@ -485,16 +485,18 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             # that we don't have, create them with our global timeline.
             for channel in fx_in_scene_file.channels:
                 for extra_channel_index in xrange(len(fx.channels), channel.index+1):
-                    fx.add_channel(EasyStepTimeline())
+                    fx.add_channel(EasyStepTimeline(fps=100))
 
             # Okay, great. Now we need to merge the timeline and steps of each
             # channel in the FX of the scene file into our FX, shifted appropriately
             for channel_in_scene_file in fx_in_scene_file.channels:
-                timeline = channel_in_scene_file.timeline.looped(until=trim)
-                timeline.shift(by=shift)
-
                 our_channel = fx.channels[channel_in_scene_file.index]
                 our_timeline = our_channel.timeline
+
+                timeline = channel_in_scene_file.timeline.scaled_to_fps(our_timeline.fps)
+                timeline.loop_until(trim)
+                timeline.shift(by=shift)
+
                 our_timeline.merge_from(timeline)
 
     def _dump_fx_to_file(self, fx, fp):
@@ -583,6 +585,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     raise InvalidDurationError(prev_time.fade + " frames")
 
             for line, timestamp_of_line in lines_and_times:
+                # Comment out the next few lines for debugging purposes.
                 if len(line) < 60:
                     line += " " * (60 - len(line))
                 line += "# " + self._format_frame_count_as_time(timestamp_of_line)

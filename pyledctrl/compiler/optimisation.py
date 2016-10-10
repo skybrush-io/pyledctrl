@@ -1,10 +1,11 @@
 """AST optimization routines for the ledctrl compiler."""
 
+from itertools import islice
 from operator import attrgetter
-from pyledctrl.compiler.ast import Node, NodeTransformer, \
-    SetBlackCommand, SetGrayCommand, SetWhiteCommand, \
+from pyledctrl.compiler.ast import Duration, Node, NodeTransformer, \
+    SetBlackCommand, SetGrayCommand, SetWhiteCommand, SetColorCommand, \
     FadeToBlackCommand, FadeToGrayCommand, FadeToWhiteCommand, \
-    LoopBlock, StatementSequence
+    FadeToColorCommand, SleepCommand, LoopBlock, StatementSequence
 from pyledctrl.compiler.utils import TimestampWrapper
 
 
@@ -141,6 +142,137 @@ class ColorCommandShortener(ASTOptimiser):
         return transformer.changed
 
 
+class CommandMerger(ASTOptimiser):
+    """AST optimiser that merges consecutive commands into one if they
+    meet certain conditions.
+
+    This optimiser uses the following rules:
+
+        - A ``set_color()`` command with a given color is merged with any
+          ``set_color()``, ``fade_to_color()`` or ``sleep()`` commands that
+          follow it if they refer to *exactly* the same color (the color
+          restriction is not applicable for ``sleep()`` of course). The final
+          command will have a duration corresponding to the total duration of
+          the commands that were merged.
+
+        - A ``fade_to_color()`` command followed by a sequence of additional
+          ``fade_to_color()``, ``set_color()`` or ``sleep()`` commands of
+          exactly the same color are replaced by the first command and
+          a ``sleep()`` command with its duration equal to the total duration
+          of the *remaining* commands that were merged.
+
+        - A sequence of ``sleep()`` commands are replaced by a single
+          ``sleep()`` command whose duration equals the total duration of the
+          commands that were merged.
+    """
+
+    class Transformer(NodeTransformer):
+        """AST transformer that analyses ``StatementSequence`` nodes and
+        replaces command sequences described in the desription of
+        CommandMerger_ appropriately.
+        """
+
+        def _handle_set_color_command(self, body, index):
+            original_command = body[index]
+            assert isinstance(original_command, SetColorCommand)
+            color = original_command.color
+            duration, length = 0, 0
+            for statement in islice(body, index, None):
+                if isinstance(statement, SetColorCommand) and \
+                        statement.color.equals(color):
+                    duration += statement.duration.value
+                elif isinstance(statement, FadeToColorCommand) and \
+                        statement.color.equals(color):
+                    duration += statement.duration.value
+                elif isinstance(statement, SleepCommand):
+                    duration += statement.duration.value
+                else:
+                    break
+                length += 1
+
+            if length > 1:
+                duration = Duration(value=duration)
+                replacement = [SetColorCommand(color=color, duration=duration)]
+                return length, replacement
+            else:
+                return None, None
+
+        def _handle_fade_to_color_command(self, body, index):
+            original_command = body[index]
+            assert isinstance(original_command, FadeToColorCommand)
+            color = original_command.color
+            duration, length = 0, 1
+            for statement in islice(body, index + 1, None):
+                if isinstance(statement, SetColorCommand) and \
+                        statement.color.equals(color):
+                    duration += statement.duration.value
+                elif isinstance(statement, FadeToColorCommand) and \
+                        statement.color.equals(color):
+                    duration += statement.duration.value
+                elif isinstance(statement, SleepCommand):
+                    duration += statement.duration.value
+                else:
+                    break
+                length += 1
+
+            if length > 1:
+                duration = Duration(value=duration)
+                replacement = [
+                    original_command,
+                    SleepCommand(duration=duration)
+                ]
+                return length, replacement
+            else:
+                return None, None
+
+        def _handle_sleep_command(self, body, index):
+            original_command = body[index]
+            assert isinstance(original_command, SleepCommand)
+            duration, length = 0, 0
+            for statement in islice(body, index, None):
+                if isinstance(statement, SleepCommand):
+                    duration += statement.duration.value
+                else:
+                    break
+                length += 1
+
+            if length > 1:
+                duration = Duration(value=duration)
+                replacement = [SleepCommand(duration=duration)]
+                return length, replacement
+            else:
+                return None, None
+
+        def visit_StatementSequence(self, node):
+            body = node.statements
+            index = 0
+            num_statements = len(body)
+            while index < num_statements:
+                statement = body[index]
+                if isinstance(statement, SetColorCommand):
+                    length_to_replace, replacement = \
+                        self._handle_set_color_command(body, index)
+                elif isinstance(statement, FadeToColorCommand):
+                    length_to_replace, replacement = \
+                        self._handle_fade_to_color_command(body, index)
+                elif isinstance(statement, SleepCommand):
+                    length_to_replace, replacement = \
+                        self._handle_sleep_command(body, index)
+                else:
+                    replacement = None
+                if replacement is not None:
+                    body[index:(index + length_to_replace)] = replacement
+                    index += len(replacement)
+                    num_statements = len(body)
+                else:
+                    index += 1
+
+    def optimise_ast(self, ast):
+        transformer = self.Transformer()
+        transformer.visit(ast)
+        return transformer.changed
+
+
 class LoopDetector(ASTOptimiser):
     """AST optimiser that attempts to detect repetitive invocations of the
     same set of commands, and replaces them with a loop of fixed length.
@@ -249,6 +381,7 @@ def create_optimiser_for_level(level=2):
 
     result = CompositeASTOptimiser()
     if level >= 1:
+        result.add_optimiser(CommandMerger())
         result.add_optimiser(ColorCommandShortener())
     if level >= 2:
         result.add_optimiser(LoopDetector())
