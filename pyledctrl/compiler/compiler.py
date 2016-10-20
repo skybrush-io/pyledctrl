@@ -163,7 +163,8 @@ class BytecodeCompiler(object):
             plan.insert_step(optimization_stage, after=stage)
 
             output_stage = output_stage_factory(optimization_stage,
-                                                real_output_file)
+                                                real_output_file,
+                                                id=stage.id)
             plan.insert_step(output_stage, after=optimization_stage)
 
     def _add_stages_for_input_led_file(self, input_file, output_file, plan,
@@ -193,7 +194,7 @@ class BytecodeCompiler(object):
         plan.add_step(preprocessing_stage)
 
         for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
-            stage = PythonSourceToASTObjectCompilationStage(intermediate_file)
+            stage = PythonSourceToASTObjectCompilationStage(intermediate_file, id=id)
             plan.add_step(stage, output=ast_only)
 
     def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
