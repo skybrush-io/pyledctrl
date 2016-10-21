@@ -56,8 +56,15 @@ private:
   LoopStack m_loopStack;
 
   /**
-   * Time when the execution of the current command has started. Used to
-   * calculate the next wakeup time.
+   * Sum of the expected (desired) duration of all the commands that have already been
+   * executed, in milliseconds, \em including the current command that is being executed
+   * (e.g., a fade).
+   */
+  unsigned long m_cumulativeDurationSinceStart;
+
+  /**
+   * Time when the execution of the current command has started, according to the
+   * \em Arduino's clock.
    */
   unsigned long m_currentCommandStartTime;
 
@@ -67,12 +74,14 @@ private:
    * 
    * Note that the internal clock of the executor is not the same as the
    * internal clock of the Arduino; the offset between them is exactly
-   * equal to the value of this variable.
+   * equal to the value of this variable. (In other words, zero time in the
+   * clock of the executor belongs to this time on the Arduino's clock).
    */
   unsigned long m_lastClockResetTime;
 
   /**
-   * Time when the executor is supposed to execute the next command.
+   * Time when the executor is supposed to execute the next command, according to
+   * the \em Arduino's clock.
    */
   unsigned long m_nextWakeupTime;
 
@@ -126,6 +135,9 @@ public:
 
   /**
    * \brief Resets the internal clock of the bytecode executor.
+   *
+   * Also resets the counter that counts the total expected duration of all the instructions
+   * that we have executed.
    */
   void resetClock() {
     setClockOriginToTimestamp(millis());
@@ -187,15 +199,29 @@ private:
   
   /**
    * \brief Delays the execution of the commands until the internal clock
+   *        of the \em executor reaches the given value.
+   * 
+   * This function does \em not make the Arduino sleep, it simply sets an
+   * internal variable in the executor that suspends the execution of
+   * commands until the given clock value is reached on the executor's
+   * own clock.
+   * 
+   * \param  ms  the desired value of the executor clock to wait for
+   */
+  void delayExecutionUntil(unsigned long ms);
+  
+  /**
+   * \brief Delays the execution of the commands until the internal clock
    *        of the \em Arduino reaches the given value.
    *        
    * This function does \em not make the Arduino sleep, it simply sets an
    * internal variable in the executor that suspends the execution of
-   * commands until the given clock value is reached.
+   * commands until the given clock value is reached on the Arduino's
+   own clock.
    * 
-   * \param  ms  the desired value of the internal clock to wait for
+   * \param  ms  the desired value of the Arduino clock to wait for
    */
-  void delayExecutionUntil(unsigned long ms);
+  void delayExecutionUntilAbsoluteTime(unsigned long ms);
 
   /**
    * \brief Executes the action prescribed by the given trigger.
@@ -362,11 +388,22 @@ private:
   /**
    * \brief Sets the origin of the internal clock of the executor to the given timestamp.
    * 
+   * Also updates the counter that counts the total expected duration of all the instructions
+   * that we have executed to millis() - timestamp so we don't mess up the scheduling of
+   * the upcoming commands.
+   * 
    * \param  timestamp  the timestamp that will be treated as T=0 by the
    *                    executor
    */
   void setClockOriginToTimestamp(unsigned long timestamp) {
+    unsigned long now = millis();
+    
     m_lastClockResetTime = timestamp;
+    if (now < timestamp) {
+      m_cumulativeDurationSinceStart = 0;
+    } else {
+      m_cumulativeDurationSinceStart = now - timestamp;
+    }
   }
 };
 

@@ -27,10 +27,20 @@ void CommandExecutor::checkAndFireTriggers() {
 }
 
 void CommandExecutor::delayExecutionFor(unsigned long duration) {
-  delayExecutionUntil(m_currentCommandStartTime + duration);
+  delayExecutionUntilAbsoluteTime(millis() + duration);
 }
 
 void CommandExecutor::delayExecutionUntil(unsigned long ms) {
+#ifdef DEBUG
+  Serial.print(F(" Actual delay: "));
+  Serial.print(m_lastClockResetTime + ((signed long)ms) - millis());
+  Serial.println(F(" msec"));
+#endif
+
+  delayExecutionUntilAbsoluteTime(m_lastClockResetTime + ms);
+}
+
+void CommandExecutor::delayExecutionUntilAbsoluteTime(unsigned long ms) {
   m_nextWakeupTime = ms;
 }
 
@@ -65,8 +75,10 @@ void CommandExecutor::executeNextCommand() {
   commandCode = nextByte();
 #ifdef DEBUG
   if (m_pBytecodeStore && !m_pBytecodeStore->suspended()) {
-    Serial.print(F(" ["));
+    Serial.print(F(" [now="));
     Serial.print(m_currentCommandStartTime - m_lastClockResetTime);
+    Serial.print(F(" ms, cum="));
+    Serial.print(m_cumulativeDurationSinceStart);
     Serial.print(F(" ms] Command: "));
     Serial.println(commandCode);
   }
@@ -149,12 +161,17 @@ void CommandExecutor::executeNextCommand() {
 
 void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
   EasingMode easingMode = EASING_LINEAR;
-  unsigned long duration = handleDelayByte();
+  unsigned long desiredDuration = handleDelayByte();
+  unsigned long actualDuration = m_nextWakeupTime - millis();
 
   m_ledStripFader.endColor = color;
   m_transition.setEasingMode(easingMode);
-  m_transition.start(duration, m_currentCommandStartTime);
+  m_transition.start(actualDuration, m_currentCommandStartTime);
   m_transition.step(m_ledStripFader);
+#ifdef DEBUG
+  Serial.print(F(" Started transition with duration = "));
+  Serial.println(actualDuration);
+#endif
 }
 
 Trigger* CommandExecutor::findTriggerForChannelIndex(u8 channelIndex) {
@@ -181,7 +198,8 @@ unsigned long CommandExecutor::handleDelayByte() {
   Serial.println(F(" msec"));
 #endif
 
-  delayExecutionFor(duration);
+  m_cumulativeDurationSinceStart += duration;
+  delayExecutionUntil(m_cumulativeDurationSinceStart);
   return duration;
 }
 
@@ -587,5 +605,6 @@ void CommandExecutor::handleWaitUntilCommand() {
   Serial.println(deadline);
 #endif
 
-  delayExecutionUntil(m_lastClockResetTime + deadline);
+  delayExecutionUntil(deadline);
+  m_cumulativeDurationSinceStart = m_nextWakeupTime - m_lastClockResetTime;
 }

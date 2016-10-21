@@ -567,6 +567,9 @@ class Step(object):
         result = cls(value=int(tag.get("L")))
         return result
 
+    def copy(self):
+        return self.__class__(value=self.value)
+
     def updated(self, value):
         return self.__class__(value=value)
 

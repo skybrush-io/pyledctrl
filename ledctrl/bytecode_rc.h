@@ -1,6 +1,6 @@
 /**
  * \file bytecode_rc.h
- * \brief Test sequence that controls the color of the LED strip from a remote
+ * \brief Bytecode sequence that controls the color of the LED strip from a remote
  *        signal source, channels 1, 2 and 3.
  */
  

@@ -9,6 +9,7 @@
 #include "serial_protocol.h"
 #include "signal_decoders.h"
 #include "switch.h"
+#include "bytecode_landing.h"
 #include "bytecode_rc.h"
 
 /**
@@ -92,34 +93,105 @@ static const u8 signalSourcePins[NUM_FAKE_SIGNAL_PINS] = { A0, A5 };
 DummySignalSource signalSource(NUM_FAKE_SIGNAL_PINS, signalSourcePins);
 #endif
 
+// Declare some variables for the default values of the switches
+// (main switch, landing switch, bytecode trigger switch). If the
+// switch channel is defined in config.h, the callback functions
+// will adjust these booleans.
+bool mainSwitchState = 1;
+bool landingSwitchState = 0;
+bool bytecodeRCSwitchState = 0;
+
+void turnAllLightsOff() {
+    builtinLed.off();
+    ledStrip.off();
+}
+
+void updateStateAfterSwitchesChanged() {
+  BytecodeStore* desiredBytecodeStore = 0;
+  
+  if (!mainSwitchState) {
+    /* Main switch is off, so we need to turn the lights off. The main loop will
+     * return on its own */
+    turnAllLightsOff();
+    return;
+  }
+  
+  /* Figure out which bytecode should be loaded. The combinations are as follows:
+   *
+   * landing switch = on,  bytecode RC switch = any ---> landing sequence
+   * landing switch = off, bytecode RC switch = off ---> preprogrammed sequence
+   * landing switch = off, bytecode RC switch = on  ---> lights controlled by RC channels
+   */
+  if (landingSwitchState) {
+    /* Landing sequence */
+    desiredBytecodeStore = &bytecodeStore_landing;
+  } else if (bytecodeRCSwitchState) {
+    /* Lights are controlled by RC channels */
+    desiredBytecodeStore = &bytecodeStore_rc;
+  } else {
+    /* Standard pre-programmed bytecode must be running */
+    desiredBytecodeStore = &bytecodeStore;
+  }
+  
+  /* Main switch is on, we can check whether the right bytecode store is loaded.
+   * If we must switch, we switch. We need this check because setBytecodeStore()
+   * rewinds the executor unconditionally even if the same bytecoe store is
+   * assigned. */
+  if (executor.bytecodeStore() != desiredBytecodeStore) {
+    executor.setBytecodeStore(desiredBytecodeStore);
+  }
+}
+
 #ifdef MAIN_SWITCH_CHANNEL
 EdgeDetector mainSwitchEdgeDetector;
 
 void mainSwitchCallback(EdgeDetector* detector, long time, void* data) {
-  // if we just got a new OFF state, we turn all LEDs off
-  if (detector->value() == 0) {
-    builtinLed.off();
-    ledStrip.off();
-  }
-  // if we just got a new ON state, we rewind the executor
+  mainSwitchState = detector->value();
+  updateStateAfterSwitchesChanged();
+  
+  // if we just got a new ON state, we rewind the executor even if we stayed
+  // on the same bytecode as before
   if (detector->value() == 1) {
     executor.rewind();
   }
 }
 #endif
 
+#ifdef LANDING_SWITCH_CHANNEL
+EdgeDetector landingSwitchEdgeDetector;
+
+void landingSwitchCallback(EdgeDetector* detector, long time, void* data) {
+  landingSwitchState = detector->value();
+  updateStateAfterSwitchesChanged();
+}
+
+void setupLandingColor() {
+#if defined(LEDCTRL_DEVICE_ID)
+  // TODO: make this more configurable, currently it's hardcoded for the Shanghai show
+  if (LEDCTRL_DEVICE_ID <= 5) {
+    // The IRIS copters have IDs 1-5 and they have to be red
+    setLandingColor(20, 0, 0);
+  } else if (LEDCTRL_DEVICE_ID == 6 || LEDCTRL_DEVICE_ID == 7 || LEDCTRL_DEVICE_ID == 21 || LEDCTRL_DEVICE_ID == 34 || LEDCTRL_DEVICE_ID == 35) {
+    // The old MikroKopters have IDs 6, 7, 21, 34 and 35 and they have to be green
+    setLandingColor(0, 20, 0);
+  } else {
+    // All the other drones are blue
+    setLandingColor(0, 0, 20);
+  }
+#else
+  // No device ID is specified, so we just use a nice blueish hue
+  setLandingColor(0, 127, 255);
+#endif
+}
+
+#endif
+
 #ifdef BYTECODE_RC_CHANNEL
 EdgeDetector bytecodeRCEdgeDetector;
 
 void bytecodeRCCallback(EdgeDetector* detector, long time, void* data) {
-  // if we just got a new OFF state, we set (and rewind) the main executor
-  if (detector->value() == 0) {
-    executor.setBytecodeStore(&bytecodeStore);
-  }
-  // if we just got a new ON state, we set (and rewind) the RC executor
-  if (detector->value() == 1) {
-    executor.setBytecodeStore(&bytecodeStore_rc);
-  }
+  bytecodeRCSwitchState = detector->value();
+  updateStateAfterSwitchesChanged();
 }
 #endif
 
@@ -255,6 +327,16 @@ void setup() {
   mainSwitchEdgeDetector.reset();
 #endif
 
+#ifdef LANDING_SWITCH_CHANNEL
+  // Set up the landing switch edge detector
+  landingSwitchEdgeDetector.callbacks.rising = landingSwitchCallback;
+  landingSwitchEdgeDetector.callbacks.falling = landingSwitchCallback;
+  landingSwitchEdgeDetector.reset();
+  
+  // Assign the proper landing color
+  setupLandingColor();
+#endif
+
 #ifdef BYTECODE_RC_CHANNEL
   // Set up the main switch edge detector
   bytecodeRCEdgeDetector.callbacks.rising = bytecodeRCCallback;
@@ -269,7 +351,7 @@ void setup() {
 
   // Reset the clock of the executor now
   executor.resetClock();
-
+  
   // Print the banner to the serial port to indicate that we are ready.
   // This will be used by any other service listening on the other end of
   // the serial port to know that the boot sequence has completed and
@@ -291,13 +373,17 @@ void loop() {
   bytecodeRCEdgeDetector.feedAnalogSignal(signalSource.channelValue(BYTECODE_RC_CHANNEL));
 #endif
 
+#ifdef LANDING_SWITCH_CHANNEL
+  // Feed the landing switch channel signal to the edge detector
+  landingSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(LANDING_SWITCH_CHANNEL));
+#endif
+
 #ifdef MAIN_SWITCH_CHANNEL
-  // Feed the mmain switch channel signal to the edge detector
+  // Feed the main switch channel signal to the edge detector
   mainSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(MAIN_SWITCH_CHANNEL));
   if (mainSwitchEdgeDetector.value() == 0) {
     // Turn off the LEDs
-    builtinLed.off();
-    ledStrip.off();
+    turnAllLightsOff();
     return;
   }
 #endif
@@ -306,8 +392,7 @@ void loop() {
   // Check the main switch pin
   if (!mainSwitch.on()) {
     // Turn off the LEDs
-    builtinLed.off();
-    ledStrip.off();
+    turnAllLightsOff();
     return;
   }
 #endif

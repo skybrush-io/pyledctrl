@@ -36,7 +36,6 @@
 * Minimum Length of a channel gap in the PPM signal (in microseconds).
 * This is needed because FrSky V8R7II receivers sometimes send a very short
 * burst when RC is switched on/off and it needs to be treated as bad signal.
-*
 */
 #define PPM_MINIMUM_CHANNEL_GAP_LENGTH_US 500 // TODO: set it according to measurements
 

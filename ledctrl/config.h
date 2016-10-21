@@ -15,7 +15,7 @@ extern "C" {
 /**
  * Use only one from the following definitions to define board version
  * NANOLED_VERSION_1 corresponds to version v1.0
- * NANOLED_VERSION_2 corresponts to versions 2.0 and 2.1
+ * NANOLED_VERSION_2 corresponds to versions 2.0 and 2.1
  */
 //#define NANOLED_VERSION_1
 #define NANOLED_VERSION_2
@@ -101,6 +101,15 @@ extern "C" {
  * an RC channel associated with a main switch
  */
 #define MAIN_SWITCH_CHANNEL 6
+
+/**
+ * \def LANDING_SWITCH_CHANNEL
+ *
+ * Zero-indexed RC channel corresponding to the landing switch
+ * Comment this out if you do not want to have
+ * an RC channel associated with a landing switch
+ */
+#define LANDING_SWITCH_CHANNEL 5
 
 /**
  * \def BYTECODE_RC_CHANNEL
