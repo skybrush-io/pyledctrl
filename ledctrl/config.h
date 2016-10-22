@@ -38,7 +38,7 @@ extern "C" {
  *
  * Define this if you need debugging information on the serial console.
  */
-#define DEBUG 1
+// #define DEBUG 1
 
 /**
  * \def set to 1 if you want to use white LED in the color mixing, 0 if not
@@ -73,7 +73,7 @@ extern "C" {
  * it will assume that the main switch was turned off exactly at the time specified in
  * that macro and update the calibration value in the EEPROM accordingly.
  */
-#define CLOCK_SKEW_CALIBRATION 1
+// #define CLOCK_SKEW_CALIBRATION 1
 
 /**
  * \def CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES

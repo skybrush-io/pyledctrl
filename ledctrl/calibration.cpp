@@ -17,7 +17,7 @@ void assumeUncalibratedState(calibration_data_t* data) {
 
 float finishCalibrationWithDuration(unsigned long time, LEDStrip* pLedStrip) {
   calibration_data_t calibration;
-  float factor = (CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES * 60000.0) / time;
+  float factor = time / (CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES * 60000.0);
   rgb_color_t color = { 0, 0, 0 };
 
   if (factor >= 0.95 && factor <= 1.05) {
@@ -56,6 +56,8 @@ float finishCalibrationWithDuration(unsigned long time, LEDStrip* pLedStrip) {
       pLedStrip->off();
     }
   }
+  
+  return factor;
 }
 
 bool readCalibrationData(calibration_data_t* data) {

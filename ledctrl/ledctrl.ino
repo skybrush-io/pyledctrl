@@ -343,6 +343,10 @@ void setup() {
 #endif
 
   // Propagate the clock skew compensation factor to the executor
+#ifdef DEBUG
+  Serial.print(" Using compensation factor: ");
+  Serial.println(calibrationData.clockSkewCompensationFactor, 8);
+#endif
   executor.setClockSkewCompensationFactor(calibrationData.clockSkewCompensationFactor);
   
   // Load the bytecode into the executor. We have to do it here and not
