@@ -111,6 +111,13 @@ public:
   }
   
   /**
+   * Cancels the current transition immediately by setting its "active" flag to false.
+   */
+  void cancel() {
+    m_active = false;
+  }
+  
+  /**
    * Returns the current easing mode of the transition.
    */
   EasingMode easingMode() const {

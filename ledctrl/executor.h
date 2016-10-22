@@ -67,7 +67,14 @@ private:
    * \em Arduino's clock.
    */
   unsigned long m_currentCommandStartTime;
-
+  
+  /**
+   * Clock skew compensation factor.
+   * 
+   * See \ref setClockSkewCompensationFactor() for more details.
+   */
+  float m_clockSkewCompensationFactor;
+  
   /**
    * Time when the internal clock of the executor was reset the last time,
    * according to the internal clock of the Arduino.
@@ -111,6 +118,15 @@ public:
   explicit CommandExecutor(LEDStrip* pLEDStrip=0);
 
   /**
+   * \brief Converts a time instant given in milliseconds on the internal clock of the
+   * Arduino to the same time instant in the internal clock of the executor.
+   *
+   * \param  ms  the time instant on the Arduino's clock, expressed in milliseconds
+   * \return the time instant on the internal clock of the executor, expressed in milliseconds
+   */
+  signed long absoluteToInternalTime(unsigned long ms);
+  
+  /**
    * \brief Returns the bytecode store that the executor will use.
    */
   BytecodeStore* bytecodeStore() const {
@@ -128,6 +144,22 @@ public:
     return millis() - m_lastClockResetTime;
   }
   
+  /**
+   * \brief Returns the value of the clock skew compensation factor used by the executor.
+   */
+  float clockSkewCompensationFactor() const {
+    return m_clockSkewCompensationFactor;
+  }
+  
+  /**
+   * \brief Converts a time instant given in milliseconds on the internal clock of the executor
+   * to the same time instant on the Arduino's clock.
+   *
+   * \param  ms  the time instant to convert, expressed in milliseconds
+   * \return the time instant on the Arduino's clock, expressed in milliseconds
+   */
+  unsigned long internalToAbsoluteTime(long ms);
+
   /**
    * \brief Rewinds the execution to the start of the current bytecode.
    */
@@ -151,6 +183,24 @@ public:
     rewind();
   }
 
+  /**
+   * \brief Sets the value of the clock skew compensation factor.
+   * 
+   * The default value of this parameter is 1. It is used as a multiplier to the durations
+   * read from the bytecode; for instance, if the skew compensation factor is 1.2 and the
+   * bytecode instructs us to wait 400 milliseconds, we will instruct the Arduino to wait
+   * 400 * 1.2 = 480 milliseconds instead, according to the Arduino's internal clock. This
+   * can be used to compensate the skew of the internal clock.
+   *
+   * This setter should be called only in a "fresh" state of the executor, i.e. before
+   * actually executing any bytecode.
+   * 
+   * See also the \c CLOCK_SKEW_CALIBRATION macro in \c config.h
+   */
+  void setClockSkewCompensationFactor(float value) {
+    m_clockSkewCompensationFactor = value;
+  }
+  
   /**
    * \brief Sets the signal source that the executor will use.
    */
@@ -396,14 +446,12 @@ private:
    *                    executor
    */
   void setClockOriginToTimestamp(unsigned long timestamp) {
+    signed long newCumulativeDuration;
     unsigned long now = millis();
     
     m_lastClockResetTime = timestamp;
-    if (now < timestamp) {
-      m_cumulativeDurationSinceStart = 0;
-    } else {
-      m_cumulativeDurationSinceStart = now - timestamp;
-    }
+    newCumulativeDuration = absoluteToInternalTime(millis());
+    m_cumulativeDurationSinceStart = (newCumulativeDuration < 0) ? 0 : newCumulativeDuration;
   }
 };
 

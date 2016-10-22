@@ -10,10 +10,16 @@
 #include "signal_decoders.h"
 
 CommandExecutor::CommandExecutor(LEDStrip* pLEDStrip) : m_pLEDStrip(pLEDStrip),
-      m_pBytecodeStore(0), m_ended(true), m_ledStripFader(pLEDStrip)
+      m_pBytecodeStore(0), m_ended(true), m_ledStripFader(pLEDStrip),
+      m_clockSkewCompensationFactor(1)
 {
   rewind();
 };
+
+signed long CommandExecutor::absoluteToInternalTime(unsigned long ms) {
+  signed long msSigned = ms;
+  return round((msSigned - m_lastClockResetTime) / m_clockSkewCompensationFactor);
+}
 
 void CommandExecutor::checkAndFireTriggers() {
   int i, n = MAX_TRIGGER_COUNT;
@@ -27,17 +33,20 @@ void CommandExecutor::checkAndFireTriggers() {
 }
 
 void CommandExecutor::delayExecutionFor(unsigned long duration) {
-  delayExecutionUntilAbsoluteTime(millis() + duration);
+  delayExecutionUntilAbsoluteTime(millis() + duration * m_clockSkewCompensationFactor);
 }
 
 void CommandExecutor::delayExecutionUntil(unsigned long ms) {
 #ifdef DEBUG
-  Serial.print(F(" Actual delay: "));
-  Serial.print(m_lastClockResetTime + ((signed long)ms) - millis());
-  Serial.println(F(" msec"));
+  signed long actualCompensatedDelay = internalToAbsoluteTime(ms) - m_lastClockResetTime;
+  Serial.print(F(" Waiting until: "));
+  Serial.print(ms);
+  Serial.print(F(" msec (internal), "));
+  Serial.print(actualCompensatedDelay);
+  Serial.println(F(" msec (absolute)"));
 #endif
 
-  delayExecutionUntilAbsoluteTime(m_lastClockResetTime + ms);
+  delayExecutionUntilAbsoluteTime(internalToAbsoluteTime(ms));
 }
 
 void CommandExecutor::delayExecutionUntilAbsoluteTime(unsigned long ms) {
@@ -76,7 +85,7 @@ void CommandExecutor::executeNextCommand() {
 #ifdef DEBUG
   if (m_pBytecodeStore && !m_pBytecodeStore->suspended()) {
     Serial.print(F(" [now="));
-    Serial.print(m_currentCommandStartTime - m_lastClockResetTime);
+    Serial.print(absoluteToInternalTime(m_currentCommandStartTime));
     Serial.print(F(" ms, cum="));
     Serial.print(m_cumulativeDurationSinceStart);
     Serial.print(F(" ms] Command: "));
@@ -161,15 +170,15 @@ void CommandExecutor::executeNextCommand() {
 
 void CommandExecutor::fadeColorOfLEDStrip(rgb_color_t color) {
   EasingMode easingMode = EASING_LINEAR;
-  unsigned long desiredDuration = handleDelayByte();
-  unsigned long actualDuration = m_nextWakeupTime - millis();
+  unsigned long desiredDuration = handleDelayByte();             // this is according to the internal clock
+  unsigned long actualDuration = m_nextWakeupTime - millis();    // this is according to the Arduino's clock
 
   m_ledStripFader.endColor = color;
   m_transition.setEasingMode(easingMode);
   m_transition.start(actualDuration, m_currentCommandStartTime);
   m_transition.step(m_ledStripFader);
 #ifdef DEBUG
-  Serial.print(F(" Started transition with duration = "));
+  Serial.print(F(" Started transition with compensated duration = "));
   Serial.println(actualDuration);
 #endif
 }
@@ -198,8 +207,9 @@ unsigned long CommandExecutor::handleDelayByte() {
   Serial.println(F(" msec"));
 #endif
 
-  m_cumulativeDurationSinceStart += duration;
+  m_cumulativeDurationSinceStart += duration;             // this is according to the internal clock
   delayExecutionUntil(m_cumulativeDurationSinceStart);
+  
   return duration;
 }
 
@@ -212,6 +222,10 @@ EasingMode CommandExecutor::handleEasingModeByte() {
 #endif
 
   return static_cast<EasingMode>(easingModeByte);
+}
+
+unsigned long CommandExecutor::internalToAbsoluteTime(long ms) {
+  return round(m_lastClockResetTime + ms * m_clockSkewCompensationFactor);
 }
 
 u8 CommandExecutor::nextByte() {
@@ -245,7 +259,10 @@ void CommandExecutor::rewind() {
   } else {
     m_ended = true;
   }
+  
   m_loopStack.clear();
+  m_transition.cancel();
+  
   CLEAR_ERROR();
   resetClock();
   delayExecutionFor(0);
@@ -259,7 +276,11 @@ void CommandExecutor::setColorOfLEDStrip(rgb_color_t color) {
 
 unsigned long CommandExecutor::step() {
   unsigned long now = millis();
-
+  
+  if (m_ended) {
+    return now;
+  }
+  
   // Check the state of the signals being watched in the triggers
   checkAndFireTriggers();
 
@@ -606,5 +627,5 @@ void CommandExecutor::handleWaitUntilCommand() {
 #endif
 
   delayExecutionUntil(deadline);
-  m_cumulativeDurationSinceStart = m_nextWakeupTime - m_lastClockResetTime;
+  m_cumulativeDurationSinceStart = absoluteToInternalTime(m_nextWakeupTime);
 }

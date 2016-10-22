@@ -41,7 +41,7 @@ static const u8 bytecode[] = {
   CMD_SET_BLACK, 6,
   CMD_LOOP_END,
   CMD_SET_WHITE, 100,
-  CMD_SET_BLACK,
+  CMD_SET_BLACK, 0,
   
   /* Program end marker */
   CMD_END

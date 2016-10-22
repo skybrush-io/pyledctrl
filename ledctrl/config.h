@@ -12,13 +12,16 @@
 extern "C" {
 #endif
 
+/* ************************************************************************** */
+/* Basic settings                                                             */
+/* ************************************************************************** */
+
 /**
  * Use only one from the following definitions to define board version
- * NANOLED_VERSION_1 corresponds to version v1.0
- * NANOLED_VERSION_2 corresponds to versions 2.0 and 2.1
+ * NANOLED_VERSION = 1 corresponds to version v1.0
+ * NANOLED_VERSION = 2 corresponds to versions 2.0 and 2.1
  */
-//#define NANOLED_VERSION_1
-#define NANOLED_VERSION_2
+#define NANOLED_VERSION 2
 
 /**
  * \def ENABLE_IS_LOW
@@ -26,9 +29,21 @@ extern "C" {
  * Define if enable of LED is at LOW/zero PWM (NanoLED v2.0 based on XL4001)
  * Do not define if it is at HIGH/max PWM (NanoLED v1.0 based on pure led strip)
  */
-#ifdef NANOLED_VERSION_2
-#define ENABLE_IS_LOW
+#if NANOLED_VERSION == 2
+#  define ENABLE_IS_LOW
 #endif
+
+/**
+ * \def DEBUG
+ *
+ * Define this if you need debugging information on the serial console.
+ */
+#define DEBUG 1
+
+/**
+ * \def set to 1 if you want to use white LED in the color mixing, 0 if not
+ */
+#define USE_WHITE_LED 0
 
 /**
  * \def MAX_PWM
@@ -39,20 +54,49 @@ extern "C" {
 #define MAX_PWM 255
 
 /**
- * \def DEBUG
+ * \def CLOCK_SKEW_CALIBRATION
+ * 
+ * Define this macro if you want to calibrate the clock skew of the NanoLED
+ * board so it can compensate for inaccuracies in the clock rate when playing
+ * back a preprogrammed light sequence.
  *
- * Define this if you need debugging information on the serial console.
+ * If this macro is not defined, the board will attempt to read a previously
+ * stored calibration value from EEPROM. In the absence of such a calibration
+ * value, it will assume that the clock rate is perfectly aligned with wall
+ * clock time (there is no skew between them). If a calibration value is found,
+ * it is assumed that X milliseconds in wall clock time is X*C milliseconds
+ * on the Arduino's clock, where C is the calibration value.
+ *
+ * If this macro is defined, the board will check the elapsed time on its internal
+ * clock when the main switch is turned off. If the elapsed time is between
+ * 95% and 105% of the value of the macro \c CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES
+ * it will assume that the main switch was turned off exactly at the time specified in
+ * that macro and update the calibration value in the EEPROM accordingly.
  */
-//#define DEBUG 1
+#define CLOCK_SKEW_CALIBRATION 1
+
+/**
+ * \def CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES
+ *
+ * Length of the clock skew calibration in wall clock time in minutes. When doing
+ * the calibration, you are expected to turn off the main switch exactly at this
+ * number of minutes.
+ */
+#define CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES 10
+
+/* ************************************************************************** */
+/* Pin configurations                                                         */
+/* ************************************************************************** */
 
 /**
  * \def RED_PWM_PIN
  *
  * Index of the PWM pin corresponding to the red LEDs.
  */
-#define RED_PWM_PIN 6 // NanoLED v1.0
-#ifdef NANOLED_VERSION_2
-#define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
+#if NANOLED_VERSION == 2
+#  define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
+#else
+#  define RED_PWM_PIN 6 // NanoLED v1.0
 #endif
 
 /**
@@ -67,9 +111,10 @@ extern "C" {
  *
  * Index of the PWM pin corresponding to the blue LEDs.
  */
-#define BLUE_PWM_PIN 5 // NanoLED v1.0
-#ifdef NANOLED_VERSION_2
-#define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
+#if NANOLED_VERSION == 2
+#  define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
+#else
+#  define BLUE_PWM_PIN 5 // NanoLED v1.0
 #endif
 
 /**
@@ -79,11 +124,6 @@ extern "C" {
  * If you have no white LED, set it to zero.
  */
 #define WHITE_PWM_PIN 10
-
-/**
- * \def set to 1 if you want to use white led in the color mixing, 0 if not
- */
-#define USE_WHITE_LED 0
 
 /**
  * \def MAIN_SWITCH_PIN
@@ -120,6 +160,9 @@ extern "C" {
  */
 #define BYTECODE_RC_CHANNEL 4
 
+/* ************************************************************************** */
+/* Serial port configuration                                                  */
+/* ************************************************************************** */
 
 /**
  * \def ENABLE_SERIAL_INPUT
@@ -139,30 +182,6 @@ extern "C" {
 // #define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
 
 /**
- * \def VOLTMETER_PIN
- *
- * Index of the pin corresponding to the voltmeter. Comment this out if
- * you don't have a voltmeter.
- */
-//#define VOLTMETER_PIN 5
-
-/**
- * \def VOLTMETER_ACCURACY
- *
- * Accuracy level for the voltmeter. This constant defines the number of
- * measurements to take on the voltmeter pin before a single measured
- * value is stored in our voltmeter class.
- */
-//#define VOLTMETER_ACCURACY 5
-
-/**
- * \def LIGHT_COEFF
- *
- * Correction coefficient for the LED brightness. Ignored if we have no voltmeter.
- */
-//#define LIGHT_COEFF 0.8
-
-/**
  * \def SERIAL_BAUD_RATE
  *
  * Baud rate of the serial port where we will listen for incoming commands
@@ -170,41 +189,9 @@ extern "C" {
  */
 #define SERIAL_BAUD_RATE 115200
 
-/**
- * \def MAX_LOOP_DEPTH
- *
- * Maximum number of nested loops that the command executor will be able to handle.
- */
-#define MAX_LOOP_DEPTH 4
-
-/**
- * \def MAX_TRIGGER_COUNT
- *
- * Maximum number of triggers that the command executor will be able to handle.
- */
-#define MAX_TRIGGER_COUNT 4
-
-/**
- * \def USE_PPM_REMOTE_CONTROLLER
- * Define this to 1 if you want to read PPM encoded signals from an RC controller.
- */
-#define USE_PPM_REMOTE_CONTROLLER 1
-
-/**
- * \def USE_PWM_REMOTE_CONTROLLER
- * Define this to 1 if you want to read PWM encoded signals from an RC controller.
- */
-#define USE_PWM_REMOTE_CONTROLLER 0
-
-/**
- * \def RC_INTERRUPT
- * Define this to the index of the interrupt to use for reading the RC controller
- * signal.
- *
- * The Arduino Nano has two interrupt pins; interrupt 0 is on digital pin 2,
- * while interrupt 1 is on digital pin 3.
- */
-#define RC_INTERRUPT 0
+/* ************************************************************************** */
+/* Voltage levels and voltmeter configuration                                 */
+/* ************************************************************************** */
 
 /**
  * \def BOARD_MAX_INPUT_VOLTAGE
@@ -261,6 +248,74 @@ extern "C" {
  * Maximum voltage where the white LED gives "quasi-white"
  */
 #define WHITE_LED_MAX_VOLTAGE 12.00
+
+/**
+ * \def VOLTMETER_PIN
+ *
+ * Index of the pin corresponding to the voltmeter. Comment this out if
+ * you don't have a voltmeter.
+ */
+// #define VOLTMETER_PIN 5
+
+/**
+ * \def VOLTMETER_ACCURACY
+ *
+ * Accuracy level for the voltmeter. This constant defines the number of
+ * measurements to take on the voltmeter pin before a single measured
+ * value is stored in our voltmeter class.
+ */
+//#define VOLTMETER_ACCURACY 5
+
+/**
+ * \def LIGHT_COEFF
+ *
+ * Correction coefficient for the LED brightness. Ignored if we have no voltmeter.
+ */
+//#define LIGHT_COEFF 0.8
+
+/* ************************************************************************** */
+/* Bytecode executor configuration                                            */
+/* ************************************************************************** */
+
+/**
+ * \def MAX_LOOP_DEPTH
+ *
+ * Maximum number of nested loops that the command executor will be able to handle.
+ */
+#define MAX_LOOP_DEPTH 4
+
+/**
+ * \def MAX_TRIGGER_COUNT
+ *
+ * Maximum number of triggers that the command executor will be able to handle.
+ */
+#define MAX_TRIGGER_COUNT 4
+
+/* ************************************************************************** */
+/* Remote controller configuration                                            */
+/* ************************************************************************** */
+
+/**
+ * \def USE_PPM_REMOTE_CONTROLLER
+ * Define this to 1 if you want to read PPM encoded signals from an RC controller.
+ */
+#define USE_PPM_REMOTE_CONTROLLER 1
+
+/**
+ * \def USE_PWM_REMOTE_CONTROLLER
+ * Define this to 1 if you want to read PWM encoded signals from an RC controller.
+ */
+#define USE_PWM_REMOTE_CONTROLLER 0
+
+/**
+ * \def RC_INTERRUPT
+ * Define this to the index of the interrupt to use for reading the RC controller
+ * signal.
+ *
+ * The Arduino Nano has two interrupt pins; interrupt 0 is on digital pin 2,
+ * while interrupt 1 is on digital pin 3.
+ */
+#define RC_INTERRUPT 0
 
 #ifdef __cplusplus
 }
