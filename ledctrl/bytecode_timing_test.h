@@ -2,7 +2,9 @@
  * \file bytecode_timing_test.h
  * \brief Timing test sequence for ledctrl
  */
- 
+
+#define CLOCK_SKEW_CALIBRATION 1
+
 static const u8 bytecode[] = {
   /* Loop starts here */
   CMD_LOOP_BEGIN,  0,
