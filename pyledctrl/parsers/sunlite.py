@@ -5,6 +5,7 @@ from __future__ import division
 from bisect import bisect
 from functools import total_ordering
 from itertools import izip_longest
+from warnings import warn
 
 
 class SceneFile(object):
@@ -197,9 +198,18 @@ class EasyStepTimeline(object):
             raise ValueError("the two timelines have different fps settings")
 
         diff = len(timeline.instants) - len(self.steps)
-        if diff != 0 and diff != 1:
-            raise ValueError("number of time instants in assigned timeline is "
-                             "incompatible with the number of steps")
+        if diff < 0:
+            warn("number of time instants in assigned timeline "
+                 "({0}) is incompatible with the number of steps ({1})"
+                 .format(len(timeline.instants), len(self.steps)))
+            to_ignore = -diff
+            warn("ignoring last {0} time steps".format(to_ignore))
+            del self.steps[-to_ignore:]
+        elif diff != 0 and diff != 1:
+            raise ValueError("number of time instants in assigned timeline "
+                             "({0}) is incompatible with the number of "
+                             "steps ({1})"
+                             .format(len(timeline.instants), len(self.steps)))
         elif diff == 1:
             if not self.steps:
                 self.steps.append(0)
