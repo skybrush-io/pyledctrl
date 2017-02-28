@@ -7,6 +7,7 @@
 #include "executor.h"
 #include "led.h"
 #include "led_strip.h"
+#include "pyro.h"
 #include "serial_protocol.h"
 #include "signal_decoders.h"
 #include "switch.h"
@@ -45,6 +46,13 @@ VoltMeter voltmeter(VOLTMETER_PIN, LIGHT_COEFF);
  * Parser for the messages coming on the serial port if we handle serial input.
  */
 SerialProtocolParser serialProtocolParser;
+#endif
+
+#ifdef PYRO_PIN
+/**
+ * A pyro trigger pin
+ */
+Pyro pyroTrigger(PYRO_PIN);
 #endif
 
 /**
@@ -111,6 +119,17 @@ bool calibrationDone = 0;
 bool mainSwitchState = 1;
 bool landingSwitchState = 0;
 bool bytecodeRCSwitchState = 0;
+bool pyroSwitchState = 0;
+
+void updatePyroTrigger() {
+#ifdef PYRO_PIN
+    if (pyroSwitchState) {
+        pyroTrigger.on();
+    } else {
+        pyroTrigger.off();
+    }
+#endif
+}
 
 void turnAllLightsOff() {
     builtinLed.off();
@@ -219,6 +238,14 @@ void bytecodeRCCallback(EdgeDetector* detector, long time, void* data) {
 }
 #endif
 
+#ifdef PYRO_SWITCH_CHANNEL
+EdgeDetector pyroSwitchEdgeDetector;
+
+void pyroSwitchCallback(EdgeDetector* detector, long time, void* data) {
+  pyroSwitchState = detector->value();
+  updatePyroTrigger();
+}
+#endif
 
 /**
  * Waits for the user to enter "?READY?" followed by a newline on the serial
@@ -395,6 +422,13 @@ void setup() {
   bytecodeRCEdgeDetector.reset();
 #endif
 
+#ifdef PYRO_SWITCH_CHANNEL
+  // Set up the pyro switch edge detector
+  pyroSwitchEdgeDetector.callbacks.rising = pyroSwitchCallback;
+  pyroSwitchEdgeDetector.callbacks.falling = pyroSwitchCallback;
+  pyroSwitchEdgeDetector.reset();
+#endif
+
 #ifdef ENABLE_SERIAL_PORT_STARTUP_SIGNAL
   // Wait for the startup signal on the serial port
   waitForStartupSignal();
@@ -418,6 +452,11 @@ void setup() {
  * The body of the main loop of the application, executed in an infinite loop.
  */
 void loop() {
+
+#ifdef PYRO_SWITCH_CHANNEL
+  // Feed the pyro channel signal to the edge detector
+  pyroSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(PYRO_SWITCH_CHANNEL));
+#endif
 
 #ifdef BYTECODE_RC_CHANNEL
   // Feed the bytecode rc channel signal to the edge detector

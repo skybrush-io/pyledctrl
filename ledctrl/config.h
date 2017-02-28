@@ -21,7 +21,7 @@ extern "C" {
  * NANOLED_VERSION = 1 corresponds to version v1.0
  * NANOLED_VERSION = 2 corresponds to versions 2.0 and 2.1
  */
-#define NANOLED_VERSION 2
+#define NANOLED_VERSION 1
 
 /**
  * \def ENABLE_IS_LOW
@@ -131,7 +131,19 @@ extern "C" {
  * Analog input corresponding to the main switch.
  * If you have a switch-button, you should define this; otherwise comment this out.
  */
-// #define MAIN_SWITCH_PIN A5
+//#define MAIN_SWITCH_PIN A5
+
+/**
+ * \def PYRO_PIN
+ *
+ * Define the pin to use as pyro output. Make sure it does not overlap with
+ * any of the LED output pins.
+ */
+#define PYRO_PIN 6
+
+/* ************************************************************************** */
+/* RC channel configuration
+/* ************************************************************************** */
 
 /**
  * \def MAIN_SWITCH_CHANNEL
@@ -149,7 +161,7 @@ extern "C" {
  * Comment this out if you do not want to have
  * an RC channel associated with a landing switch
  */
-#define LANDING_SWITCH_CHANNEL 5
+//#define LANDING_SWITCH_CHANNEL 5
 
 /**
  * \def BYTECODE_RC_CHANNEL
@@ -159,6 +171,14 @@ extern "C" {
  * an RC channel associated with a bytecode_rc mode
  */
 #define BYTECODE_RC_CHANNEL 4
+
+/**
+ * \def PYRO_SWITCH_CHANNEL
+ *
+ * Zero-indexed RC channel that triggers the pyro
+ */
+#define PYRO_SWITCH_CHANNEL 7
+
 
 /* ************************************************************************** */
 /* Serial port configuration                                                  */
@@ -170,7 +190,7 @@ extern "C" {
  * Whether the LED controller should listen for incoming commands on the
  * serial port.
  */
-#define ENABLE_SERIAL_INPUT 0
+#define ENABLE_SERIAL_INPUT 1
 
 /**
 * \def ENABLE_STARTUP_SIGNAL
@@ -179,7 +199,7 @@ extern "C" {
  * string "?READY?" followed by a newline character on the serial console
  * before it will enter the main loop or parse any other serial input.
  */
-// #define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
+#define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
 
 /**
  * \def SERIAL_BAUD_RATE
