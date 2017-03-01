@@ -89,6 +89,14 @@ extern "C" {
 /* ************************************************************************** */
 
 /**
+ * \def PYRO_PIN
+ *
+ * Define the pin to use as pyro output. Make sure it does not overlap with
+ * any of the LED output pins.
+ */
+//#define PYRO_PIN 6
+
+/**
  * \def RED_PWM_PIN
  *
  * Index of the PWM pin corresponding to the red LEDs.
@@ -96,7 +104,11 @@ extern "C" {
 #if NANOLED_VERSION == 2
 #  define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
 #else
-#  define RED_PWM_PIN 6 // NanoLED v1.0
+#  if PYRO_PIN == 6
+#    define RED_PWM_PIN 7 // NanoLED v1.0 dummy red pin, 6 used for pyro
+#  else
+#    define RED_PWM_PIN 6 // NanoLED v1.0
+#  endif
 #endif
 
 /**
@@ -132,14 +144,6 @@ extern "C" {
  * If you have a switch-button, you should define this; otherwise comment this out.
  */
 //#define MAIN_SWITCH_PIN A5
-
-/**
- * \def PYRO_PIN
- *
- * Define the pin to use as pyro output. Make sure it does not overlap with
- * any of the LED output pins.
- */
-#define PYRO_PIN 6
 
 /* ************************************************************************** */
 /* RC channel configuration
@@ -177,7 +181,7 @@ extern "C" {
  *
  * Zero-indexed RC channel that triggers the pyro
  */
-#define PYRO_SWITCH_CHANNEL 7
+//#define PYRO_SWITCH_CHANNEL 7
 
 
 /* ************************************************************************** */
