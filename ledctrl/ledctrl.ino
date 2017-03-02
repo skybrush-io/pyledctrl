@@ -74,7 +74,7 @@ CommandExecutor executor(&ledStrip);
 // 8 = timing test pattern for calibrating the clock skew (red-green-blue-black, one second each).
 //     Using this test sequence will automatically turn on the calibration mode (even if you did not define
 //     it in config.h)
-#define BYTECODE_INDEX 7
+#define BYTECODE_INDEX 1
 
 #if BYTECODE_INDEX == 0
 #  include "bytecode_first_test.h"
@@ -466,6 +466,13 @@ void loop() {
 #ifdef LANDING_SWITCH_CHANNEL
   // Feed the landing switch channel signal to the edge detector
   landingSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(LANDING_SWITCH_CHANNEL));
+#endif
+
+#ifdef PYRO_PIN
+#ifdef PYRO_PULSE_LENGTH_IN_SECONDS
+  // step the pyro executor to limit pulse length
+  pyroTrigger.step();
+#endif
 #endif
 
 #ifdef MAIN_SWITCH_CHANNEL

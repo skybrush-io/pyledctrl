@@ -25,6 +25,17 @@ private:
    */
   u8 m_Pin;
 
+  /**
+   * Time of last ON switch.
+   */
+   unsigned long m_LastSwitchOnTime;
+
+  /**
+   * Was there an off signal already? Otherwise we do not take into account
+   * any on (avoiding situation when arduino os switched on later than
+   * rc transmitter, which is already in on state */
+  u8 m_EnableOn;
+
 public:
 
   /**
@@ -47,16 +58,18 @@ public:
   /**
    * \brief Turns the pyro off.
    */
-  void off() const {
-    LED_PIN_WRITE(m_Pin, 0);
-  }
+  void off(u8 enableOn = 1);
 
   /**
    * \brief Turns the pyro on to full.
    */
-  void on() const {
-    LED_PIN_WRITE(m_Pin, 255);
-  }
+  void on();
+
+  /**
+   * \brief This function must be called repeatedly from the main loop
+   *        of the sketch to keep the execution flowing.
+   */
+  void step();
 
 private:
 

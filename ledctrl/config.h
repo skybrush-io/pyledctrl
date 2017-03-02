@@ -38,7 +38,7 @@ extern "C" {
  *
  * Define this if you need debugging information on the serial console.
  */
-// #define DEBUG 1
+//#define DEBUG 1
 
 /**
  * \def set to 1 if you want to use white LED in the color mixing, 0 if not
@@ -84,6 +84,13 @@ extern "C" {
  */
 #define CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES 10
 
+/**
+ * \def PYRO_PULSE_LENGTH_IN_SECONDS
+ *
+ * Length of the pyro ON pulse after transmitter switch ON.
+ */
+#define PYRO_PULSE_LENGTH_IN_SECONDS 5
+
 /* ************************************************************************** */
 /* Pin configurations                                                         */
 /* ************************************************************************** */
@@ -91,10 +98,12 @@ extern "C" {
 /**
  * \def PYRO_PIN
  *
- * Define the pin to use as pyro output. Make sure it does not overlap with
- * any of the LED output pins.
+ * Define the pin to use as pyro output. If pyro pin is configured, LED pins
+ * will be redirected to a dummy pin (D7) to avoid overlap of pyro and LED
+ * control. Use values of 5,6,9 (NanoLED v1.0)
  */
 //#define PYRO_PIN 6
+#define DUMMY_PIN 7
 
 /**
  * \def RED_PWM_PIN
@@ -104,11 +113,10 @@ extern "C" {
 #if NANOLED_VERSION == 2
 #  define RED_PWM_PIN 11 // timer2 (NanoLED v2.1)
 #else
-#  if PYRO_PIN == 6
-#    define RED_PWM_PIN 7 // NanoLED v1.0 dummy red pin, 6 used for pyro
-#  else
-#    define RED_PWM_PIN 6 // NanoLED v1.0
-#  endif
+#  define RED_PWM_PIN 6 // NanoLED v1.0
+#endif
+#if RED_PWM_PIN == PYRO_PIN
+#  define RED_PWM_PIN DUMMY_PIN
 #endif
 
 /**
@@ -117,6 +125,9 @@ extern "C" {
  * Index of the PWM pin corresponding to the green LEDs.
  */
 #define GREEN_PWM_PIN 9
+#if GREEN_PWM_PIN == PYRO_PIN
+#  define GREEN_PWM_PIN DUMMY_PIN
+#endif
 
 /**
  * \def BLUE_PWM_PIN
@@ -127,6 +138,9 @@ extern "C" {
 #  define BLUE_PWM_PIN 3 // timer2 (NanoLED v2.1)
 #else
 #  define BLUE_PWM_PIN 5 // NanoLED v1.0
+#endif
+#if BLUE_PWM_PIN == PYRO_PIN
+#  define BLUE_PWM_PIN DUMMY_PIN
 #endif
 
 /**
@@ -194,7 +208,7 @@ extern "C" {
  * Whether the LED controller should listen for incoming commands on the
  * serial port.
  */
-#define ENABLE_SERIAL_INPUT 1
+//#define ENABLE_SERIAL_INPUT 1
 
 /**
 * \def ENABLE_STARTUP_SIGNAL
@@ -203,7 +217,7 @@ extern "C" {
  * string "?READY?" followed by a newline character on the serial console
  * before it will enter the main loop or parse any other serial input.
  */
-#define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
+//#define ENABLE_SERIAL_PORT_STARTUP_SIGNAL 1
 
 /**
  * \def SERIAL_BAUD_RATE
