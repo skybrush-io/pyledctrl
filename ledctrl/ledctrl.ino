@@ -48,7 +48,7 @@ VoltMeter voltmeter(VOLTMETER_PIN, LIGHT_COEFF);
 SerialProtocolParser serialProtocolParser;
 #endif
 
-#ifdef PYRO_PIN
+#if USE_PYRO == 1
 /**
  * A pyro trigger pin
  */
@@ -119,17 +119,17 @@ bool calibrationDone = 0;
 bool mainSwitchState = 1;
 bool landingSwitchState = 0;
 bool bytecodeRCSwitchState = 0;
-bool pyroSwitchState = 0;
 
+#if USE_PYRO == 1
+bool pyroSwitchState = 0;
 void updatePyroTrigger() {
-#ifdef PYRO_PIN
     if (pyroSwitchState) {
         pyroTrigger.on();
     } else {
         pyroTrigger.off();
     }
-#endif
 }
+#endif
 
 void turnAllLightsOff() {
     builtinLed.off();
@@ -238,7 +238,7 @@ void bytecodeRCCallback(EdgeDetector* detector, long time, void* data) {
 }
 #endif
 
-#ifdef PYRO_SWITCH_CHANNEL
+#if USE_PYRO == 1
 EdgeDetector pyroSwitchEdgeDetector;
 
 void pyroSwitchCallback(EdgeDetector* detector, long time, void* data) {
@@ -422,7 +422,7 @@ void setup() {
   bytecodeRCEdgeDetector.reset();
 #endif
 
-#ifdef PYRO_SWITCH_CHANNEL
+#if USE_PYRO == 1
   // Set up the pyro switch edge detector
   pyroSwitchEdgeDetector.callbacks.rising = pyroSwitchCallback;
   pyroSwitchEdgeDetector.callbacks.falling = pyroSwitchCallback;
@@ -453,7 +453,7 @@ void setup() {
  */
 void loop() {
 
-#ifdef PYRO_SWITCH_CHANNEL
+#if USE_PYRO == 1
   // Feed the pyro channel signal to the edge detector
   pyroSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(PYRO_SWITCH_CHANNEL));
 #endif
@@ -468,11 +468,9 @@ void loop() {
   landingSwitchEdgeDetector.feedAnalogSignal(signalSource.channelValue(LANDING_SWITCH_CHANNEL));
 #endif
 
-#ifdef PYRO_PIN
-#ifdef PYRO_PULSE_LENGTH_IN_SECONDS
+#if USE_PYRO == 1
   // step the pyro executor to limit pulse length
   pyroTrigger.step();
-#endif
 #endif
 
 #ifdef MAIN_SWITCH_CHANNEL

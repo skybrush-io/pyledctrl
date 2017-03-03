@@ -84,6 +84,18 @@ extern "C" {
  */
 #define CLOCK_SKEW_CALIBRATION_DURATION_IN_MINUTES 10
 
+/* ************************************************************************** */
+/* Pyro configurations                                                         */
+/* ************************************************************************** */
+
+/**
+ * \def USE_PYRO
+ *
+ * Set to 1 to enable all pyro-related stuff.
+ * Uncomment or set to 0 to disable pyro.
+ */
+#define USE_PYRO 0
+
 /**
  * \def PYRO_PULSE_LENGTH_IN_SECONDS
  *
@@ -102,7 +114,7 @@ extern "C" {
  * will be redirected to a dummy pin (D7) to avoid overlap of pyro and LED
  * control. Use values of 5,6,9 (NanoLED v1.0)
  */
-//#define PYRO_PIN 6
+#define PYRO_PIN 9
 #define DUMMY_PIN 7
 
 /**
@@ -195,7 +207,7 @@ extern "C" {
  *
  * Zero-indexed RC channel that triggers the pyro
  */
-//#define PYRO_SWITCH_CHANNEL 7
+#define PYRO_SWITCH_CHANNEL 7
 
 
 /* ************************************************************************** */
