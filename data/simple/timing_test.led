@@ -1,0 +1,4 @@
+with loop():
+	set_color("red", duration=1)
+	set_color("green", duration=1)
+	set_color("blue", duration=1)
