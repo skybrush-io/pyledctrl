@@ -41,6 +41,7 @@ class NullASTOptimiser(ASTOptimiser):
     """Null optimiser that does not transform the AST at all."""
 
     def optimise_ast(self, obj):
+        """Dummy implementation that does nothing."""
         return False
 
 
@@ -50,6 +51,7 @@ class CompositeASTOptimiser(ASTOptimiser):
     """
 
     def __init__(self):
+        """Constructor."""
         self._optimisers = []
 
     def add_optimiser(self, optimiser):
@@ -75,7 +77,8 @@ class ColorCommandShortener(ASTOptimiser):
 
     Replacements performed by this optimiser are:
 
-        - ``set_color(0, 0, 0, duration)`` is replaced by ``set_black(duration)``
+        - ``set_color(0, 0, 0, duration)`` is replaced by
+          ``set_black(duration)``
 
         - ``set_color(255, 255, 255, duration)`` is replaced by
           ``set_white(duration)``
@@ -322,7 +325,7 @@ class LoopDetector(ASTOptimiser):
                 statement = body[index]
                 end = index + 1
                 max_end = min(num_statements, index + self.max_loop_len)
-                for end in xrange(index+1, max_end):
+                for end in xrange(index + 1, max_end):
                     end_statement = body[end]
                     if statement.is_equivalent_to(end_statement):
                         # A potential loop starts at index with a body
@@ -339,9 +342,9 @@ class LoopDetector(ASTOptimiser):
                     # Find the best loop, i.e. the one that takes the smallest
                     # amount of space, and replace the body with the best
                     # loop
-                    blocks = [LoopBlock(iterations=iterations,
+                    blocks = [LoopBlock(iterations=iterations_,
                                         body=StatementSequence(body[index:end]))
-                              for end, iterations in potential_loops]
+                              for end, iterations_ in potential_loops]
                     best_block = min(blocks, key=attrgetter("length_in_bytes"))
                     end = index + best_block.iterations.value * \
                         len(best_block.body.statements)
