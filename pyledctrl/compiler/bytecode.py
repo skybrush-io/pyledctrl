@@ -126,6 +126,20 @@ def nop():
     return ast.NopCommand()
 
 
+def pyro_disable(*channels):
+    mask = ast.ChannelMask(enable=False, channels=channels)
+    return ast.SetPyroCommand(mask=mask)
+
+
+def pyro_enable(*channels):
+    mask = ast.ChannelMask(enable=True, channels=channels)
+    return ast.SetPyroCommand(mask=mask)
+
+
+def pyro_set_all(*channels):
+    return ast.SetPyroAllCommand(values=ast.ChannelValues(channels))
+
+
 def set_black(duration=None):
     return ast.SetBlackCommand(duration=ast.Duration.from_seconds(duration))
 

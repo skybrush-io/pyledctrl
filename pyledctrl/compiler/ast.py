@@ -28,7 +28,9 @@ terminals and therefore are enclosed in quotes)::
             | reset-timer-command
             | set-color-from-channels-command
             | fade-to-color-from-channels-command
-            | jump-command;
+            | jump-command
+            | pyro-set-command
+            | pyro-set-all-command;
 
     (* Declaration of a comment block *)
     comment = "";            (* resolves to empty bytecode *)
@@ -52,6 +54,8 @@ terminals and therefore are enclosed in quotes)::
     fade-to-color-from-channels-command = "CommandCode.SET_COLOR_FROM_CHANNELS",
                                           channel-index * 3, duration;
     jump-command = "CommandCode.JUMP", address;
+    set-pyro-command = "CommandCode.SET_PYRO", channel-mask;
+    set-pyro-all-command = "CommandCode.SET_PYRO_ALL", channel-values;
 
     (* Loop blocks *)
     loop-block = iterations, statement-sequence;
@@ -59,6 +63,8 @@ terminals and therefore are enclosed in quotes)::
     (* Not-so-basic types *)
     address = varuint;
     channel-index = unsigned-byte;
+    channel-mask = unsigned-byte;
+    channel-values = unsigned-byte;
     duration = varuint;
     gray-value = unsigned-byte;
     iterations = unsigned-byte;
@@ -121,6 +127,8 @@ class CommandCode(object):
     FADE_TO_COLOR_FROM_CHANNELS = b'\x11'
     JUMP = b'\x12'
     TRIGGERED_JUMP = b'\x13'
+    SET_PYRO = b'\x14'
+    SET_PYRO_ALL = b'\x15'
 
 
 class EasingMode(object):
@@ -407,12 +415,15 @@ class Literal(Node):
 
 class Byte(Literal):
     """Node that represents a single-byte literal value."""
-    pass
+
+    @Node.length_in_bytes.getter
+    def length_in_bytes(self):
+        return 1
 
 
 class UnsignedByte(Byte):
     """Node that represents a single-byte literal value (such as a component
-    of an RGB color that is stored on a single byte.
+    of an RGB color that is stored on a single byte).
     """
 
     _fields = ("value", )
@@ -434,10 +445,6 @@ class UnsignedByte(Byte):
         are the same.
         """
         return self._value == other._value
-
-    @Node.length_in_bytes.getter
-    def length_in_bytes(self):
-        return 1
 
     def to_bytecode(self):
         return self.bytecode
@@ -495,6 +502,101 @@ class Varuint(Literal):
             raise ValueError("varuints greater than 2**28 are not supported "
                              "by the bytecode")
         self._value = value
+
+
+class ChannelMask(Byte):
+    """Literal that represents the channel mask of a SET_PYRO command."""
+
+    _fields = ("enable", "channels")
+    _defaults = {
+        "enable": False,
+        "channels": ()
+    }
+    _immutable = _fields
+
+    def __init__(self, enable=False, channels=()):
+        """Constructor.
+
+        Parameters:
+            enable (bool): whether to enable or disable the channels in the mask
+            channels (Iterable[int]): collection of channel indices that are
+                present in the mask
+        """
+        self._enable = bool(enable)
+        self._set_channels(channels)
+
+    def equals(self, other):
+        """Compares this byte with another byte to decide whether they
+        are the same.
+        """
+        return self._enable == other._enable and self._channels == other._channels
+
+    def _to_byte(self):
+        result = 0
+        for bit in self._channels:
+            result |= (1 << bit)
+        return (result & 127) + (128 if self._enable else 0)
+
+    def to_bytecode(self):
+        return chr(self._to_byte())
+
+    def to_led_source(self):
+        return str(tuple(sorted(self._channels)))[1:-1]
+
+    def _set_channels(self, value):
+        if any(ch < 0 or ch > 6 for ch in value):
+            raise ValueError("channel indices must be between 0 and 6 (inclusive)")
+        self._channels = frozenset(value)
+
+
+class ChannelValues(Byte):
+    """Literal that represents the channel value byte of a SET_PYRO_ALL
+    command."""
+
+    _fields = ("channels", )
+    _defaults = {
+        "channels": ()
+    }
+
+    def __init__(self, channels=()):
+        """Constructor.
+
+        Parameters:
+            channels (Iterable[int]): collection of channel indices that are
+                set to 1 after the execution of the SET_PYRO_ALL command.
+        """
+        self._set_channels(channels)
+
+    def equals(self, other):
+        """Compares this byte with another byte to decide whether they
+        are the same.
+        """
+        return self._channels == other._channels
+
+    def _to_byte(self):
+        result = 0
+        for bit in self._channels:
+            result |= (1 << bit)
+        return result & 127
+
+    def to_bytecode(self):
+        return chr(self._to_byte())
+
+    def to_led_source(self):
+        return str(tuple(sorted(self._channels)))[1:-1]
+
+    @property
+    def channels(self):
+        return self._channels
+
+    @property
+    def enable(self):
+        return self._enable
+
+    def _set_channels(self, value):
+        if any(ch < 0 or ch > 6 for ch in value):
+            raise ValueError("channel indices must be between 0 and 6 (inclusive)")
+        self._channels = frozenset(value)
 
 
 class RGBColor(Node):
@@ -954,6 +1056,53 @@ class JumpCommand(Command):
     _defaults = {
         "address": Varuint
     }
+
+
+class SetPyroCommand(Command):
+    """Node that represents a ``SET_PYRO`` command in the bytecode."""
+
+    code = CommandCode.SET_PYRO
+    _fields = ("mask", )
+    _defaults = {
+        "mask": ChannelMask
+    }
+    _immutable = _fields
+
+    def __init__(self, mask):
+        assert isinstance(mask, ChannelMask)
+        self._mask = mask
+
+    def _is_equivalent_to_inner(self, other):
+        return self._mask.equals(other._mask)
+
+    def to_led_source(self):
+        bits = self._mask.to_led_source()
+        if self._mask.enable:
+            return "pyro_enable({0})".format(bits)
+        else:
+            return "pyro_disable({0})".format(bits)
+
+
+class SetPyroAllCommand(Command):
+    """Node that represents a ``SET_PYRO_ALL`` command in the bytecode."""
+
+    code = CommandCode.SET_PYRO_ALL
+    _fields = ("values", )
+    _defaults = {
+        "values": ChannelValues
+    }
+    _immutable = _fields
+
+    def __init__(self, values):
+        assert isinstance(values, ChannelValues)
+        self._values = values
+
+    def _is_equivalent_to_inner(self, other):
+        return self._values.equals(other._values)
+
+    def to_led_source(self):
+        value = self._values.to_led_source()
+        return "pyro_set_all({0})".format(value)
 
 
 class LoopBlock(Statement):
