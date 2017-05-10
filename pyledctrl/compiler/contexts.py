@@ -100,6 +100,7 @@ class ExecutionContext(object):
             "jump": wrapper_for(bytecode.jump),
             "label": wrapper_for(bytecode.label),
             "nop": wrapper_for(bytecode.nop),
+            "pyro_clear": wrapper_for(bytecode.pyro_clear),
             "pyro_disable": wrapper_for(bytecode.pyro_disable),
             "pyro_enable": wrapper_for(bytecode.pyro_enable),
             "pyro_set_all": wrapper_for(bytecode.pyro_set_all),

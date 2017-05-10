@@ -49,3 +49,5 @@ with loop():
 	sleep(duration=1)
 	pyro_set_all(6)
 	sleep(duration=1)
+	pyro_clear()
+	sleep(duration=1)

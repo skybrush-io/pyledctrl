@@ -126,6 +126,10 @@ def nop():
     return ast.NopCommand()
 
 
+def pyro_clear():
+    return pyro_set_all()
+
+
 def pyro_disable(*channels):
     mask = ast.ChannelMask(enable=False, channels=channels)
     return ast.SetPyroCommand(mask=mask)
