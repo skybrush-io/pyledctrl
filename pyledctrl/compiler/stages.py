@@ -572,7 +572,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             for channel_in_scene_file in fx_in_scene_file.channels:
                 our_channel = fx.channels[channel_in_scene_file.index]
                 our_timeline = our_channel.timeline
-                out_fps = our_timeline.fps
+                our_fps = our_timeline.fps
 
                 timeline = channel_in_scene_file.timeline.scaled_to_fps(
                     our_fps)
