@@ -600,9 +600,6 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # steps, they could be merged, but the compiler won't do this.
         # It is up to an optimization step that comes later.
 
-        prev_time = None
-        prev_channels = None
-
         # Create a "line collector" object that is responsible for printing
         # the appropriate commands to the output file and insert the
         # markers at the right places between lines
@@ -610,6 +607,9 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         for marker in fx.markers:
             comment = Comment(value=marker.value)
             lines.add_marker(comment.to_led_source(), time=marker.time)
+
+        prev_time = None
+        prev_channels = None
 
         for time, steps_by_channels in self._merge_channels(fx.channels):
             all_channels = tuple(step.value if step else 0
@@ -624,9 +624,8 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # This is the first step; process time.wait only as time.fade
                 # will be processed in the next iteration
                 lines.add(
-                    "set_color({r}, {g}, {b}, duration={dt})"
-                    .format(dt=time.wait / self.FPS, **color_params),
-                    time.wait
+                    "set_color({r}, {g}, {b}, duration=@DT@)"
+                    .format(**color_params), time.wait
                 )
             else:
                 # This is not the first step. We need to check whether there is
@@ -639,32 +638,23 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                 diff = time.time - prev_time.end
                 if diff > 0:
-                    lines.add(
-                        "sleep(duration={dt})".format(dt=diff / self.FPS),
-                        diff
-                    )
+                    lines.add("sleep(duration=@DT@)", diff)
                 elif diff < 0:
                     raise ValueError("timeline inconsistent; this is "
                                      "probably a bug")
 
                 if prev_time.fade == 0:
                     lines.add(
-                        "set_color({r}, {g}, {b}, duration={dt})"
-                        .format(dt=time.wait / self.FPS, **color_params),
-                        time.wait
+                        "set_color({r}, {g}, {b}, duration=@DT@)"
+                        .format(**color_params), time.wait
                     )
                 elif prev_time.fade > 0:
                     lines.add(
-                        "fade_to_color({r}, {g}, {b}, duration={dt})"
-                        .format(dt=prev_time.fade / self.FPS, **color_params),
-                        prev_time.fade
+                        "fade_to_color({r}, {g}, {b}, duration=@DT@)"
+                        .format(**color_params), prev_time.fade
                     )
                     if time.wait > 0:
-                        lines.add(
-                            "sleep(duration={dt})"
-                            .format(dt=time.wait / self.FPS),
-                            time.wait
-                        )
+                        lines.add("sleep(duration=@DT@)", time.wait)
                 else:
                     raise InvalidDurationError(prev_time.fade + " frames")
 

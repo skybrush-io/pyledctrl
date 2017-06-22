@@ -1,5 +1,7 @@
 """Utility objects and functions for the compiler."""
 
+from __future__ import division
+
 from bisect import bisect, bisect_left
 from time import time
 
@@ -95,6 +97,9 @@ class TimestampedLineCollector(object):
     def add(self, line, duration):
         """Adds a new line to the line collector object.
 
+        The token ``@DT@`` in the line will be replaced by the duration
+        in *seconds*.
+
         Parameters:
             line (str): the line to add
             duration (int): the duration of the execution of the line,
@@ -103,6 +108,7 @@ class TimestampedLineCollector(object):
         if duration > 0:
             self._print_markers_until(self._timer + 1)
 
+        line = line.replace("@DT@", str(duration / self.fps))
         self.out.write(self._format_line(line, self._timer))
         self._advance_by(duration)
 
