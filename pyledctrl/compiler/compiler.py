@@ -1,5 +1,6 @@
 """Module that implements the bytecode compiler that produces raw bytecode
-from input files in various formats."""
+from input files in various formats.
+"""
 
 import os
 
@@ -35,14 +36,24 @@ def _replace_extension(filename, ext):
 
 class BytecodeCompiler(object):
     """Bytecode compiler that produces raw bytecode from input files in
-    various formats."""
+    various formats.
+    """
 
-    def __init__(self, keep_intermediate_files=False):
+    def __init__(self, keep_intermediate_files=False, verbose=False):
+        """Constructor.
+
+        Parameters:
+            keep_intermediate_files (bool): whether to keep any intermediate
+                files that are created during compilation
+            verbose (bool): whether to print messages about the progress of
+                the compilation
+        """
         self.keep_intermediate_files = keep_intermediate_files
         self._tmpdir = None
         self._optimiser = None
         self._optimisation_level = 0
         self.optimisation_level = 2
+        self.verbose = verbose
 
     def compile(self, input_file, output_file=None, force=True):
         """Runs the compiler.
@@ -94,7 +105,7 @@ class BytecodeCompiler(object):
     def _compile(self, input_file, output_file, force):
         plan = Plan()
         self._collect_stages(input_file, output_file, plan)
-        self.output = plan.execute(force=force)
+        self.output = plan.execute(force=force, verbose=self.verbose)
 
     def _collect_stages(self, input_file, output_file, plan):
         """Collects the compilation stages that will turn the given input
@@ -105,7 +116,8 @@ class BytecodeCompiler(object):
         :param output_file: the name of the output file or ``None`` if we only
             need to generate an abstract syntax tree
         :type output_file: str or None
-        :param plan: compilation plan where the collected stages will be added to
+        :param plan: compilation plan where the collected stages will be
+            added to
         :type plan: Plan
 
         :return: list of stages that generate their outputs in memory and that
@@ -183,18 +195,22 @@ class BytecodeCompiler(object):
             )
         else:
             if "{}" not in output_file:
-                raise CompilerError("output file needs to include {} placeholder "
-                                    "for the FX id when compiling a Sunlite "
-                                    "Suite scene file")
-            led_file_template = self._create_intermediate_filename(output_file, ".led")
+                raise CompilerError(
+                    "output file needs to include a {} placeholder for the "
+                    "FX identifier when compiling a Sunlite Suite scene "
+                    "file"
+                )
+            led_file_template = self._create_intermediate_filename(
+                output_file, ".led")
 
-        preprocessing_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
+        preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
             [(0, None, parsing_stage.output)], led_file_template
         )
-        plan.add_step(preprocessing_stage)
+        plan.add_step(preproc_stage)
 
-        for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
-            stage = PythonSourceToASTObjectCompilationStage(intermediate_file, id=id)
+        for id, intermediate_file in preproc_stage.output_files_by_ids.items():
+            stage = PythonSourceToASTObjectCompilationStage(
+                intermediate_file, id=id)
             plan.add_step(stage, output=ast_only)
 
     def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
@@ -233,21 +249,24 @@ class BytecodeCompiler(object):
             )
         else:
             if "{}" not in output_file:
-                raise CompilerError("output file needs to include {} placeholder "
-                                    "for the FX id when compiling a Sunlite "
-                                    "Suite scene file")
-            led_file_template = self._create_intermediate_filename(output_file, ".led")
+                raise CompilerError(
+                    "output file needs to include a {} placeholder for the "
+                    "FX identifier when compiling a Sunlite Suite scene "
+                    "file"
+                )
+            led_file_template = self._create_intermediate_filename(
+                output_file, ".led")
 
         # Add the preprocessing stage that merges multiple Sunlite Suite scene
         # files into .led (Python) source files, sorted by FX IDs
-        preprocessing_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
+        preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
             scene_order, led_file_template
         )
-        plan.add_step(preprocessing_stage)
+        plan.add_step(preproc_stage)
 
         # For each intermediate .led (Python) file created in the preprocessing
         # stage, add a stage to compile the corresponding .ast file
-        for id, intermediate_file in preprocessing_stage.output_files_by_ids.items():
+        for id, intermediate_file in preproc_stage.output_files_by_ids.items():
             stage = PythonSourceToASTObjectCompilationStage(intermediate_file,
                                                             id=id)
             plan.add_step(stage, output=ast_only)

@@ -2,7 +2,7 @@
 
 from tqdm import tqdm
 
-__all__ = ["Plan"]
+__all__ = ("Plan", )
 
 
 class Plan(object):
@@ -28,14 +28,17 @@ class Plan(object):
         if output:
             self._mark_as_output(step)
 
-    def execute(self, force=False):
+    def execute(self, force=False, verbose=False):
         """Executes the steps of the plan.
 
-        :param force: force the execution of all steps even if the steps
-            indicate that they not need to be run
-        :type force: bool
+        Parameters:
+            force (bool): force the execution of all steps even if the steps
+                indicate that they not need to be run
+            verbose (bool): whether to print verbose messages about the
+                progress of the plan execution
 
-        :raises CompilerError: in case of a compilation error
+        Raises:
+            CompilerError: in case of a compilation error
         """
         last_step = self._steps[-1] if self._steps else None
         result = []
@@ -43,8 +46,9 @@ class Plan(object):
         progress_bar = tqdm(self._steps, bar_format=bar_format)
         for step in progress_bar:
             if force or step == last_step or step.should_run():
-                message = self._get_message_for_step(step)
-                progress_bar.write(message)
+                if verbose:
+                    message = self._get_message_for_step(step)
+                    progress_bar.write(message)
                 step.run()
                 if step in self._output_steps:
                     result.append(step.output)

@@ -7,6 +7,8 @@ try:
 except ImportError:
     import pickle                # for Python 3.x
 
+import logging
+
 from decimal import Decimal
 from functools import partial
 from operator import attrgetter
@@ -18,6 +20,9 @@ from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
 from pyledctrl.utils import first, grouper
 from textwrap import dedent
+
+
+log = logging.getLogger("pyledctrl.compiler.stages")
 
 
 class CompilationStage(object):
@@ -471,6 +476,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 linearly. ``None`` means not to trim the input file.
         """
         filename = scene_file.filename
+        log.info("Processing scene file: {0}".format(filename))
 
         for fx_in_scene_file in scene_file.fxs:
             # Get the FX object that we will merge the FX from the scene file into
@@ -529,7 +535,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         timer = 0
         for time, steps_by_channels in self._merge_channels(fx.channels):
             r, g, b = tuple(step.value if step else 0
-                            for step in steps_by_channels)
+                            for step in steps_by_channels)[:3]
             params = dict(r=r, g=g, b=b)
 
             # Print any necessary markers into the output file

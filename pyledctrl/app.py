@@ -1,11 +1,10 @@
-"""
-Main application class for PyLedCtrl
-"""
+"""Main application class for PyLedCtrl"""
 
 from __future__ import print_function
 
 import baker
 import csv
+import logging
 import os
 import subprocess
 import sys
@@ -20,8 +19,9 @@ from pyledctrl.utils import error, get_serial_port_filename, \
 pyledctrl = baker.Baker()
 
 
-@pyledctrl.command(shortopts=dict(output="o", keep="k", optimisation="O"))
-def compile(filename, output=None, keep=False, optimisation=2):
+@pyledctrl.command(shortopts=dict(output="o", keep="k", optimisation="O",
+                                  verbose="v"))
+def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
     """\
     Compiles a LedCtrl source file to a bytecode file.
 
@@ -33,12 +33,17 @@ def compile(filename, output=None, keep=False, optimisation=2):
         compilation.
     :param optimisation: The optimisation level to use. 0 = no optimisation,
         1 = only basic optimisations, 2 = aggressive optimisation (default).
+    :param verbose: Whether to print verbose messages about what the
+        compiler is doing.
     """
     if output is None:
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
 
-    compiler = BytecodeCompiler(keep_intermediate_files=keep)
+    if verbose:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=True)
     compiler.optimisation_level = optimisation
     compiler.compile(filename, output)
 
