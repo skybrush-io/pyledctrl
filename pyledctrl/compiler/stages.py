@@ -15,7 +15,8 @@ from operator import attrgetter
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError
-from pyledctrl.compiler.utils import get_timestamp_of, TimestampWrapper
+from pyledctrl.compiler.utils import get_timestamp_of, \
+    TimestampedLineCollector, TimestampWrapper
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
 from pyledctrl.utils import first, grouper
@@ -608,6 +609,8 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
         prev_time = None
         prev_channels = None
+        lines = TimestampedLineCollector(fps=self.FPS)
+
         timer = 0
         for time, steps_by_channels in self._merge_channels(fx.channels):
             all_channels = tuple(step.value if step else 0
@@ -628,16 +631,14 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 else:
                     next_marker_time = None
 
-            lines_and_times = []
             if prev_time is None:
                 # This is the first step; process time.wait only as time.fade
                 # will be processed in the next iteration
-                lines_and_times.append((
+                lines.add(
                     "set_color({r}, {g}, {b}, duration={dt})"
                     .format(dt=time.wait / self.FPS, **color_params),
-                    timer
-                ))
-                timer += time.wait
+                    time.wait
+                )
             else:
                 # This is not the first step. We need to check whether there is
                 # a "jump" in the timeline, which may happen if
@@ -649,47 +650,36 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                 diff = time.time - prev_time.end
                 if diff > 0:
-                    lines_and_times.append((
+                    lines.add(
                         "sleep(duration={dt})".format(dt=diff / self.FPS),
-                        timer
-                    ))
-                    timer += diff
+                        diff
+                    )
                 elif diff < 0:
                     raise ValueError("timeline inconsistent; this is "
                                      "probably a bug")
 
                 if prev_time.fade == 0:
-                    lines_and_times.append((
+                    lines.add(
                         "set_color({r}, {g}, {b}, duration={dt})"
                         .format(dt=time.wait / self.FPS, **color_params),
-                        timer
-                    ))
-                    timer += time.wait
+                        time.wait
+                    )
                 elif prev_time.fade > 0:
-                    lines_and_times.append((
+                    lines.add(
                         "fade_to_color({r}, {g}, {b}, duration={dt})"
                         .format(dt=prev_time.fade / self.FPS, **color_params),
-                        timer
-                    ))
-                    timer += prev_time.fade
+                        prev_time.fade
+                    )
                     if time.wait > 0:
-                        lines_and_times.append((
+                        lines.add(
                             "sleep(duration={dt})"
                             .format(dt=time.wait / self.FPS),
-                            timer
-                        ))
-                        timer += time.wait
+                            time.wait
+                        )
                 else:
                     raise InvalidDurationError(prev_time.fade + " frames")
 
-            for line, timestamp_of_line in lines_and_times:
-                # Comment out the next few lines for debugging purposes.
-                if len(line) < 60:
-                    line += " " * (60 - len(line))
-                line += "# " + self._format_frame_count_as_time(
-                    timestamp_of_line)
-                fp.write(line + "\n")
-
+            lines.flush(fp)
             prev_time = time
 
         if fx.name:

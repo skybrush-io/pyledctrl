@@ -47,6 +47,12 @@ class TimestampWrapper(object):
         return cls(wrapped, timestamp)
 
     def __init__(self, wrapped, timestamp):
+        """Constructor.
+
+        Parameters:
+            wrapped (object): the object to wrap
+            timestamp (loat): the timestamp added to the object.
+        """
         self._wrapped = wrapped
         self._timestamp = float(timestamp)
 
@@ -55,4 +61,73 @@ class TimestampWrapper(object):
 
     @property
     def wrapped(self):
+        """The object wrapped by this wrapper."""
         return self._wrapped
+
+
+class TimestampedLineCollector(object):
+    """Helper object that allows us to collect lines to be printed into a
+    ``.led`` output file and also keep track of a running timer such that
+    each added line is timestamped with the state of the timer at the
+    time the line will be executed.
+    """
+
+    def __init__(self, fps=25):
+        """Constructor.
+
+        Parameters:
+            fps (int): number of frames per second
+        """
+        self._add_timestamps = True
+        self._lines = []
+        self._timer = 0
+        self.fps = fps
+
+    def add(self, line, duration):
+        """Adds a new line to the line collector object.
+
+        Parameters:
+            line (str): the line to add
+            duration (int): the duration of the execution of the line,
+                in frames
+        """
+        self._lines.append((line, self._timer))
+        self._timer += duration
+
+    def flush(self, fp):
+        """Flushes the lines collected so far into the given file-like
+        object.
+        """
+        for line, timestamp in self._lines:
+            fp.write(self._format_line(line, timestamp))
+        self._lines = []
+
+    @property
+    def timer(self):
+        """The state of the current timer, in frames."""
+        return self._timer
+
+    def _format_line(self, line, timestamp):
+        """Formats the given line in a way that is suitable for the
+        output.
+
+        Parameters:
+            line (str): the line to format
+            timestamp (int): the timestamp of the line, in frames
+
+        Returns:
+            str: the formatted line
+        """
+        if self._add_timestamps:
+            if len(line) < 60:
+                line += " " * (60 - len(line))
+            line += "# " + self._format_frame_count_as_time(timestamp)
+        return line + "\n"
+
+    def _format_frame_count_as_time(self, frames):
+        seconds, residual = divmod(frames, self.fps)
+        minutes, seconds = divmod(seconds, 60)
+        return "{minutes}:{seconds:02}+{residual:02} ({frames} frames)".format(
+            minutes=int(minutes), seconds=int(seconds),
+            residual=int(residual), frames=int(frames)
+        )
