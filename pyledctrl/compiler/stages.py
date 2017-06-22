@@ -607,11 +607,16 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # It is up to an optimization step that comes later.
 
         prev_time = None
+        prev_channels = None
         timer = 0
         for time, steps_by_channels in self._merge_channels(fx.channels):
-            r, g, b = tuple(step.value if step else 0
-                            for step in steps_by_channels)[:3]
-            params = dict(r=r, g=g, b=b)
+            all_channels = tuple(step.value if step else 0
+                                 for step in steps_by_channels)
+
+            r, g, b = all_channels[:3]
+            pyro_channels = all_channels[3:]
+
+            color_params = dict(r=r, g=g, b=b)
 
             # Print any necessary markers into the output file
             while next_marker_time is not None and next_marker_time <= time.time:
@@ -629,7 +634,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # will be processed in the next iteration
                 lines_and_times.append((
                     "set_color({r}, {g}, {b}, duration={dt})"
-                    .format(dt=time.wait / self.FPS, **params),
+                    .format(dt=time.wait / self.FPS, **color_params),
                     timer
                 ))
                 timer += time.wait
@@ -638,8 +643,9 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # a "jump" in the timeline, which may happen if
                 # prev_time.time + prev_time.total_duration < time.time. In
                 # such cases, we need to insert a sleep() statement.
-                # Also, if prev_time.time + prev_time.total_duration > time.time,
-                # then we are screwed because the timeline is inconsistent.
+                # Also, if prev_time.time + prev_time.total_duration is
+                # greater than time.time, then we are screwed because the
+                # timeline is inconsistent.
 
                 diff = time.time - prev_time.end
                 if diff > 0:
@@ -655,14 +661,14 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 if prev_time.fade == 0:
                     lines_and_times.append((
                         "set_color({r}, {g}, {b}, duration={dt})"
-                        .format(dt=time.wait / self.FPS, **params),
+                        .format(dt=time.wait / self.FPS, **color_params),
                         timer
                     ))
                     timer += time.wait
                 elif prev_time.fade > 0:
                     lines_and_times.append((
                         "fade_to_color({r}, {g}, {b}, duration={dt})"
-                        .format(dt=prev_time.fade / self.FPS, **params),
+                        .format(dt=prev_time.fade / self.FPS, **color_params),
                         timer
                     ))
                     timer += prev_time.fade
