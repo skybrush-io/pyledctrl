@@ -94,7 +94,7 @@ class TimestampedLineCollector(object):
         self.out = out
         self.fps = fps
 
-    def add(self, line, duration):
+    def add(self, line, duration=0):
         """Adds a new line to the line collector object.
 
         The token ``@DT@`` in the line will be replaced by the duration
@@ -110,6 +110,7 @@ class TimestampedLineCollector(object):
 
         line = line.replace("@DT@", str(duration / self.fps))
         self.out.write(self._format_line(line, self._timer))
+
         self._advance_by(duration)
 
     def add_marker(self, marker, time):

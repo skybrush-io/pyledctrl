@@ -19,7 +19,7 @@ from pyledctrl.compiler.utils import get_timestamp_of, \
     TimestampedLineCollector, TimestampWrapper
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
-from pyledctrl.utils import first, grouper
+from pyledctrl.utils import changed_indexes, first, grouper
 from textwrap import dedent
 
 
@@ -616,13 +616,31 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                                  for step in steps_by_channels)
 
             r, g, b = all_channels[:3]
-            pyro_channels = all_channels[3:]
-
             color_params = dict(r=r, g=g, b=b)
+
+            changed_pyro_channels = {
+                ch for ch in changed_indexes(prev_channels, all_channels)
+                if ch >= 3
+            }
+            enabled_pyro_channels = [
+                ch - 3 for ch in changed_pyro_channels
+                if all_channels[ch] >= 220
+            ]
+            if changed_pyro_channels:
+                if enabled_pyro_channels:
+                    pyro_command = "pyro_set_all({0})".format(
+                        ", ".join(map(str, enabled_pyro_channels))
+                    )
+                else:
+                    pyro_command = "pyro_clear()"
+            else:
+                pyro_command = None
 
             if prev_time is None:
                 # This is the first step; process time.wait only as time.fade
-                # will be processed in the next iteration
+                # will be processed in the next iteration.
+                if pyro_command:
+                    lines.add(pyro_command)
                 lines.add(
                     "set_color({r}, {g}, {b}, duration=@DT@)"
                     .format(**color_params), time.wait
@@ -643,7 +661,11 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     raise ValueError("timeline inconsistent; this is "
                                      "probably a bug")
 
+                # Jump handled so we are now at time.time
+
                 if prev_time.fade == 0:
+                    if pyro_command:
+                        lines.add(pyro_command)
                     lines.add(
                         "set_color({r}, {g}, {b}, duration=@DT@)"
                         .format(**color_params), time.wait
@@ -653,12 +675,14 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                         "fade_to_color({r}, {g}, {b}, duration=@DT@)"
                         .format(**color_params), prev_time.fade
                     )
+                    if pyro_command:
+                        lines.add(pyro_command)
                     if time.wait > 0:
                         lines.add("sleep(duration=@DT@)", time.wait)
                 else:
                     raise InvalidDurationError(prev_time.fade + " frames")
 
-            prev_time = time
+            prev_time, prev_channels = time, all_channels
 
         lines.close()
 

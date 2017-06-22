@@ -11,9 +11,38 @@ from itertools import islice
 from pyledctrl.config import DEFAULT_BAUD
 
 
+def changed_indexes(seq1, seq2):
+    """Compares two sequences and returns the indices where the two
+    sequences are different.
+
+    The two sequences are assumed to have the same length.
+
+    When a sequence is ``None``, all the indices of the other sequence are
+    returned.
+
+    When both sequences are ``None``, an empty list is returned.
+
+    Parameters:
+        seq1 (Optional[Seq[object]]): the first sequence
+        seq2 (Optional[Seq[object]]): the second sequence
+
+    Returns:
+        List[int]: a list containing the indices where the two sequences are
+            different
+    """
+    if seq1 is None:
+        return [] if seq2 is None else range(len(seq2))
+    if seq2 is None:
+        return range(len(seq1))
+
+    assert len(seq1) == len(seq2)
+    return [i for i in xrange(len(seq1)) if seq1[i] != seq2[i]]
+
+
 def ensure_tuple(obj):
     """Ensures that the given object is a tuple. If it is not a tuple,
-    returns a tuple containing the object only."""
+    returns a tuple containing the object only.
+    """
     return obj if isinstance(obj, tuple) else obj,
 
 
@@ -30,7 +59,8 @@ def error(message, fatal=False):
 
 def first(iterable):
     """Returns the first element from the given iterable. Raises ``ValueError``
-    if the iterable is empty."""
+    if the iterable is empty.
+    """
     for item in iterable:
         return item
     raise ValueError("iterable is empty")
@@ -115,7 +145,8 @@ class _TemporaryDirectory(object):
     name = None
     _closed = False
 
-    def __init__(self, suffix="", prefix=tempfile.template, dir=None, keep=False):
+    def __init__(self, suffix="", prefix=tempfile.template, dir=None,
+                 keep=False):
         self.name = tempfile.mkdtemp(suffix, prefix, dir)
         self.keep = keep
 
