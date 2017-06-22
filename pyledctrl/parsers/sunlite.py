@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import sys
+
 from bisect import bisect
 from functools import total_ordering
 from itertools import izip_longest
@@ -45,7 +47,7 @@ class SceneFile(object):
             fx.name = filename
             for channel in fx.channels:
                 if channel.timeline is None:
-                    channel.timeline = result.timeline
+                    channel.use_timeline_with_default_value(result.timeline)
                 elif not channel.timeline.has_instants:
                     channel.timeline.fps = result.timeline.fps
                     channel.timeline.copy_instants_from(result.timeline)
@@ -54,7 +56,8 @@ class SceneFile(object):
 
     def shift(self, by):
         """Shifts all the time steps in the timeline of the file by the given
-        amount."""
+        amount.
+        """
         timelines_to_shift = set()
         timelines_to_shift.add(self.timeline)
         for fx in self.fxs:
@@ -143,6 +146,7 @@ class FXChannel(object):
     def __init__(self, index=None, timeline=None):
         self.tag = None
         self.index = index
+        self.default_value = None
         self.timeline = timeline
 
     @classmethod
@@ -151,10 +155,17 @@ class FXChannel(object):
         result = cls()
         result.tag = tag
         result.index = int(tag.get("Index"))
+        if "L" in tag.attrib:
+            result.default_value = int(tag.get("L"))
         timeline_tag = tag.find("EasyStep")
         if timeline_tag is not None:
             result.timeline = EasyStepTimeline.from_xml(timeline_tag)
         return result
+
+    def use_timeline_with_default_value(self, timeline):
+        self.timeline = timeline.copy()
+        if self.default_value is not None:
+            self.timeline.set_constant_value(self.default_value)
 
 
 class EasyStepTimeline(object):
@@ -193,7 +204,8 @@ class EasyStepTimeline(object):
 
         The timeline from where the instants are copied must contain _exactly_
         as many time instants as the number of steps in this object, or
-        at most one more (in which case the last step is repeated)."""
+        at most one more (in which case the last step is repeated).
+        """
         if self.fps != timeline.fps:
             raise ValueError("the two timelines have different fps settings")
 
@@ -219,6 +231,21 @@ class EasyStepTimeline(object):
             pass
         self.instants = list(timeline.instants)
         self._assert_instants_and_steps_consistent()
+
+    def dump(self, fp=sys.stdout):
+        """Dumps some basic data about the channel in a human-readable
+        format for debugging purposes.
+        """
+        import csv
+
+        writer = csv.writer(fp)
+        writer.writerow(["FPS = {0}".format(self.fps)])
+        writer.writerow("Time Fade Wait Value".split())
+        for instant, step in self.iteritems():
+            writer.writerow([
+                instant.time, instant.fade, instant.wait,
+                step.value if step is not None else "---"
+            ])
 
     @classmethod
     def from_xml(cls, tag):
@@ -250,7 +277,8 @@ class EasyStepTimeline(object):
 
     def has_same_instants(self, other):
         """Checks whether this timeline has exactly the same time instants and
-        fps setting as some other timeline."""
+        fps setting as some other timeline.
+        """
         return self.instants == other.instants and self.fps == other.fps
 
     def iteritems(self):
@@ -340,7 +368,7 @@ class EasyStepTimeline(object):
         """
         if self.fps != other.fps:
             raise ValueError("cannot merge timelines with different fps "
-                             "settings ({0!r} and {1!r})"\
+                             "settings ({0!r} and {1!r})"
                              .format(self.fps, other.fps))
 
         self._assert_instants_and_steps_consistent()
@@ -402,9 +430,19 @@ class EasyStepTimeline(object):
             instant.scale_fps(by=factor)
         self.fps = new_fps
 
+    def set_constant_value(self, value):
+        """Updates the time steps of the timeline to have a constant
+        value for all time instants.
+
+        Parameters:
+            value (int): the value to set in each time step
+        """
+        self.steps = [Step(value) for instant in self.instants]
+
     def shifted(self, by):
         """Copies this timeline and shifts all the time steps in the copy by
-        the given amount."""
+        the given amount.
+        """
         copy = self.copy()
         copy.shift(by=by)
         return copy
@@ -416,7 +454,8 @@ class EasyStepTimeline(object):
 
     def shifted(self, by):
         """Copies this timeline and shifts all the time steps in the copy by
-        the given amount."""
+        the given amount.
+        """
         copy = self.copy()
         copy.shift(by=by)
         return copy
@@ -554,6 +593,9 @@ class Time(object):
     def __eq__(self, other):
         return self.time == other.time and self.fade == other.fade and \
             self.wait == other.wait
+
+    def __ne__(self, other):
+        return not self == other
 
     __hash__ = None
 

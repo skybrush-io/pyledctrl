@@ -11,7 +11,6 @@ import logging
 
 from decimal import Decimal
 from functools import partial
-from operator import attrgetter
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError
@@ -128,6 +127,7 @@ class ObjectTargetMixin(object):
 
     @property
     def output(self):
+        """THe output object of the compilation stage."""
         raise NotImplementedError
 
     @property
@@ -245,7 +245,8 @@ class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
 class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
     """Compilation stage that turns a Python source file into an abstract
     syntax tree representation of the LED controller program and saves this
-    representation to permanent storage."""
+    representation to permanent storage.
+    """
 
     def __init__(self, input, output, id=None):
         super(PythonSourceToASTFileCompilationStage, self).__init__()
@@ -317,6 +318,7 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
         return self._ast
 
     def run(self):
+        """Inherited."""
         self.optimiser.optimise(self.input_object)
 
 
@@ -570,6 +572,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             # Okay, great. Now we need to merge the timeline and steps of each
             # channel in the FX of the scene file into our FX, shifted
             # appropriately
+            seen_indexes, timeline = set(), None
             for channel_in_scene_file in fx_in_scene_file.channels:
                 our_channel = fx.channels[channel_in_scene_file.index]
                 our_timeline = our_channel.timeline
@@ -581,6 +584,19 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 timeline.shift(by=shift)
 
                 our_timeline.merge_from(timeline)
+
+                seen_indexes.add(channel_in_scene_file.index)
+
+            # For any channel that was not in the scene file being processed
+            # but is present in our merged FX object, we also need to extend
+            # its timeline to make it stay compatible with the remaining
+            # channels. We arbitrarily use the last timeline seen from the
+            # scene file as a "template".
+            for our_channel in fx.channels:
+                if our_channel.index not in seen_indexes:
+                    our_timeline = our_channel.timeline
+                    our_timeline.merge_from(timeline)
+
 
     def _dump_fx_to_file(self, fx, fp):
         """Processes a single FX component from the merged Sunlite Suite
