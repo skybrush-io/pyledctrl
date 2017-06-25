@@ -12,9 +12,15 @@ from warnings import warn
 
 class SceneFile(object):
     """Represents a parsed Sunlite Suite scene file (with extension
-    ``.sce``)."""
+    ``.sce``).
+    """
 
     def __init__(self, filename=None):
+        """Constructor.
+
+        Parameters:
+            filename (Optional[str]): the name of the scene file, if known
+        """
         self.filename = filename
         self.tag = None
         self.timeline = None
@@ -22,6 +28,13 @@ class SceneFile(object):
 
     @classmethod
     def from_xml(cls, tag, filename=None):
+        """Parses a Sunlite Suite scene file from an XML tag.
+
+        Parameters:
+            tag: the XML tag
+            filename (Optional[str]): name of the file that the tag
+                originates from, if known
+        """
         result = cls(filename=filename)
         result.tag = tag
 
@@ -76,6 +89,13 @@ class Marker(object):
     """
 
     def __init__(self, time, value):
+        """Constructor.
+
+        Parameters:
+            time (int): the time where the marker will appear, in frames
+            value (str): the value of the marker that will be shown as a
+                comment in the generated ``.led`` file
+        """
         self.time = time
         self.value = value
 
@@ -93,7 +113,8 @@ class Marker(object):
 
 class FX(object):
     """Represents an FX object (``<Fx>`` tag) from a Sunlite Suite scene
-    file."""
+    file.
+    """
 
     def __init__(self):
         self.tag = None
@@ -110,8 +131,10 @@ class FX(object):
         result.id = tag.get("ID")
         for index, channel_tag in enumerate(tag.findall("./Ch")):
             channel = FXChannel.from_xml(channel_tag)
-            assert channel.index == index
-            result.channels.append(channel)
+            result._ensure_channel_count_is_at_least(index + 1)
+            assert result.channels[index] is None, \
+                "duplicate channel index in <Fx> tag"
+            result.channels[index] = channel
         return result
 
     def add_channel(self, timeline=None):
@@ -138,10 +161,16 @@ class FX(object):
     def markers(self):
         return self._markers
 
+    def _ensure_channel_count_is_at_least(self, count):
+        current = len(self.channels)
+        if count > current:
+            self.channels.extend([None] * (count - current))
+
 
 class FXChannel(object):
     """Represents an FX channel (``<Ch>`` tag) from a Sunlite Suite scene
-    file."""
+    file.
+    """
 
     def __init__(self, index=None, timeline=None):
         self.tag = None
