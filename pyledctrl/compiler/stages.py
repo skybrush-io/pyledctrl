@@ -524,7 +524,9 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # Run the steps and maintain a list containing the current state of
         # each channel
         for index, time in enumerate(timeline.instants):
-            yield time, (channel.timeline.steps[index] for channel in channels)
+            steps = [channel.timeline.steps[index] for channel in channels]
+            yield time, tuple(step.value if step is not None else 0
+                              for step in steps)
 
     def run(self, environment):
         """Inherited."""
@@ -542,17 +544,20 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 self._process_single_scene_file(scene_file, shift=shift,
                                                 trim=size)
 
-            # Run postprocessing steps on each FX. This is where we ensure
-            # that the pyro master channel gets turned on two seconds before
-            # any of the "real" pyro channels are activated
-            # TODO
-
-            # For each FX, write it into the corresponding output file
+            # For each FX...
             for fx_id in sorted(self.fx_map.keys()):
                 fx = self.fx_map[fx_id]
+
+                # Merge the channels of the FX into a common timeline. The
+                # result is a list containing pairs of time instants and
+                # corresponding channel values for each channel (light and
+                # pyro)
+                merged_channels = list(self._merge_channels(fx.channels))
+
+                # Write the result into the corresponding output file
                 output_file = self.output_files_by_ids[fx.id]
                 with open(output_file, "w") as fp:
-                    self._dump_fx_to_file(fx, fp)
+                    self._dump_fx_to_file(fx, fp, merged_channels)
         finally:
             self.fx_map = None
             self.env = None
@@ -627,7 +632,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     our_timeline = our_channel.timeline
                     our_timeline.merge_from(timeline)
 
-    def _dump_fx_to_file(self, fx, fp):
+    def _dump_fx_to_file(self, fx, fp, merged_channels):
         """Processes a single FX component from the merged Sunlite Suite
         stage files and writes the corresponding bytecode into the given
         file-like object.
@@ -656,10 +661,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         prev_time = None
         prev_pyro = None
 
-        for time, steps_by_channels in self._merge_channels(fx.channels):
-            all_channels = tuple(step.value if step else 0
-                                 for step in steps_by_channels)
-
+        for time, all_channels in merged_channels:
             color, pyro = self._split_color_and_pyro_channels(all_channels)
 
             # Check whether any pyro channels have changed since the
