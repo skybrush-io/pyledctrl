@@ -1,5 +1,8 @@
 """Compilation plan being used in the bytecode compiler."""
 
+from __future__ import division
+
+from collections import defaultdict
 from tqdm import tqdm
 
 __all__ = ("Plan", )
@@ -14,6 +17,7 @@ class Plan(object):
         """Constructor."""
         self._steps = []
         self._output_steps = set()
+        self._callbacks = defaultdict(list)
 
     def add_step(self, step, output=False):
         """Adds the given step to the plan after any other step that has been
@@ -24,10 +28,15 @@ class Plan(object):
             output (bool): whether to mark the step as an output step. The
                 results of steps marked as an output step will be returned
                 by the ``execute()`` method.
+
+        Returns:
+            Continuation: a helper object that can be used to attach hook
+                functions to the execution of the step
         """
         self._steps.append(step)
         if output:
             self._mark_as_output(step)
+        return Continuation(self, step)
 
     def execute(self, environment, force=False, verbose=False):
         """Executes the steps of the plan.
@@ -44,18 +53,49 @@ class Plan(object):
         Raises:
             CompilerError: in case of a compilation error
         """
-        last_step = self._steps[-1] if self._steps else None
         result = []
         bar_format = "{desc}{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}"
-        progress_bar = tqdm(self._steps, bar_format=bar_format)
-        for step in progress_bar:
-            if force or step == last_step or step.should_run():
-                if verbose:
-                    message = self._get_message_for_step(step)
-                    progress_bar.write(message)
-                step.run(environment=environment)
-                if step in self._output_steps:
-                    result.append(step.output)
+
+        step_index, num_steps = 0, len(self._steps)
+
+        with tqdm(total=num_steps, bar_format=bar_format) as progress_bar:
+            while step_index < num_steps:
+                step = self._steps[step_index]
+                is_last = (step_index == num_steps - 1)
+
+                # Jump to the next step
+                step_index += 1
+
+                if force or is_last or step.should_run():
+                    # Print information about the step being executed if
+                    # needed
+                    if verbose:
+                        message = self._get_message_for_step(step)
+                        progress_bar.write(message)
+
+                    # Run the step
+                    step.run(environment=environment)
+
+                    # Call any 'done' callbacks for the step
+                    callbacks = self._callbacks.get((step, "done"))
+                    if callbacks:
+                        for callback in callbacks:
+                            if hasattr(step, "output"):
+                                callback(step.output)
+                            else:
+                                callback()
+
+                    # If this was an output step, collect the result
+                    if step in self._output_steps:
+                        result.append(step.output)
+
+                    # Re-evaluate num_steps because the last step may have
+                    # appended more steps to the plan on-the-fly
+                    num_steps = len(self._steps)
+
+                    # Update the progress bar
+                    progress_bar.total = num_steps
+                    progress_bar.update(1)
 
     def insert_step(self, step, before=None, after=None, output=False):
         """Inserts the given step before or after some other step that is
@@ -81,6 +121,7 @@ class Plan(object):
         self._steps.insert(index, step)
         if output:
             self._mark_as_output(step)
+        return Continuation(self, step)
 
     def iter_steps(self, cls=None):
         """Iterates over the steps of this compilation plan.
@@ -96,6 +137,18 @@ class Plan(object):
             return iter(self._steps)
         else:
             return (step for step in self._steps if isinstance(step, cls))
+
+    def when_step_is_done(self, step, func):
+        """Registers a function to be called when the given compilation
+        step is done.
+
+        Parameters:
+            step (CompilationStage): the compilation stage
+            func (callable): the function to be called. It will be called
+                with the output of the stage if it has an ``output``
+                attribute, or with no arguments otherwise
+        """
+        return self._register_callback(step, "done", func)
 
     def _get_message_for_step(self, step):
         """Returns the message to be shown on the console when the given step
@@ -114,3 +167,34 @@ class Plan(object):
         plan.
         """
         self._output_steps.add(step)
+
+    def _register_callback(self, step, callback_type, func):
+        self._callbacks[step, callback_type].append(func)
+
+
+class Continuation(object):
+    """Helper object that is returned from the ``add_step()`` and
+    ``insert_step()`` methods of Plan_ in order to help specifying hook
+    functions for the execution of a compilation step.
+    """
+
+    def __init__(self, plan, step):
+        """Constructor.
+
+        Parameters:
+            plan (Plan): the compilation plan
+            step (CompilationStage): the compilation step
+        """
+        self.plan = plan
+        self.step = step
+
+    def and_when_done(self, func):
+        """Specifies the given function to be called when the plan finishes
+        the execution of the step. The function will be invoked with the
+        value of the ``output`` property of the step if it has such a
+        property, otherwise it will be invoked with no arguments.
+
+        Parameters:
+            func (callable): the callable to call when the step finishes
+        """
+        self.plan.when_step_is_done(self.step, func)
