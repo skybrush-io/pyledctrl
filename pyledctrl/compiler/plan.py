@@ -11,6 +11,7 @@ class Plan(object):
     """
 
     def __init__(self):
+        """Constructor."""
         self._steps = []
         self._output_steps = set()
 
@@ -60,16 +61,17 @@ class Plan(object):
         Exactly one of ``before`` and ``after`` must be ``None``; the other
         must be a step that is already part of the plan.
 
-        :param step: the step to insert
-        :type step: CompilationStage
-        :param before: the step before which the new step is to be inserted
-        :type before: CompilationStage or None
-        :param after: the step after which the new step is to be inserted
-        :type after: CompilationStage or None
-        :param output: whether to mark the step as an output step
+        Parameters:
+            step (CompilationStage): the step to insert
+            before (Optional[CompilationStage]): the step before which the
+                new step is to be inserted
+            after (Optional[CompilationStage]): the step after which the
+                new step is to be inserted
+            output (bool): whether to mark the step as an output step
         """
         if (before is None) == (after is None):
-            raise ValueError("exactly one of before=... and after=... must be None")
+            raise ValueError("exactly one of before=... and after=... "
+                             "must be None")
         index = self._steps.index(before or after)
         if before is None:
             index += 1
@@ -80,9 +82,12 @@ class Plan(object):
     def iter_steps(self, cls=None):
         """Iterates over the steps of this compilation plan.
 
-        :param cls: optional class filter; when it is not ``None``, only the
-            steps that are instances of the given class are returned
-        :type cls: type or None
+        Parameters:
+            cls (Optional[type]): when it is not ``None``, only the steps
+                that are instances of the given class are returned
+
+        Yields:
+            CompilationStage: each compilation stage in this plan
         """
         if cls is None:
             return iter(self._steps)
