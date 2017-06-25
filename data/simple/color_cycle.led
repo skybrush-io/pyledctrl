@@ -1,4 +1,4 @@
-FADE_DURATION=10
+FADE_DURATION=1
 
 set_color("white", duration=0.1)
 set_color("black", duration=0.1)
