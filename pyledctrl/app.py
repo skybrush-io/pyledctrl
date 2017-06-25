@@ -43,7 +43,8 @@ def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
     logging.basicConfig(level=logging.INFO if verbose else logging.WARNING,
                         format="%(message)s")
 
-    compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=True)
+    compiler = BytecodeCompiler(keep_intermediate_files=keep,
+                                verbose=verbose)
     compiler.optimisation_level = optimisation
     compiler.compile(filename, output)
 

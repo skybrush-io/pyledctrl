@@ -672,9 +672,10 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # Validate the pyro channels; they should always be either 0
                 # or 255. If this is not the case, it may be that something
                 # is messed up in the input file
-                if any(value not in (0, 17) for value in pyro):
+                if any(value not in (0, 255) for value in pyro):
                     self.env.warn("Pyro channel values are invalid at frame "
-                                  "{0.time}: {1!r}".format(time, list(pyro)))
+                                  "{0.time} for FX {1}: {2!r}".format(
+                                      time, fx.id, list(pyro)))
 
                 enabled_pyro_channels = [
                     ch for ch in changed_pyro_channels
