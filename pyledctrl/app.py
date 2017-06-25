@@ -40,8 +40,8 @@ def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
 
-    if verbose:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.basicConfig(level=logging.INFO if verbose else logging.WARNING,
+                        format="%(message)s")
 
     compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=True)
     compiler.optimisation_level = optimisation
@@ -120,4 +120,5 @@ def upload(filename, port=None, baud=DEFAULT_BAUD):
 
 
 def main():
+    """Main entry point of the compiler."""
     sys.exit(pyledctrl.run())

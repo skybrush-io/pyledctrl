@@ -2,6 +2,7 @@
 from input files in various formats.
 """
 
+import logging
 import os
 
 from pyledctrl.compiler.errors import CompilerError, \
@@ -9,6 +10,7 @@ from pyledctrl.compiler.errors import CompilerError, \
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import \
+    CompilationStageExecutionEnvironment, \
     ParsedSunliteScenesToPythonSourceCompilationStage, \
     PythonSourceToASTObjectCompilationStage, \
     SunliteSceneParsingStage, \
@@ -18,6 +20,8 @@ from pyledctrl.compiler.stages import \
     ASTObjectToProgmemHeaderCompilationStage, \
     ASTOptimisationStage
 from pyledctrl.utils import TemporaryDirectory
+
+log = logging.getLogger("pyledctrl.compiler.compiler")
 
 
 def _replace_extension(filename, ext):
@@ -54,6 +58,7 @@ class BytecodeCompiler(object):
         self._optimisation_level = 0
         self.optimisation_level = 2
         self.verbose = verbose
+        self.environment = CompilationStageExecutionEnvironment(self)
 
     def compile(self, input_file, output_file=None, force=True):
         """Runs the compiler.
@@ -105,7 +110,8 @@ class BytecodeCompiler(object):
     def _compile(self, input_file, output_file, force):
         plan = Plan()
         self._collect_stages(input_file, output_file, plan)
-        self.output = plan.execute(force=force, verbose=self.verbose)
+        self.output = plan.execute(self.environment,
+                                   force=force, verbose=self.verbose)
 
     def _collect_stages(self, input_file, output_file, plan):
         """Collects the compilation stages that will turn the given input
@@ -187,7 +193,7 @@ class BytecodeCompiler(object):
     def _add_stages_for_input_sce_file(self, input_file, output_file, plan,
                                        ast_only):
         parsing_stage = SunliteSceneParsingStage(input_file)
-        parsing_stage.run()
+        parsing_stage.run(environment=self.environment)
 
         if ast_only:
             led_file_template = self._create_intermediate_filename(
@@ -222,7 +228,7 @@ class BytecodeCompiler(object):
 
         # Parse the .ses file, and find all the .sce files that we depend on
         ses_parsing_stage = SunliteSwitchParsingStage(input_file)
-        ses_parsing_stage.run()
+        ses_parsing_stage.run(environment=self.environment)
         parsed_ses_file = ses_parsing_stage.output
         sce_dependencies = dict(
             (file_id, os.path.join(dirname, filename) + ".sce")
@@ -233,7 +239,7 @@ class BytecodeCompiler(object):
         for sce_file_id in list(sce_dependencies.keys()):
             filename = sce_dependencies[sce_file_id]
             sce_parsing_stage = SunliteSceneParsingStage(filename)
-            sce_parsing_stage.run()
+            sce_parsing_stage.run(environment=self.environment)
             sce_dependencies[sce_file_id] = sce_parsing_stage.output
 
         # Calculate the final scene ordering

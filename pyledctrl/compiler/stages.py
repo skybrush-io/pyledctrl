@@ -25,6 +25,19 @@ from textwrap import dedent
 log = logging.getLogger("pyledctrl.compiler.stages")
 
 
+class CompilationStageExecutionEnvironment(object):
+    """Execution environment of compilation stages that contains a few
+    functions that the stages may use to access functionality of the
+    compiler itself.
+    """
+
+    def __init__(self, compiler):
+        self._compiler = compiler
+
+    log = log
+    warn = log.warn
+
+
 class CompilationStage(object):
     """Compilation stage that can be executed during a course of compilation.
 
@@ -35,8 +48,14 @@ class CompilationStage(object):
     extension in the end.
     """
 
-    def run(self):
-        """Executes the compilation phase."""
+    def run(self, environment):
+        """Executes the compilation phase.
+
+        Parameters:
+            environment (CompilationStageExecutionEnvironment): the execution
+                environment of the compilation stage, providing useful
+                functions for printing warnings etc
+        """
         raise NotImplementedError
 
     def should_run(self):
@@ -231,7 +250,7 @@ class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
         """Inherited."""
         return self._output
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         context = ExecutionContext()
         with open(self._input) as fp:
@@ -273,7 +292,7 @@ class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
     def output(self, value):
         self._output = value
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         pickle_format, pickler = self._choose_pickler()
         with open(self._output, "wb") as output:
@@ -317,7 +336,7 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
         """Inherited."""
         return self._ast
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         self.optimiser.optimise(self.input_object)
 
@@ -396,7 +415,7 @@ class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
     ``ledctrl upload``.
     """
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         _write_bytecode_from_ast_to_file(self.input_object, self._output_file)
 
@@ -406,7 +425,7 @@ class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
     (functionally equivalent) ``.led`` file.
     """
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         _write_led_source_from_ast_to_file(
             self.input_object, self._output_file)
@@ -418,7 +437,7 @@ class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage
     code with an ``#include`` directive.
     """
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         _write_progmem_header_from_ast_to_file(self.input_object,
                                                self._output_file, self.id)
@@ -426,8 +445,9 @@ class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage
 
 class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationStage):  # noqa
 
-    # TODO(ntamas): make this configurable
+    # TODO(ntamas): make these configurable
     FPS = Decimal(100)
+    PYRO_THRESHOLD = 220
 
     def __init__(self, input, output_template=None):
         """Constructor.
@@ -506,7 +526,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         for index, time in enumerate(timeline.instants):
             yield time, (channel.timeline.steps[index] for channel in channels)
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         # input_object is a sequence containing [(shift, size, scene_file)]
         # pairs such that the given scene_file has to be inserted into the
@@ -514,18 +534,28 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # it by the given amount from t=0
 
         self.fx_map = {}
+        self.env = environment
 
-        for shift, size, scene_file in self.input_object:
-            self._process_single_scene_file(scene_file, shift=shift,
-                                            trim=size)
+        try:
+            # Process each single scene and build the global timeline
+            for shift, size, scene_file in self.input_object:
+                self._process_single_scene_file(scene_file, shift=shift,
+                                                trim=size)
 
-        for fx_id in sorted(self.fx_map.keys()):
-            fx = self.fx_map[fx_id]
-            output_file = self.output_files_by_ids[fx.id]
-            with open(output_file, "w") as fp:
-                self._dump_fx_to_file(fx, fp)
+            # Run postprocessing steps on each FX. This is where we ensure
+            # that the pyro master channel gets turned on two seconds before
+            # any of the "real" pyro channels are activated
+            # TODO
 
-        self.fx_map = None
+            # For each FX, write it into the corresponding output file
+            for fx_id in sorted(self.fx_map.keys()):
+                fx = self.fx_map[fx_id]
+                output_file = self.output_files_by_ids[fx.id]
+                with open(output_file, "w") as fp:
+                    self._dump_fx_to_file(fx, fp)
+        finally:
+            self.fx_map = None
+            self.env = None
 
     def _process_single_scene_file(self, scene_file, shift=0, trim=None):
         """Processes the contents of a single Sunlite Suite scene file that is
@@ -597,7 +627,6 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     our_timeline = our_channel.timeline
                     our_timeline.merge_from(timeline)
 
-
     def _dump_fx_to_file(self, fx, fp):
         """Processes a single FX component from the merged Sunlite Suite
         stage files and writes the corresponding bytecode into the given
@@ -625,24 +654,32 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             lines.add_marker(comment.to_led_source(), time=marker.time)
 
         prev_time = None
-        prev_channels = None
+        prev_pyro = None
 
         for time, steps_by_channels in self._merge_channels(fx.channels):
             all_channels = tuple(step.value if step else 0
                                  for step in steps_by_channels)
 
-            r, g, b = all_channels[:3]
-            color_params = dict(r=r, g=g, b=b)
+            color, pyro = self._split_color_and_pyro_channels(all_channels)
 
-            changed_pyro_channels = {
-                ch for ch in changed_indexes(prev_channels, all_channels)
-                if ch >= 3
-            }
-            enabled_pyro_channels = [
-                ch - 3 for ch in changed_pyro_channels
-                if all_channels[ch] >= 220
+            # Check whether any pyro channels have changed since the
+            # previous step
+            changed_pyro_channels = [
+                ch for ch in changed_indexes(prev_pyro, pyro)
             ]
+
             if changed_pyro_channels:
+                # Validate the pyro channels; they should always be either 0
+                # or 255. If this is not the case, it may be that something
+                # is messed up in the input file
+                if any(value not in (0, 17) for value in pyro):
+                    self.env.warn("Pyro channel values are invalid at frame "
+                                  "{0.time}: {1!r}".format(time, list(pyro)))
+
+                enabled_pyro_channels = [
+                    ch for ch in changed_pyro_channels
+                    if pyro[ch] >= self.PYRO_THRESHOLD
+                ]
                 if enabled_pyro_channels:
                     pyro_command = "pyro_set_all({0})".format(
                         ", ".join(map(str, enabled_pyro_channels))
@@ -659,7 +696,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     lines.add(pyro_command)
                 lines.add(
                     "set_color({r}, {g}, {b}, duration=@DT@)"
-                    .format(**color_params), time.wait
+                    .format(**color), time.wait
                 )
             else:
                 # This is not the first step. We need to check whether there is
@@ -684,12 +721,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                         lines.add(pyro_command)
                     lines.add(
                         "set_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**color_params), time.wait
+                        .format(**color), time.wait
                     )
                 elif prev_time.fade > 0:
                     lines.add(
                         "fade_to_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**color_params), prev_time.fade
+                        .format(**color), prev_time.fade
                     )
                     if pyro_command:
                         lines.add(pyro_command)
@@ -698,13 +735,28 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 else:
                     raise InvalidDurationError(prev_time.fade + " frames")
 
-            prev_time, prev_channels = time, all_channels
+            prev_time, prev_pyro = time, pyro
 
         lines.close()
 
         if fx.name:
             comment = Comment(value="{0!r} ends here".format(fx.name))
             fp.write(comment.to_led_source() + "\n")
+
+    def _split_color_and_pyro_channels(self, all_channels):
+        """Given the values of all the channels at a given time instant,
+        separates them into color and pyro channels.
+
+        Parameters:
+            all_channels (List[int]): the list of channel values
+
+        Returns:
+            (Dict, List[int]): a dictionary with keys ``r``, ``g`` and ``b``
+                for the values of the color channels, and a list containing
+                the values of the pyro channels.
+        """
+        r, g, b = all_channels[:3]
+        return dict(r=r, g=g, b=b), all_channels[3:]
 
 
 class SunliteSceneParsingStage(FileToObjectCompilationStage):
@@ -733,7 +785,7 @@ class SunliteSceneParsingStage(FileToObjectCompilationStage):
             result.shift(self._shift)
         return result
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         self._output = self._parse()
 
@@ -760,6 +812,6 @@ class SunliteSwitchParsingStage(FileToObjectCompilationStage):
         with open(self._input, "rb") as fp:
             return SunliteSuiteSwitchFileParser().parse(fp)
 
-    def run(self):
+    def run(self, environment):
         """Inherited."""
         self._output = self._parse()

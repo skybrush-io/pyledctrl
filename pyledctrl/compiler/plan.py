@@ -29,10 +29,13 @@ class Plan(object):
         if output:
             self._mark_as_output(step)
 
-    def execute(self, force=False, verbose=False):
+    def execute(self, environment, force=False, verbose=False):
         """Executes the steps of the plan.
 
         Parameters:
+            environment (CompilationStageExecutionEnvironment): the exection
+                environment of each compilation stage, provided by the
+                compiler that calls this function
             force (bool): force the execution of all steps even if the steps
                 indicate that they not need to be run
             verbose (bool): whether to print verbose messages about the
@@ -50,7 +53,7 @@ class Plan(object):
                 if verbose:
                     message = self._get_message_for_step(step)
                     progress_bar.write(message)
-                step.run()
+                step.run(environment=environment)
                 if step in self._output_steps:
                     result.append(step.output)
 
