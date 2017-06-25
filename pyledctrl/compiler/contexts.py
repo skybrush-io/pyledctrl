@@ -14,7 +14,8 @@ from functools import wraps
 from pyledctrl.compiler import bytecode
 from pyledctrl.compiler.ast import LoopBlock, Node, StatementSequence
 from pyledctrl.compiler.bytecode import Marker
-from pyledctrl.compiler.errors import DuplicateLabelError, MarkerNotResolvableError
+from pyledctrl.compiler.errors import DuplicateLabelError, \
+    MarkerNotResolvableError
 from pyledctrl.utils import ensure_tuple
 
 
@@ -22,7 +23,8 @@ def _flatten_bytes(iterable):
     """Given an iterable containing bytes objects, Markers and other iterables
     containing bytes object, returns a list that contains the same bytes and
     markers in the same order but "flattened" so there are no nestings
-    wihtin the list."""
+    wihtin the list.
+    """
     return list(_flatten_bytes_helper(iterable))
 
 
@@ -48,12 +50,14 @@ class ExecutionContext(object):
     """
 
     def __init__(self):
+        """Constuctor."""
         self.reset()
 
     @property
     def ast(self):
         """Returns the abstract syntax tree that was parsed after evaluating
-        the source code."""
+        the source code.
+        """
         return self._ast
 
     @property
@@ -76,7 +80,8 @@ class ExecutionContext(object):
 
     def get_globals(self):
         """Returns a dictionary containing the global variables to be made
-        available in the executed file."""
+        available in the executed file.
+        """
         if self._globals is None:
             self._globals = self._construct_globals()
         return self._globals
@@ -144,9 +149,10 @@ class ExecutionContext(object):
     def _postprocess_syntax_tree(self):
         """Post-processes the abstract syntax tree and the additional markers
         collected in ``self._ast`` at the end of an execution, finalizes
-        jump addresses etc."""
+        jump addresses etc.
+        """
         return
-        # TODO: fix this
+        # TODO(ntamas): fix this
         # Find all the jump instructions in the bytecode
         jumps_by_destination = defaultdict(list)
         for item in self._bytecode:
@@ -161,7 +167,7 @@ class ExecutionContext(object):
             for address, item in enumerate(self._bytecode):
                 if isinstance(item, bytecode.LabelMarker):
                     for jump in jumps_by_destination.get(item.name, []):
-                        jump.resolve_to_address(address-address_offset)
+                        jump.resolve_to_address(address - address_offset)
                     address_offset += 1
 
             # We can now eliminate all label markers.
@@ -193,6 +199,6 @@ class ExecutionContext(object):
                     replacement = marker.to_ast_node()
                 if replacement is not None:
                     replacement = _flatten_bytes(ensure_tuple(replacement))
-                    self._bytecode[index:(index+1)] = replacement
-                    length += len(replacement)-1
+                    self._bytecode[index:(index + 1)] = replacement
+                    length += len(replacement) - 1
             index += 1
