@@ -138,17 +138,25 @@ class Plan(object):
         else:
             return (step for step in self._steps if isinstance(step, cls))
 
-    def when_step_is_done(self, step, func):
+    def when_step_is_done(self, step, func=None):
         """Registers a function to be called when the given compilation
         step is done.
 
         Parameters:
             step (CompilationStage): the compilation stage
-            func (callable): the function to be called. It will be called
-                with the output of the stage if it has an ``output``
-                attribute, or with no arguments otherwise
+            func (Optional[callable]): the function to be called. It will be
+                called with the output of the stage if it has an ``output``
+                attribute, or with no arguments otherwise. When omitted, the
+                function acts as a decorator, i.e. it will return another
+                function that registers the decorated function as a callback.
         """
-        return self._register_callback(step, "done", func)
+        if func is not None:
+            return self._register_callback(step, "done", func)
+        else:
+            def decorator(decorated):
+                self.when_step_is_done(step, decorated)
+                return decorated
+            return decorator
 
     def _get_message_for_step(self, step):
         """Returns the message to be shown on the console when the given step

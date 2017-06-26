@@ -172,7 +172,7 @@ class BytecodeCompiler(object):
         # an output file for each AST object. We cannot do this in advance
         # because it may happen that there are already some callbacks
         # registered on the AST step that create new steps in the plan.
-        # TODO(ntamas): use decorator syntax here
+        @plan.when_step_is_done(ast_step)
         def generate_output_files(output):
             # We need to generate an output file for each AST object.
             for stage in plan.iter_steps(PythonSourceToASTObjectCompilationStage):
@@ -189,8 +189,6 @@ class BytecodeCompiler(object):
                                                     real_output_file,
                                                     id=stage.id)
                 plan.insert_step(output_stage, after=optimization_stage)
-
-        plan.when_step_is_done(ast_step, generate_output_files)
 
     def _add_stages_for_input_led_file(self, input_file, output_file, plan,
                                        ast_only):
@@ -214,6 +212,10 @@ class BytecodeCompiler(object):
             led_file_template = self._create_intermediate_filename(
                 output_file, ".led")
 
+        parsing_stage = SunliteSceneParsingStage(input_file)
+        plan.add_step(parsing_stage)
+
+        @plan.when_step_is_done(parsing_stage)
         def create_next_stages(output):
             preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
                 [(0, None, output)], led_file_template
@@ -225,8 +227,6 @@ class BytecodeCompiler(object):
                     intermediate_file, id=id)
                 plan.add_step(stage, output=ast_only)
 
-        parsing_stage = SunliteSceneParsingStage(input_file)
-        plan.add_step(parsing_stage).and_when_done(create_next_stages)
         return stage
 
     def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
