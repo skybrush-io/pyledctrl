@@ -543,6 +543,7 @@ class EasyStepTimeline(object):
         return copy
 
 
+@total_ordering
 class Time(object):
     """Represents a ``<Time>`` tag from an ``<EasyStep>`` timeline object.
 
@@ -610,21 +611,29 @@ class Time(object):
 
     def shifted(self, by):
         """Returns a copy of the time step after shifting it on the time axis by
-        the given amount."""
+        the given amount.
+        """
         return self.copy(shift_by=by)
 
     @property
     def total_duration(self):
         """The total duration of the time step on the timeline. The total
-        duration is the sum of the wait time and the fade time."""
+        duration is the sum of the wait time and the fade time.
+        """
         return self.wait + self.fade
 
     def __eq__(self, other):
         return self.time == other.time and self.fade == other.fade and \
             self.wait == other.wait
 
-    def __ne__(self, other):
-        return not self == other
+    def __lt__(self, other):
+        if self.time < other.time:
+            return True
+        if self.time == other.time:
+            if self.fade < other.fade:
+                return True
+            if self.fade == other.fade:
+                return self.wait < other.wait
 
     __hash__ = None
 

@@ -15,7 +15,7 @@ from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.errors import InvalidDurationError
 from pyledctrl.compiler.utils import get_timestamp_of, \
-    TimestampedLineCollector, TimestampWrapper
+    TimestampedLineCollector, TimestampWrapper, UnifiedTimeline
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
 from pyledctrl.utils import changed_indexes, first, grouper
@@ -466,6 +466,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
     # TODO(ntamas): make these configurable
     FPS = Decimal(100)
     PYRO_THRESHOLD = 220
+    PYRO_MASTER_CHANNEL = 6
 
     def __init__(self, input, output_template=None):
         """Constructor.
@@ -541,10 +542,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
         # Run the steps and maintain a list containing the current state of
         # each channel
+        result = UnifiedTimeline()
         for index, time in enumerate(timeline.instants):
             steps = [channel.timeline.steps[index] for channel in channels]
-            yield time, tuple(step.value if step is not None else 0
-                              for step in steps)
+            result.add(time, tuple(step.value if step is not None else 0
+                                   for step in steps))
+        return result
 
     def run(self, environment):
         """Inherited."""
@@ -570,7 +573,37 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # result is a list containing pairs of time instants and
                 # corresponding channel values for each channel (light and
                 # pyro)
-                merged_channels = list(self._merge_channels(fx.channels))
+                merged_channels = self._merge_channels(fx.channels)
+
+                # Insert the extra pyro master channel. Pyro channels are
+                # indexed from zero, so PYRO_MASTER_CHANNEL = 6 means that
+                # there will be at least seven pyro channels, and the
+                # last one will be 1 about one second before at least one
+                # other pyro channel turns 1
+                merged_channels.ensure_min_channel_count(
+                    self.PYRO_MASTER_CHANNEL + 3 + 1
+                )
+                prev_pyro, prev_active = None, False
+                pyro_master_on = []
+                for time, all_channels in merged_channels:
+                    color, pyro = self._split_channels(all_channels)
+                    if pyro == prev_pyro:
+                        continue
+
+                    active = any(v >= self.PYRO_THRESHOLD for v in pyro)
+                    if active and not prev_active:
+                        new_time = max(time.time - self.FPS, 0)
+                        pyro_master_on.append((new_time, None))
+                    elif not active and prev_active:
+                        new_time = time.time + self.FPS
+                        pyro_master_on[-1] = (pyro_master_on[-1][0], new_time)
+
+                    prev_active = active
+
+                for start, end in pyro_master_on:
+                    merged_channels.set_channel_value_in_range(
+                        start, end, self.PYRO_MASTER_CHANNEL + 3, 255
+                    )
 
                 # Write the result into the corresponding output file
                 output_file = self.output_files_by_ids[fx.id]
@@ -680,7 +713,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         prev_pyro = None
 
         for time, all_channels in merged_channels:
-            color, pyro = self._split_color_and_pyro_channels(all_channels)
+            color, pyro = self._split_channels(all_channels)
 
             # Check whether any pyro channels have changed since the
             # previous step
@@ -698,8 +731,8 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                                       time, fx.id, list(pyro)))
 
                 enabled_pyro_channels = [
-                    ch for ch in changed_pyro_channels
-                    if pyro[ch] >= self.PYRO_THRESHOLD
+                    index for index, value in enumerate(pyro)
+                    if value >= self.PYRO_THRESHOLD
                 ]
                 if enabled_pyro_channels:
                     pyro_command = "pyro_set_all({0})".format(
@@ -764,7 +797,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             comment = Comment(value="{0!r} ends here".format(fx.name))
             fp.write(comment.to_led_source() + "\n")
 
-    def _split_color_and_pyro_channels(self, all_channels):
+    def _split_channels(self, all_channels):
         """Given the values of all the channels at a given time instant,
         separates them into color and pyro channels.
 

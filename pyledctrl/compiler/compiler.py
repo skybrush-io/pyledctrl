@@ -187,12 +187,12 @@ class BytecodeCompiler(object):
 
                 optimization_stage = ASTOptimisationStage(stage,
                                                           self._optimiser)
-                plan.insert_step(optimization_stage, after=stage)
+                plan.add_step(optimization_stage)
 
                 output_stage = output_stage_factory(optimization_stage,
                                                     real_output_file,
                                                     id=stage.id)
-                plan.insert_step(output_stage, after=optimization_stage)
+                plan.add_step(output_stage)
 
     def _add_stages_for_input_led_file(self, input_file, output_file, plan,
                                        ast_only):

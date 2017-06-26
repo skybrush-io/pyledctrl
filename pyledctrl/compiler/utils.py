@@ -3,7 +3,10 @@
 from __future__ import division
 
 from bisect import bisect, bisect_left
+from itertools import izip
 from time import time
+
+from pyledctrl.parsers.sunlite import Time
 
 
 def get_timestamp_of(obj, default_value=None):
@@ -88,6 +91,8 @@ class TimestampedLineCollector(object):
             fps (int): number of frames per second
         """
         self._add_timestamps = True
+        self._formatted_ticks_cache = {}
+        self._fps = None
         self._markers = []
         self._marker_index = 0
         self._timer = 0
@@ -102,8 +107,8 @@ class TimestampedLineCollector(object):
 
         Parameters:
             line (str): the line to add
-            duration (int): the duration of the execution of the line,
-                in frames
+            duration (decimal.Decimal): the duration of the execution of
+                the line, in frames
         """
         if duration > 0:
             self._print_markers_until(self._timer + 1)
@@ -141,6 +146,19 @@ class TimestampedLineCollector(object):
                 self._advance_to(max_time)
 
     @property
+    def fps(self):
+        """Number of frames per second."""
+        return self._fps
+
+    @fps.setter
+    def fps(self, value):
+        if self._fps == value:
+            return
+
+        self._fps = value
+        self._formatted_ticks_cache = {}
+
+    @property
     def timer(self):
         """The state of the current timer, in frames."""
         return self._timer
@@ -175,12 +193,17 @@ class TimestampedLineCollector(object):
         return line + "\n"
 
     def _format_frame_count_as_time(self, frames):
-        seconds, residual = divmod(frames, self.fps)
-        minutes, seconds = divmod(seconds, 60)
-        return "{minutes}:{seconds:02}+{residual:02} ({frames} frames)".format(
-            minutes=int(minutes), seconds=int(seconds),
-            residual=int(residual), frames=int(frames)
-        )
+        result = self._formatted_ticks_cache.get(frames)
+        if not result:
+            seconds, residual = divmod(frames, self.fps)
+            minutes, seconds = divmod(seconds, 60)
+            result = "{minutes}:{seconds:02}+{residual:02} "\
+                "({frames} frames)".format(
+                    minutes=int(minutes), seconds=int(seconds),
+                    residual=int(residual), frames=int(frames)
+                )
+            self._formatted_ticks_cache[frames] = result
+        return result
 
     def _print_markers_until(self, timer):
         next_index = bisect_left(self._markers, (timer, None))
@@ -188,3 +211,136 @@ class TimestampedLineCollector(object):
             timestamp, marker = self._markers[i]
             self.out.write(self._format_line(marker))
         self._marker_index = next_index
+
+
+class UnifiedTimeline(object):
+    """Unified timeline object that contains a time axis with time instant.
+    and a list of associated channel values for each time instant. The time
+    instants have the following properties:
+
+    - ``time`` - the time, in frames
+
+    - ``fade`` - fade time into the time instant, in frames
+
+    - ``wait`` - wait time after the time instant, in frames
+    """
+
+    @classmethod
+    def from_times_and_channels(cls, iterable):
+        """Constructs a unified timeline from an iterable that yields
+        pairs of time instants and channel values. The time instants
+        yielded by the iterable must be sorted.
+        """
+        result = cls()
+        result.times, result.channels = izip(*iterable)
+
+    def __init__(self):
+        """Constructor."""
+        self._last_time = -1
+        self.times = []
+        self.channels = []
+
+    def add(self, time, channels):
+        """Adds a new time instant with the corresponding channel values.
+
+        Parameters:
+            time (Time): the time instant
+            channels (Iterable[int]): the channel values corresponding to
+                the time instant
+        """
+        if time.time >= self._last_time:
+            self.times.append(time)
+            self.channels.append(list(channels))
+        else:
+            raise ValueError("UnifiedTimeline.add() must be called in "
+                             "sorted order")
+        self._last_time = time.time
+
+    def ensure_min_channel_count(self, num_channels):
+        """Ensures that there are at least the given number of channels for
+        each time instant in the timeline.
+
+        Parameters:
+            num_channels (int): the minimum number of channels
+        """
+        for values in self.channels:
+            if len(values) < num_channels:
+                values.extend([0] * (num_channels - len(values)))
+
+    def set_channel_value_at(self, time, channel_index, value):
+        """Sets the value of the channel with the given index to the given
+        value on the time axis.
+
+        Parameters:
+            time (int): the time instant
+            channel_index (int): the channel index
+            value (int): the channel value
+        """
+        place = self._find_time(time)
+        self.channels[place][channel_index] = value
+
+    def set_channel_value_in_range(self, start, end, channel_index, value):
+        """Sets the value of the channel with the given index to the given
+        value on the time axis in the given range.
+
+        Parameters:
+            start (int): the start time
+            end (int): the end time
+            channel_index (int): the channel index
+            value (int): the channel value
+        """
+        start_index = self._find_time(start)
+        if end is not None:
+            end_index = self._find_time(end)
+        else:
+            end_index = len(self.times)
+        for place in xrange(start_index, end_index):
+            self.channels[place][channel_index] = value
+
+    def _find_time(self, time):
+        dummy_time = Time(time=time)
+        place = bisect_left(self.times, dummy_time)
+        if place >= len(self.times):
+            # New timestamp has to be inserted at the end
+            # TODO(ntamas): implement this
+            raise NotImplementedError
+        elif self.times[place].time != time:
+            # Timestamp does not exist yet
+            if place == 0:
+                # New timestamp has to be inserted at the beginning
+                # TODO(ntamas): implement this
+                raise NotImplementedError
+            else:
+                prev_time = self.times[place - 1]
+                prev_channels = self.channels[place - 1]
+                if prev_time.fade != 0 and prev_time.wait != 0:
+                    raise ValueError("time instants with both fade and "
+                                     "wait times are not handled yet")
+
+                diff = time - prev_time.time
+                if prev_time.fade:
+                    ratio = diff / prev_time.fade
+                    dummy_time.fade = prev_time.fade - diff
+                    prev_time.fade = diff
+                    next_channels = self.channels[place]
+                    new_channels = [
+                        ratio * next_channels[i] +
+                        (1 - ratio) * prev_channels[i]
+                        for i in xrange(len(prev_channels))
+                    ]
+                if prev_time.wait:
+                    dummy_time.wait = prev_time.wait - diff
+                    prev_time.wait = diff
+                    new_channels = list(prev_channels)
+
+                # Make sure that pyro channels are not interpolated
+                if len(new_channels) >= 3:
+                    new_channels[3:] = prev_channels[3:]
+
+                self.times.insert(place, dummy_time)
+                self.channels.insert(place, new_channels)
+
+        return place
+
+    def __iter__(self):
+        return izip(self.times, self.channels)
