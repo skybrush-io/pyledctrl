@@ -5,11 +5,14 @@ from input files in various formats.
 import logging
 import os
 
+from functools import partial
+
 from pyledctrl.compiler.errors import CompilerError, \
     UnsupportedInputFileFormatError
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import \
+    DummyStage, \
     CompilationStageExecutionEnvironment, \
     ParsedSunliteScenesToPythonSourceCompilationStage, \
     PythonSourceToASTObjectCompilationStage, \
@@ -173,9 +176,10 @@ class BytecodeCompiler(object):
         # because it may happen that there are already some callbacks
         # registered on the AST step that create new steps in the plan.
         @plan.when_step_is_done(ast_step)
-        def generate_output_files(output):
+        def generate_output_files(output=None):
             # We need to generate an output file for each AST object.
-            for stage in plan.iter_steps(PythonSourceToASTObjectCompilationStage):
+            ast_stage_class = PythonSourceToASTObjectCompilationStage
+            for stage in plan.iter_steps(ast_stage_class):
                 if getattr(stage, "id", None) is not None:
                     real_output_file = output_file.replace("{}", stage.id)
                 else:
@@ -222,12 +226,13 @@ class BytecodeCompiler(object):
             )
             plan.add_step(preproc_stage)
 
-            for id, intermediate_file in preproc_stage.output_files_by_ids.items():
+            intermediate_files = preproc_stage.output_files_by_ids.items()
+            for id, intermediate_file in intermediate_files:
                 stage = PythonSourceToASTObjectCompilationStage(
                     intermediate_file, id=id)
                 plan.add_step(stage, output=ast_only)
 
-        return stage
+        return parsing_stage
 
     def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
                                        ast_only):
@@ -236,61 +241,92 @@ class BytecodeCompiler(object):
         # are in the same directory
         dirname = os.path.dirname(input_file)
 
+        # Create filename templates for the LED files
+        if ast_only:
+            led_file_template = self._create_intermediate_filename(
+                "stage{}_" + input_file, ".led"
+            )
+        else:
+            if "{}" not in output_file:
+                raise CompilerError(
+                    "output file needs to include a {} placeholder for the "
+                    "FX identifier when compiling a Sunlite Suite scene "
+                    "file"
+                )
+            led_file_template = self._create_intermediate_filename(
+                output_file, ".led")
+
+        # Parse the .ses file, and find all the .sce files that we depend on
+        ses_parsing_stage = SunliteSwitchParsingStage(input_file)
+        plan.add_step(ses_parsing_stage)
+
+        # Create a dummy stage that will be reached when we have added all
+        # the steps in the plan that eventually yields an AST (abstract
+        # syntax tree)
+        marker_stage = DummyStage()
+        plan.add_step(marker_stage)
+        add_step = partial(plan.insert_step, before=marker_stage)
+
         # Define the "continuation function" for the stage that parses the
         # .ses file. The continuation is responsible for parsing each
         # .sce file that the .ses file depends on
+        @plan.when_step_is_done(ses_parsing_stage)
         def parse_scene_files(parsed_ses_file):
             sce_dependencies = dict(
                 (file_id, os.path.join(dirname, filename) + ".sce")
                 for file_id, filename in parsed_ses_file.files.iteritems()
             )
 
-            # Parse each .sce file into an in-memory object
+            # Add steps to parse each .sce file into an in-memory object.
+            # At the end of each such step, store the result back into
+            # sce_dependencies
+            def store_parsed_scene_file(id, parsed_sce_file):
+                sce_dependencies[id] = parsed_sce_file
+
+            sce_parsing_stages = []
             for sce_file_id in list(sce_dependencies.keys()):
                 filename = sce_dependencies[sce_file_id]
                 sce_parsing_stage = SunliteSceneParsingStage(filename)
-                sce_parsing_stage.run(environment=self.environment)
-                sce_dependencies[sce_file_id] = sce_parsing_stage.output
-
-            # Calculate the final scene ordering
-            scene_order = [
-                (button.position, button.size, sce_dependencies[button.name])
-                for button in parsed_ses_file.buttons
-            ]
-
-            # Create filename templates for the LED files
-            if ast_only:
-                led_file_template = self._create_intermediate_filename(
-                    "stage{}_" + input_file, ".led"
+                sce_parsing_stages.append(sce_parsing_stage)
+                add_step(sce_parsing_stage).and_when_done(
+                    partial(store_parsed_scene_file, sce_file_id)
                 )
-            else:
-                if "{}" not in output_file:
-                    raise CompilerError(
-                        "output file needs to include a {} placeholder for the "
-                        "FX identifier when compiling a Sunlite Suite scene "
-                        "file"
+
+            # When the last .sce file has been parsed, we need to
+            # calculate the final scene ordering and then add steps
+            # to convert the .sce files into the abstract syntax tree
+            # (AST) representation
+            last_sce_parsing_stage = sce_parsing_stages[-1]
+            if not last_sce_parsing_stage:
+                return
+
+            @plan.when_step_is_done(last_sce_parsing_stage)
+            def convert_scene_files_to_ast(output):
+                # Calculate the final scene ordering
+                scene_order = [
+                    (btn.position, btn.size, sce_dependencies[btn.name])
+                    for btn in parsed_ses_file.buttons
+                ]
+
+                # Add the preprocessing stage that merges multiple Sunlite
+                # Suite scene files into .led (Python) source files, sorted
+                # by FX IDs
+                preproc_stage = \
+                    ParsedSunliteScenesToPythonSourceCompilationStage(
+                        scene_order, led_file_template
                     )
-                led_file_template = self._create_intermediate_filename(
-                    output_file, ".led")
+                add_step(preproc_stage)
 
-            # Add the preprocessing stage that merges multiple Sunlite Suite scene
-            # files into .led (Python) source files, sorted by FX IDs
-            preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
-                scene_order, led_file_template
-            )
-            plan.add_step(preproc_stage)
+                # For each intermediate .led (Python) file created in the
+                # preprocessing stage, add a stage to compile the
+                # corresponding .ast file
+                intermediate_files = preproc_stage.output_files_by_ids.items()
+                for id, intermediate_file in intermediate_files:
+                    stage = PythonSourceToASTObjectCompilationStage(
+                        intermediate_file, id=id)
+                    add_step(stage, output=ast_only)
 
-            # For each intermediate .led (Python) file created in the preprocessing
-            # stage, add a stage to compile the corresponding .ast file
-            for id, intermediate_file in preproc_stage.output_files_by_ids.items():
-                stage = PythonSourceToASTObjectCompilationStage(intermediate_file,
-                                                                id=id)
-                plan.add_step(stage, output=ast_only)
-
-        # Parse the .ses file, and find all the .sce files that we depend on
-        ses_parsing_stage = SunliteSwitchParsingStage(input_file)
-        plan.add_step(ses_parsing_stage).and_when_done(parse_scene_files)
-        return ses_parsing_stage
+        return marker_stage
 
     def _create_intermediate_filename(self, output_file, ext):
         """Creates an intermediate filename or filename template from the

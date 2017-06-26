@@ -32,6 +32,12 @@ class CompilationStageExecutionEnvironment(object):
     """
 
     def __init__(self, compiler):
+        """Constructor.
+
+        Parameters:
+            compiler (BytecodeCompiler): the compiler that owns this
+                environment
+        """
         self._compiler = compiler
 
     log = log
@@ -64,6 +70,18 @@ class CompilationStage(object):
         up-to-date so there is no need to re-run the compilation phase.
         """
         raise NotImplementedError
+
+
+class DummyStage(CompilationStage):
+    """Dummy stage that does nothing on its own."""
+
+    def run(self, environment):
+        """Inherited."""
+        pass
+
+    def should_run(self):
+        """Inherited."""
+        return True
 
 
 class FileSourceMixin(object):

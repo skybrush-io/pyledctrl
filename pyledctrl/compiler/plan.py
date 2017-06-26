@@ -63,9 +63,6 @@ class Plan(object):
                 step = self._steps[step_index]
                 is_last = (step_index == num_steps - 1)
 
-                # Jump to the next step
-                step_index += 1
-
                 if force or is_last or step.should_run():
                     # Print information about the step being executed if
                     # needed
@@ -92,10 +89,13 @@ class Plan(object):
                     # Re-evaluate num_steps because the last step may have
                     # appended more steps to the plan on-the-fly
                     num_steps = len(self._steps)
+                    new_step_index = self._steps.index(step) + 1
+                    delta_step_index = new_step_index - step_index
+                    step_index = new_step_index
 
                     # Update the progress bar
                     progress_bar.total = num_steps
-                    progress_bar.update(1)
+                    progress_bar.update(delta_step_index)
 
     def insert_step(self, step, before=None, after=None, output=False):
         """Inserts the given step before or after some other step that is
