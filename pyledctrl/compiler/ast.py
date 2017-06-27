@@ -583,7 +583,10 @@ class ChannelValues(Byte):
         return chr(self._to_byte())
 
     def to_led_source(self):
-        return str(tuple(sorted(self._channels)))[1:-1]
+        if len(self._channels) != 1:
+            return str(tuple(sorted(self._channels)))[1:-1]
+        else:
+            return str(list(self._channels)[0])
 
     @property
     def channels(self):
@@ -1102,7 +1105,10 @@ class SetPyroAllCommand(Command):
 
     def to_led_source(self):
         value = self._values.to_led_source()
-        return "pyro_set_all({0})".format(value)
+        if value:
+            return "pyro_set_all({0})".format(value)
+        else:
+            return "pyro_clear_all()"
 
 
 class LoopBlock(Statement):
