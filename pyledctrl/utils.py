@@ -7,7 +7,7 @@ import shutil
 import sys
 import tempfile
 
-from itertools import islice
+from itertools import islice, izip, tee
 from pyledctrl.config import DEFAULT_BAUD
 
 
@@ -38,6 +38,20 @@ def changed_indexes(seq1, seq2):
     assert len(seq1) == len(seq2)
     return [i for i in xrange(len(seq1)) if seq1[i] != seq2[i]]
 
+
+def consecutive_pairs(iterable):
+    """Given an iterable, returns a generator that generates consecutive
+    pairs of items from the iterable.
+
+    Parameters:
+        iteable (Iterable): the iterable
+
+    Yields:
+        (object, object): pairs of consecutive items from the iterable
+    """
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
 
 def ensure_tuple(obj):
     """Ensures that the given object is a tuple. If it is not a tuple,
