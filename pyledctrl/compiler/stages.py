@@ -592,10 +592,10 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                     active = any(v >= self.PYRO_THRESHOLD for v in pyro)
                     if active and not prev_active:
-                        new_time = max(time.time - self.FPS, 0)
+                        new_time = max(time.time - int(self.FPS), 0)
                         pyro_master_on.append((new_time, None))
                     elif not active and prev_active:
-                        new_time = time.time + self.FPS
+                        new_time = time.time + int(self.FPS)
                         pyro_master_on[-1] = (pyro_master_on[-1][0], new_time)
 
                     prev_active = active
@@ -730,28 +730,40 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                                   "{0.time} for FX {1}: {2!r}".format(
                                       time, fx.id, list(pyro)))
 
-                enabled_pyro_channels = [
-                    index for index, value in enumerate(pyro)
-                    if value >= self.PYRO_THRESHOLD
-                ]
-                if enabled_pyro_channels:
-                    pyro_command = "pyro_set_all({0})".format(
-                        ", ".join(map(str, enabled_pyro_channels))
-                    )
+                if len(changed_pyro_channels) == 1:
+                    # Only one pyro channel changed so we can generate a
+                    # pyro_enable() or pyro_disable() command
+                    changed = changed_pyro_channels[0]
+                    if pyro[changed] >= self.PYRO_THRESHOLD:
+                        pyro_command = "pyro_enable({0})".format(changed)
+                    else:
+                        pyro_command = "pyro_disable({0})".format(changed)
                 else:
-                    pyro_command = "pyro_clear()"
+                    # More than one channel changed so we generate a
+                    # pyro_set_all() command
+                    enabled_pyro_channels = [
+                        index for index, value in enumerate(pyro)
+                        if value >= self.PYRO_THRESHOLD
+                    ]
+                    if enabled_pyro_channels:
+                        pyro_command = "pyro_set_all({0})".format(
+                            ", ".join(map(str, enabled_pyro_channels))
+                        )
+                    else:
+                        pyro_command = "pyro_clear()"
             else:
                 pyro_command = None
 
             if prev_time is None:
-                # This is the first step; process time.wait only as time.fade
-                # will be processed in the next iteration.
-                if pyro_command:
-                    lines.add(pyro_command)
+                # This is the first step; handle the pyro command only
+                # because we will only know where to fade to after we have
+                # seen the next step.
                 lines.add(
                     "set_color({r}, {g}, {b}, duration=@DT@)"
                     .format(**color), time.wait
                 )
+                if pyro_command:
+                    lines.add(pyro_command)
             else:
                 # This is not the first step. We need to check whether there is
                 # a "jump" in the timeline, which may happen if
@@ -763,6 +775,9 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                 diff = time.time - prev_time.end
                 if diff > 0:
+                    self.env.warn("Jump in timeline from frame {0} to {1}; "
+                                  "this might not be handled correctly yet."
+                                  .format(prev_time.end, time.time))
                     lines.add("sleep(duration=@DT@)", diff)
                 elif diff < 0:
                     raise ValueError("timeline inconsistent; this is "
