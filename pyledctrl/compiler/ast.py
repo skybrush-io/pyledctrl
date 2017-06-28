@@ -1108,7 +1108,7 @@ class SetPyroAllCommand(Command):
         if value:
             return "pyro_set_all({0})".format(value)
         else:
-            return "pyro_clear_all()"
+            return "pyro_clear()"
 
 
 class LoopBlock(Statement):
