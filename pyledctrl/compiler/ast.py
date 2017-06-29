@@ -541,7 +541,10 @@ class ChannelMask(Byte):
         return chr(self._to_byte())
 
     def to_led_source(self):
-        return str(tuple(sorted(self._channels)))[1:-1]
+        if len(self._channels) == 1:
+            return str(tuple(self._channels)[0])
+        else:
+            return str(tuple(sorted(self._channels)))[1:-1]
 
     def _set_channels(self, value):
         if any(ch < 0 or ch > 6 for ch in value):
