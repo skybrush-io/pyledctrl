@@ -151,7 +151,7 @@ class BytecodeCompiler(object):
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
-        if ext == ".led":
+        if ext == ".led" or ext == ".oled":
             func = self._add_stages_for_input_led_file
         elif ext == ".sce":
             func = self._add_stages_for_input_sce_file
