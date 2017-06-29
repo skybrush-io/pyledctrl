@@ -9,6 +9,7 @@ except ImportError:
 
 import logging
 
+from contextlib import closing
 from decimal import Decimal
 from functools import partial
 from pyledctrl.compiler.ast import Comment
@@ -18,7 +19,7 @@ from pyledctrl.compiler.utils import get_timestamp_of, \
     TimestampedLineCollector, TimestampWrapper, UnifiedTimeline
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
-from pyledctrl.utils import changed_indexes, first, grouper
+from pyledctrl.utils import changed_indexes, consecutive_pairs, first, grouper
 from textwrap import dedent
 
 
@@ -547,6 +548,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             steps = [channel.timeline.steps[index] for channel in channels]
             result.add(time, tuple(step.value if step is not None else 0
                                    for step in steps))
+
+        # TODO: if first time instant is not at zero time, insert a fake
+        # entry.
+        if timeline.instants[0].time != 0:
+            self.env.warn("First time step does not start at T=0")
+
         return result
 
     def run(self, environment):
@@ -600,6 +607,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                     prev_active = active
 
+                pyro_master_on = []
                 for start, end in pyro_master_on:
                     merged_channels.set_channel_value_in_range(
                         start, end, self.PYRO_MASTER_CHANNEL + 3, 255
@@ -709,104 +717,93 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             comment = Comment(value=marker.value)
             lines.add_marker(comment.to_led_source(), time=marker.time)
 
-        prev_time = None
-        prev_pyro = None
+        with closing(lines):
+            channel_iter = consecutive_pairs(merged_channels)
 
-        for time, all_channels in merged_channels:
-            color, pyro = self._split_channels(all_channels)
+            last_color, last_pyro = None, None
+            for (time, channels), (next_time, next_channels) in channel_iter:
+                # Separate color and pyro channels
+                color, pyro = self._split_channels(channels)
 
-            # Check whether any pyro channels have changed since the
-            # previous step
-            changed_pyro_channels = [
-                ch for ch in changed_indexes(prev_pyro, pyro)
-            ]
+                # We are at 'time'. First, we handle the pyro channels.
+                # Check whether any pyro channels have changed since the
+                # previous step
+                changed_pyro_channels = [
+                    ch for ch in changed_indexes(last_pyro, pyro)
+                ]
 
-            if changed_pyro_channels:
-                # Validate the pyro channels; they should always be either 0
-                # or 255. If this is not the case, it may be that something
-                # is messed up in the input file
-                if any(value not in (0, 255) for value in pyro):
-                    self.env.warn("Pyro channel values are invalid at frame "
-                                  "{0.time} for FX {1}: {2!r}".format(
-                                      time, fx.id, list(pyro)))
-
-                if len(changed_pyro_channels) == 1:
-                    # Only one pyro channel changed so we can generate a
-                    # pyro_enable() or pyro_disable() command
-                    changed = changed_pyro_channels[0]
-                    if pyro[changed] >= self.PYRO_THRESHOLD:
-                        pyro_command = "pyro_enable({0})".format(changed)
-                    else:
-                        pyro_command = "pyro_disable({0})".format(changed)
-                else:
-                    # More than one channel changed so we generate a
-                    # pyro_set_all() command
-                    enabled_pyro_channels = [
-                        index for index, value in enumerate(pyro)
-                        if value >= self.PYRO_THRESHOLD
-                    ]
-                    if enabled_pyro_channels:
-                        pyro_command = "pyro_set_all({0})".format(
-                            ", ".join(map(str, enabled_pyro_channels))
+                if changed_pyro_channels:
+                    # Validate the pyro channels; they should always be either 0
+                    # or 255. If this is not the case, it may be that something
+                    # is messed up in the input file
+                    if any(value not in (0, 255) for value in pyro):
+                        self.env.warn(
+                            "Pyro channel values are invalid at frame {0.time}"
+                            " for FX {1}: {2!r}".format(
+                                time, fx.id, list(pyro)
+                            )
                         )
+
+                    if len(changed_pyro_channels) == 1:
+                        # Only one pyro channel changed so we can generate a
+                        # pyro_enable() or pyro_disable() command
+                        changed = changed_pyro_channels[0]
+                        if pyro[changed] >= self.PYRO_THRESHOLD:
+                            pyro_command = "pyro_enable({0})".format(changed)
+                        else:
+                            pyro_command = "pyro_disable({0})".format(changed)
                     else:
-                        pyro_command = "pyro_clear()"
-            else:
-                pyro_command = None
+                        # More than one channel changed so we generate a
+                        # pyro_set_all() command
+                        enabled_pyro_channels = [
+                            index for index, value in enumerate(pyro)
+                            if value >= self.PYRO_THRESHOLD
+                        ]
+                        if enabled_pyro_channels:
+                            pyro_command = "pyro_set_all({0})".format(
+                                ", ".join(map(str, enabled_pyro_channels))
+                            )
+                        else:
+                            pyro_command = "pyro_clear()"
 
-            if prev_time is None:
-                # This is the first step; handle the pyro command only
-                # because we will only know where to fade to after we have
-                # seen the next step.
-                lines.add(
-                    "set_color({r}, {g}, {b}, duration=@DT@)"
-                    .format(**color), time.wait
-                )
-                if pyro_command:
                     lines.add(pyro_command)
-            else:
-                # This is not the first step. We need to check whether there is
-                # a "jump" in the timeline, which may happen if
-                # prev_time.time + prev_time.total_duration < time.time. In
-                # such cases, we need to insert a sleep() statement.
-                # Also, if prev_time.time + prev_time.total_duration is
-                # greater than time.time, then we are screwed because the
-                # timeline is inconsistent.
+                    last_pyro = pyro
 
-                diff = time.time - prev_time.end
-                if diff > 0:
-                    self.env.warn("Jump in timeline from frame {0} to {1}; "
-                                  "this might not be handled correctly yet."
-                                  .format(prev_time.end, time.time))
-                    lines.add("sleep(duration=@DT@)", diff)
-                elif diff < 0:
-                    raise ValueError("timeline inconsistent; this is "
-                                     "probably a bug")
+                # We need to ensure that the current color is the one specified
+                # in the time step if it is different from the color that we
+                # have emitted the last time.
+                time_to_wait = next_time.time - time.time - time.fade
+                if time_to_wait != time.wait:
+                    self.env.warn("Jump in timeline from frame {0} to frame {1}"
+                                  " in FX {2}"
+                                  .format(time.end, next_time.time, fx.id))
+                already_waited = False
+                if last_color != color:
+                    command = "set_color({r}, {g}, {b}, duration=@DT@)"\
+                              .format(**color)
+                    if time.fade == 0:
+                        lines.add(command, time_to_wait)
+                        already_waited = True
+                    else:
+                        lines.add(command)
+                    last_color = color
 
-                # Jump handled so we are now at time.time
-
-                if prev_time.fade == 0:
-                    if pyro_command:
-                        lines.add(pyro_command)
-                    lines.add(
-                        "set_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**color), time.wait
-                    )
-                elif prev_time.fade > 0:
+                if time.fade > 0:
+                    # Add an instruction to fade from the start color to the
+                    # next color
+                    next_color, _ = self._split_channels(next_channels)
                     lines.add(
                         "fade_to_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**color), prev_time.fade
+                        .format(**next_color), time.fade
                     )
-                    if pyro_command:
-                        lines.add(pyro_command)
-                    if time.wait > 0:
-                        lines.add("sleep(duration=@DT@)", time.wait)
-                else:
-                    raise InvalidDurationError(prev_time.fade + " frames")
+                    last_color = next_color
 
-            prev_time, prev_pyro = time, pyro
-
-        lines.close()
+                if time_to_wait > 0 and not already_waited:
+                    # Wait for the specified amount of time if we did not wait
+                    # already in the set_color() command emitted above
+                    lines.add(
+                        "sleep(duration=@DT@)", time_to_wait
+                    )
 
         if fx.name:
             comment = Comment(value="{0!r} ends here".format(fx.name))
