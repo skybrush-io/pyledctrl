@@ -308,37 +308,51 @@ class UnifiedTimeline(object):
             # Timestamp does not exist yet
             if place == 0:
                 # New timestamp has to be inserted at the beginning
-                # TODO(ntamas): implement this
-                raise NotImplementedError
+                next_time = self.times[0]
+                dummy_time.wait = next_time.time - dummy_time.time
+                new_channels = [0] * len(self.channels[0])
             else:
                 prev_time = self.times[place - 1]
                 prev_channels = self.channels[place - 1]
-                if prev_time.fade != 0 and prev_time.wait != 0:
-                    raise ValueError("time instants with both fade and "
-                                     "wait times are not handled yet")
 
-                diff = time - prev_time.time
-                if prev_time.fade:
-                    ratio = diff / prev_time.fade
-                    dummy_time.fade = prev_time.fade - diff
-                    prev_time.fade = diff
+                # When a timestamp has both 'fade' and 'wait' times,
+                # 'fade' comes first, followed by 'wait'. Therefore,
+                # we will first consume frames from the 'wait' time of
+                # the previous frame and then we consume from 'fade' time
+                # only if we have consumed all the available 'wait' time
+
+                # First we consume the wait time
+                diff = prev_time.time + prev_time.fade + prev_time.wait - time
+                wait_time_to_consume = min(prev_time.wait, diff)
+                dummy_time.wait += wait_time_to_consume
+                prev_time.wait -= wait_time_to_consume
+                diff -= wait_time_to_consume
+                new_channels = list(prev_channels)
+
+                # Now we consume the fade time
+                if diff > 0:
+                    fade_time_to_consume = min(prev_time.fade, diff)
+                    ratio = fade_time_to_consume / prev_time.fade
+                    dummy_time.fade += fade_time_to_consume
+                    prev_time.fade -= fade_time_to_consume
                     next_channels = self.channels[place]
                     new_channels = [
-                        ratio * next_channels[i] +
-                        (1 - ratio) * prev_channels[i]
-                        for i in xrange(len(prev_channels))
+                        (1 - ratio) * next_channels[i] +
+                        ratio * new_channels[i]
+                        for i in xrange(len(new_channels))
                     ]
-                if prev_time.wait:
-                    dummy_time.wait = prev_time.wait - diff
-                    prev_time.wait = diff
-                    new_channels = list(prev_channels)
+                    diff -= fade_time_to_consume
+
+                if diff > 0:
+                    # This should not have happened
+                    raise ValueError("inconsistent timeline")
 
                 # Make sure that pyro channels are not interpolated
                 if len(new_channels) >= 3:
                     new_channels[3:] = prev_channels[3:]
 
-                self.times.insert(place, dummy_time)
-                self.channels.insert(place, new_channels)
+            self.times.insert(place, dummy_time)
+            self.channels.insert(place, new_channels)
 
         return place
 

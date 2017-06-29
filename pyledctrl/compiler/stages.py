@@ -607,7 +607,6 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
                     prev_active = active
 
-                pyro_master_on = []
                 for start, end in pyro_master_on:
                     merged_channels.set_channel_value_in_range(
                         start, end, self.PYRO_MASTER_CHANNEL + 3, 255
