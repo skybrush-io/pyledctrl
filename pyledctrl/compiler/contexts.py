@@ -12,7 +12,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import wraps
 from pyledctrl.compiler import bytecode
-from pyledctrl.compiler.ast import LoopBlock, Node, StatementSequence
+from pyledctrl.compiler.ast import EndCommand, LoopBlock, Node, \
+    StatementSequence
 from pyledctrl.compiler.bytecode import Marker
 from pyledctrl.compiler.errors import DuplicateLabelError, \
     MarkerNotResolvableError
@@ -75,7 +76,15 @@ class ExecutionContext(object):
         global_vars = self.get_globals()
         exec(code, global_vars, {})
         if add_end_command:
-            global_vars["end"]()
+            last_command = self._ast
+            while isinstance(last_command, StatementSequence):
+                statements = last_command.statements
+                if statements:
+                    last_command = statements[-1]
+                else:
+                    last_command = None
+            if not isinstance(last_command, EndCommand):
+                global_vars["end"]()
         self._postprocess_syntax_tree()
 
     def get_globals(self):
