@@ -60,6 +60,7 @@ class BytecodeCompiler(object):
         self._optimiser = None
         self._optimisation_level = 0
         self.optimisation_level = 2
+        self.shift_by = 0
         self.verbose = verbose
         self.environment = CompilationStageExecutionEnvironment(self)
 
@@ -148,6 +149,11 @@ class BytecodeCompiler(object):
             output_ext = None
             ast_only = True
 
+        # Shifting is supported for ``.sce`` and ``.ses`` only
+        if ext not in (".sce", ".ses") and self.shift_by != 0:
+            raise CompilerError("Shifting is supported only for Sunlite "
+                                "Suite files")
+
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
@@ -222,7 +228,8 @@ class BytecodeCompiler(object):
         @plan.when_step_is_done(parsing_stage)
         def create_next_stages(output):
             preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
-                [(0, None, output)], led_file_template
+                [(0, None, output)], led_file_template,
+                start_at=self.shift_by
             )
             plan.add_step(preproc_stage)
 
@@ -313,7 +320,8 @@ class BytecodeCompiler(object):
                 # by FX IDs
                 preproc_stage = \
                     ParsedSunliteScenesToPythonSourceCompilationStage(
-                        scene_order, led_file_template
+                        scene_order, led_file_template,
+                        start_at=self.shift_by
                     )
                 add_step(preproc_stage)
 

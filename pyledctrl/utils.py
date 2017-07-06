@@ -53,6 +53,7 @@ def consecutive_pairs(iterable):
     next(b, None)
     return izip(a, b)
 
+
 def ensure_tuple(obj):
     """Ensures that the given object is a tuple. If it is not a tuple,
     returns a tuple containing the object only.
@@ -78,6 +79,24 @@ def first(iterable):
     for item in iterable:
         return item
     raise ValueError("iterable is empty")
+
+
+def format_frame_count(frames, fps):
+    """Formats a time instant given as the number of frames since T=0 into
+    a conventional minutes:seconds+frames representation.
+
+    Parameters:
+        frames (int): the number of frames
+        fps (int): the number of frames per second
+
+    Returns:
+        str: the formatted representation of the frame count
+    """
+    seconds, residual = divmod(frames, fps)
+    minutes, seconds = divmod(seconds, 60)
+    return "{minutes}:{seconds:02}+{residual:02}".format(
+        minutes=int(minutes), seconds=int(seconds), residual=int(residual)
+    )
 
 
 def get_serial_port_filename(port=None):
@@ -132,7 +151,6 @@ def memoize(func):
     """Single-argument memoization decorator for a function. Caches the results
     of the function in a dictionary.
     """
-
     class memodict(dict):
         __slots__ = ()
 
@@ -141,6 +159,32 @@ def memoize(func):
             return ret
 
     return memodict().__getitem__
+
+
+def parse_as_frame_count(value, fps):
+    """Parses the given input string containing the representation of a time
+    instant in the usual ``minutes:seconds+frames`` format into an absolute
+    frame count.
+
+    When the frame (residual) part after the ``+`` sign is omitted, it is
+    assumed to be zero.
+
+    When the minutes part before the ``:`` sign is omitted, it is also
+    assumed to be zero.
+
+    Parameters:
+        value (str): the input string to parse
+        fps (int): the number of frames per second
+
+    Returns:
+        int: the absolute frame count parsed out from the string
+    """
+    minutes, _, seconds = value.rpartition(":")
+    minutes = float(minutes) if minutes else 0
+    seconds, _, residual = seconds.rpartition("+")
+    seconds = float(seconds) if seconds else 0
+    residual = float(residual) if residual else 0
+    return int((minutes * 60 + seconds) * fps + residual)
 
 
 class _TemporaryDirectory(object):

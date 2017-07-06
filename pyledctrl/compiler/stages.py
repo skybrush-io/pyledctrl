@@ -14,12 +14,12 @@ from decimal import Decimal
 from functools import partial
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
-from pyledctrl.compiler.errors import InvalidDurationError
 from pyledctrl.compiler.utils import get_timestamp_of, \
     TimestampedLineCollector, TimestampWrapper, UnifiedTimeline
 from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
     SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
-from pyledctrl.utils import changed_indexes, consecutive_pairs, first, grouper
+from pyledctrl.utils import changed_indexes, consecutive_pairs, first, \
+    format_frame_count, grouper
 from textwrap import dedent
 
 
@@ -469,7 +469,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
     PYRO_THRESHOLD = 220
     PYRO_MASTER_CHANNEL = 6
 
-    def __init__(self, input, output_template=None):
+    def __init__(self, input, output_template=None, start_at=0):
         """Constructor.
 
         Parameters:
@@ -478,6 +478,11 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 names of the output files, given the ID of an FX. Must
                 contain a single ``{}`` token to identify the place where
                 the FX ID should be inserted into.
+            start_at (int): number of frames where the timeline of the
+                output should start, in the timeline of the input files.
+                E.g., setting this to ``200`` would mean that the output
+                starts at 2 seconds into the input timelines, assuming
+                100 frames per second.
         """
         super(ParsedSunliteScenesToPythonSourceCompilationStage,
               self).__init__()
@@ -490,6 +495,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         self._output_template = output_template
         self._outputs = None
         self._outputs_by_ids = None
+        self._start_at = Decimal(start_at)
 
     @ObjectToFileCompilationStage.input.getter
     def input(self):
@@ -519,11 +525,10 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         self._outputs = sorted(self._outputs_by_ids.values())
 
     def _format_frame_count_as_time(self, frames):
-        seconds, residual = divmod(frames, self.FPS)
-        minutes, seconds = divmod(seconds, 60)
-        return "{minutes}:{seconds:02}+{residual:02} ({frames} frames)".format(
-            minutes=int(minutes), seconds=int(seconds),
-            residual=int(residual), frames=int(frames))
+        formatted_frames = format_frame_count(frames, fps=self.FPS)
+        return "{formatted_frames} ({frames} frames)".format(
+            formatted_frames=formatted_frames, frames=frames
+        )
 
     def _merge_channels(self, channels):
         """Merges multiple channels into a common timeline. Yields pairs
@@ -611,6 +616,11 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     merged_channels.set_channel_value_in_range(
                         start, end, self.PYRO_MASTER_CHANNEL + 3, 255
                     )
+
+                # Now that we are done with the merged channels, we can
+                # apply the time shift that was specified at construction
+                # time
+                merged_channels.shift_to_left(self._start_at)
 
                 # Write the result into the corresponding output file
                 output_file = self.output_files_by_ids[fx.id]
@@ -713,8 +723,10 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         # markers at the right places between lines
         lines = TimestampedLineCollector(out=fp, fps=self.FPS)
         for marker in fx.markers:
+            marker.time -= self._start_at
             comment = Comment(value=marker.value)
-            lines.add_marker(comment.to_led_source(), time=marker.time)
+            lines.add_marker(comment.to_led_source(),
+                             time=marker.time)
 
         with closing(lines):
             channel_iter = consecutive_pairs(merged_channels)
@@ -732,9 +744,9 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 ]
 
                 if changed_pyro_channels:
-                    # Validate the pyro channels; they should always be either 0
-                    # or 255. If this is not the case, it may be that something
-                    # is messed up in the input file
+                    # Validate the pyro channels; they should always be either
+                    # 0 or 255. If this is not the case, it may be that
+                    # something is messed up in the input file
                     if any(value not in (0, 255) for value in pyro):
                         self.env.warn(
                             "Pyro channel values are invalid at frame {0.time}"

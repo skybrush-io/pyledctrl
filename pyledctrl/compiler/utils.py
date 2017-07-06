@@ -297,6 +297,24 @@ class UnifiedTimeline(object):
         for place in xrange(start_index, end_index):
             self.channels[place][channel_index] = value
 
+    def shift_to_left(self, frames):
+        """Shift the entire timeline and all its time points to the left
+        (i.e. into the past) by the given number of frames.
+
+        Time points that are moved before T=0 will be removed.
+
+        Parameters:
+            frames (int): the number of frames to shift by
+        """
+        if frames == 0:
+            return
+
+        place = self._find_time(frames)
+        self.times[:place] = []
+        self.channels[:place] = []
+        for time_instant in self.times:
+            time_instant.time -= frames
+
     def _find_time(self, time):
         dummy_time = Time(time=time)
         place = bisect_left(self.times, dummy_time)

@@ -14,14 +14,15 @@ from pyledctrl.config import DEFAULT_BAUD
 from pyledctrl.executor import Executor
 from pyledctrl.upload import BytecodeUploader
 from pyledctrl.utils import error, get_serial_port_filename, \
-    get_serial_connection
+    get_serial_connection, parse_as_frame_count
 
 pyledctrl = baker.Baker()
 
 
 @pyledctrl.command(shortopts=dict(output="o", keep="k", optimisation="O",
-                                  verbose="v"))
-def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
+                                  verbose="v", shift="s"))
+def compile(filename, output=None, keep=False, optimisation=2, shift="",
+            verbose=False):
     """\
     Compiles a LedCtrl source file to a bytecode file.
 
@@ -33,6 +34,11 @@ def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
         compilation.
     :param optimisation: The optimisation level to use. 0 = no optimisation,
         1 = only basic optimisations, 2 = aggressive optimisation (default).
+    :param shift: Time interval with which the time axis parsed from the
+        input file should be shifted *to the left*. This means that, e.g.,
+        a shift of ``2:00`` would mean that the output file will start at
+        2 minutes into the input file. The duration must be specified as
+        ``MIN:SEC+FRAMES`` where the minutes and the frames may be omitted.
     :param verbose: Whether to print verbose messages about what the
         compiler is doing.
     """
@@ -46,6 +52,9 @@ def compile(filename, output=None, keep=False, optimisation=2, verbose=False):
     compiler = BytecodeCompiler(keep_intermediate_files=keep,
                                 verbose=verbose)
     compiler.optimisation_level = optimisation
+
+    # TODO(ntamas): don't hardcode 100 fps here
+    compiler.shift_by = parse_as_frame_count(shift, fps=100) if shift else 0
     compiler.compile(filename, output)
 
 
