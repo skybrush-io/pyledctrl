@@ -181,7 +181,7 @@ def parse_as_frame_count(value, fps):
     """
     minutes, _, seconds = value.rpartition(":")
     minutes = float(minutes) if minutes else 0
-    seconds, _, residual = seconds.rpartition("+")
+    seconds, _, residual = seconds.partition("+")
     seconds = float(seconds) if seconds else 0
     residual = float(residual) if residual else 0
     return int((minutes * 60 + seconds) * fps + residual)
