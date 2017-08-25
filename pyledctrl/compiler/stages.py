@@ -732,6 +732,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             channel_iter = consecutive_pairs(merged_channels)
 
             last_color, last_pyro = None, None
+
+            # Sequence is:
+            # 1. We are at t=time.time, with color=channels.color
+            # 2. We wait for time.wait
+            # 3. We fade into color=next_channels.color with next_time.fade
+
             for (time, channels), (next_time, next_channels) in channel_iter:
                 # Separate color and pyro channels
                 color, pyro = self._split_channels(channels)
@@ -783,7 +789,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # We need to ensure that the current color is the one specified
                 # in the time step if it is different from the color that we
                 # have emitted the last time.
-                time_to_wait = next_time.time - time.time - time.fade
+                time_to_wait = next_time.time - time.time - next_time.fade
                 if time_to_wait != time.wait:
                     self.env.warn("Jump in timeline from frame {0} to frame {1}"
                                   " in FX {2}"
@@ -792,20 +798,20 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 if last_color != color:
                     command = "set_color({r}, {g}, {b}, duration=@DT@)"\
                               .format(**color)
-                    if time.fade == 0:
+                    if next_time.fade == 0:
                         lines.add(command, time_to_wait)
                         already_waited = True
                     else:
                         lines.add(command)
                     last_color = color
 
-                if time.fade > 0:
+                if next_time.fade > 0:
                     # Add an instruction to fade from the start color to the
                     # next color
                     next_color, _ = self._split_channels(next_channels)
                     lines.add(
                         "fade_to_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**next_color), time.fade
+                        .format(**next_color), next_time.fade
                     )
                     last_color = next_color
 
