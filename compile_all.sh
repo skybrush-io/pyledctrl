@@ -1,9 +1,11 @@
 #!/bin/sh
 # 
-# Compiles all the files found in data/simple/
+# Compiles all the files found in data/simple/ and data/tests/
 
-for fname in `find data/simple -name '*.led' -type f`; do
-	outfname="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.bin/'`"
-	mkdir -p "`dirname $outfname`"
-	bin/ledctrl compile "$fname" -o "$outfname" "$@"
+for subdir in simple tests; do
+	for fname in `find data/$subdir -name '*.led' -type f`; do
+		outfname="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.bin/'`"
+		mkdir -p "`dirname $outfname`"
+		bin/ledctrl compile "$fname" -o "$outfname" "$@"
+	done
 done

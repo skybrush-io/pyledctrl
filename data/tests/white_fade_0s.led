@@ -1,0 +1,1 @@
+fade_to_color(255, 255, 255, duration=0)
