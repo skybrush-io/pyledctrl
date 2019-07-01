@@ -79,7 +79,6 @@ terminals and therefore are enclosed in quotes)::
 from __future__ import division
 
 from decimal import Decimal, Inexact, getcontext
-from future_builtins import zip
 from pyledctrl.utils import first, memoize
 from struct import Struct
 from warnings import warn

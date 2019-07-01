@@ -6,7 +6,7 @@ import sys
 
 from bisect import bisect
 from functools import total_ordering
-from itertools import izip_longest
+from itertools import zip_longest
 from warnings import warn
 
 

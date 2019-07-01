@@ -3,7 +3,6 @@
 from __future__ import division
 
 from bisect import bisect, bisect_left
-from itertools import izip
 from time import time
 
 from pyledctrl.parsers.sunlite import Time
@@ -232,7 +231,7 @@ class UnifiedTimeline(object):
         yielded by the iterable must be sorted.
         """
         result = cls()
-        result.times, result.channels = izip(*iterable)
+        result.times, result.channels = zip(*iterable)
 
     def __init__(self):
         """Constructor."""
@@ -375,4 +374,4 @@ class UnifiedTimeline(object):
         return place
 
     def __iter__(self):
-        return izip(self.times, self.channels)
+        return zip(self.times, self.channels)

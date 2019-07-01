@@ -7,7 +7,7 @@ import shutil
 import sys
 import tempfile
 
-from itertools import islice, izip, tee
+from itertools import islice, tee
 from pyledctrl.config import DEFAULT_BAUD
 
 
@@ -51,7 +51,7 @@ def consecutive_pairs(iterable):
     """
     a, b = tee(iterable)
     next(b, None)
-    return izip(a, b)
+    return zip(a, b)
 
 
 def ensure_tuple(obj):
