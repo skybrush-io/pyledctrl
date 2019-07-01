@@ -1,15 +1,21 @@
 #!/usr/bin/env python
 
-import pyledctrl
-from setuptools import setup
+from setuptools import setup, find_packages
+
+requires = ["pyserial>=3.1.1", "baker>=1.0", "tqdm>=4.8.4", "lxml>=3.6.4"]
+
+__version__ = None
+__author__ = None
+__email__ = None
+exec(open("pyledctrl/version.py").read())
 
 setup(
     name="pyledctrl",
-    version=pyledctrl.__version__,
+    author=__author__,
+    author_email=__email__,
+    version=__version__,
     description="Bytecode compiler and utilities for ledctrl",
-    author=pyledctrl.__author__,
-    author_email=pyledctrl.__email__,
-    packages=["pyledctrl", "pyledctrl.compiler", "pyledctrl.parsers"],
+    packages=find_packages(),
     scripts=["bin/ledctrl"],
-    requires=["pyserial (>=3.1.1)", "Baker (>=1.0)", "tqdm (>= 4.8.4)", "lxml (>= 3.6.4)"]
+    install_requires=requires,
 )
