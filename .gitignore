@@ -1,4 +1,5 @@
 data/show/
+dist/
 out/
 *.pyc
 .python-version
