@@ -700,7 +700,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(
             # global timeline.
             for channel in fx_in_scene_file.channels:
                 max_index = channel.index + 1
-                for extra_index in xrange(len(fx.channels), max_index):
+                for extra_index in range(len(fx.channels), max_index):
                     fx.add_channel(EasyStepTimeline(fps=100))
 
             # Okay, great. Now we need to merge the timeline and steps of each

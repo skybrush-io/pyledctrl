@@ -341,7 +341,7 @@ class LoopDetector(ASTOptimiser):
                 statement = body[index]
                 end = index + 1
                 max_end = min(num_statements, index + self.max_loop_len)
-                for end in xrange(index + 1, max_end):
+                for end in range(index + 1, max_end):
                     end_statement = body[end]
                     if statement.is_equivalent_to(end_statement):
                         # A potential loop starts at index with a body

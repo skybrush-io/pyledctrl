@@ -133,7 +133,7 @@ class Executor(object):
     def _execute_LoopBlock(self, node):
         num_iterations = node.iterations.value
         if num_iterations > 0:
-            iterator = xrange(num_iterations)
+            iterator = range(num_iterations)
         else:
             iterator = count()
         for i in iterator:

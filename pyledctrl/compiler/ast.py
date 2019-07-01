@@ -99,7 +99,7 @@ def _to_varuint(value):
             else:
                 result.append((value & 0x7F) + 0x80)
             value >>= 7
-    return bytes(bytearray(result))
+    return bytes(result)
 
 
 class CommandCode(object):
@@ -301,10 +301,8 @@ class _NodeMeta(type):
         return __init__
 
 
-class Node(object):
+class Node(object, metaclass=_NodeMeta):
     """Base class for nodes in the abstract syntax tree."""
-
-    __metaclass__ = _NodeMeta
 
     def iter_child_nodes(self):
         """Returns an iterator that yields all field values that are subclasses
@@ -446,7 +444,7 @@ class UnsignedByte(Byte):
             value (int): the value of the literal
         """
         self._set_value(value)
-        self.bytecode = chr(self.value)
+        self.bytecode = bytes([self.value])
 
     def equals(self, other):
         """Compares this byte with another byte to decide whether they
@@ -542,7 +540,7 @@ class ChannelMask(Byte):
         return (result & 127) + (128 if self._enable else 0)
 
     def to_bytecode(self):
-        return chr(self._to_byte())
+        return bytes([self._to_byte()])
 
     def to_led_source(self):
         if len(self._channels) == 1:
@@ -585,7 +583,7 @@ class ChannelValues(Byte):
         return result & 127
 
     def to_bytecode(self):
-        return chr(self._to_byte())
+        return bytes([self._to_byte()])
 
     def to_led_source(self):
         if len(self._channels) != 1:

@@ -207,7 +207,7 @@ class TimestampedLineCollector(object):
 
     def _print_markers_until(self, timer):
         next_index = bisect_left(self._markers, (timer, None))
-        for i in xrange(self._marker_index, next_index):
+        for i in range(self._marker_index, next_index):
             timestamp, marker = self._markers[i]
             self.out.write(self._format_line(marker))
         self._marker_index = next_index
@@ -293,7 +293,7 @@ class UnifiedTimeline(object):
             end_index = self._find_time(end)
         else:
             end_index = len(self.times)
-        for place in xrange(start_index, end_index):
+        for place in range(start_index, end_index):
             self.channels[place][channel_index] = value
 
     def shift_to_left(self, frames):
@@ -355,7 +355,7 @@ class UnifiedTimeline(object):
                     next_channels = self.channels[place]
                     new_channels = [
                         (1 - ratio) * next_channels[i] + ratio * new_channels[i]
-                        for i in xrange(len(new_channels))
+                        for i in range(len(new_channels))
                     ]
                     diff -= fade_time_to_consume
 

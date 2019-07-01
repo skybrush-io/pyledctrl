@@ -36,7 +36,7 @@ def changed_indexes(seq1, seq2):
         return range(len(seq1))
 
     assert len(seq1) == len(seq2)
-    return [i for i in xrange(len(seq1)) if seq1[i] != seq2[i]]
+    return [i for i in range(len(seq1)) if seq1[i] != seq2[i]]
 
 
 def consecutive_pairs(iterable):
