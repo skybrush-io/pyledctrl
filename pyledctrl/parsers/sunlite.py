@@ -51,8 +51,7 @@ class SceneFile(object):
                 result.timeline.fps = int(fps_attr)
 
         # Parse the FX objects
-        result.fxs = [FX.from_xml(fx_tag)
-                      for fx_tag in tag.findall("./Fxs/Fx")]
+        result.fxs = [FX.from_xml(fx_tag) for fx_tag in tag.findall("./Fxs/Fx")]
 
         # Attach the global timeline to the channels that have no timeline
         # on their own
@@ -103,12 +102,12 @@ class Marker(object):
         return self.time, self.value == other.time, other.value
 
     def __lt__(self, other):
-        return self.time < other.time or \
-            (self.time == other.time and self.value < other.value)
+        return self.time < other.time or (
+            self.time == other.time and self.value < other.value
+        )
 
     def __repr__(self):
-        return "{0.__class__.__name__}(time={0.time!r}, value={0.value!r})"\
-            .format(self)
+        return "{0.__class__.__name__}(time={0.time!r}, value={0.value!r})".format(self)
 
 
 class FX(object):
@@ -132,8 +131,7 @@ class FX(object):
         for index, channel_tag in enumerate(tag.findall("./Ch")):
             channel = FXChannel.from_xml(channel_tag)
             result._ensure_channel_count_is_at_least(index + 1)
-            assert result.channels[index] is None, \
-                "duplicate channel index in <Fx> tag"
+            assert result.channels[index] is None, "duplicate channel index in <Fx> tag"
             result.channels[index] = channel
         return result
 
@@ -240,17 +238,21 @@ class EasyStepTimeline(object):
 
         diff = len(timeline.instants) - len(self.steps)
         if diff < 0:
-            warn("number of time instants in assigned timeline "
-                 "({0}) is incompatible with the number of steps ({1})"
-                 .format(len(timeline.instants), len(self.steps)))
+            warn(
+                "number of time instants in assigned timeline "
+                "({0}) is incompatible with the number of steps ({1})".format(
+                    len(timeline.instants), len(self.steps)
+                )
+            )
             to_ignore = -diff
             warn("ignoring last {0} time steps".format(to_ignore))
             del self.steps[-to_ignore:]
         elif diff != 0 and diff != 1:
-            raise ValueError("number of time instants in assigned timeline "
-                             "({0}) is incompatible with the number of "
-                             "steps ({1})"
-                             .format(len(timeline.instants), len(self.steps)))
+            raise ValueError(
+                "number of time instants in assigned timeline "
+                "({0}) is incompatible with the number of "
+                "steps ({1})".format(len(timeline.instants), len(self.steps))
+            )
         elif diff == 1:
             if not self.steps:
                 self.steps.append(0)
@@ -271,10 +273,14 @@ class EasyStepTimeline(object):
         writer.writerow(["FPS = {0}".format(self.fps)])
         writer.writerow("Time Fade Wait Value".split())
         for instant, step in self.iteritems():
-            writer.writerow([
-                instant.time, instant.fade, instant.wait,
-                step.value if step is not None else "---"
-            ])
+            writer.writerow(
+                [
+                    instant.time,
+                    instant.fade,
+                    instant.wait,
+                    step.value if step is not None else "---",
+                ]
+            )
 
     @classmethod
     def from_xml(cls, tag):
@@ -359,8 +365,7 @@ class EasyStepTimeline(object):
         to_insert = []
         while start + shift < end:
             to_insert.extend(
-                (instant.shifted(by=shift), value)
-                for instant, value in to_repeat
+                (instant.shifted(by=shift), value) for instant, value in to_repeat
             )
             shift += total_length
 
@@ -396,18 +401,23 @@ class EasyStepTimeline(object):
         over the steps of the first timeline.
         """
         if self.fps != other.fps:
-            raise ValueError("cannot merge timelines with different fps "
-                             "settings ({0!r} and {1!r})"
-                             .format(self.fps, other.fps))
+            raise ValueError(
+                "cannot merge timelines with different fps "
+                "settings ({0!r} and {1!r})".format(self.fps, other.fps)
+            )
 
         self._assert_instants_and_steps_consistent()
         self_range = self.range
         other_range = other.range
-        if self.has_instants and other.has_instants and \
-                (self_range[1] > other_range[0] or other_range[1] < self_range[0]):
-            raise NotImplementedError("not implemented for overlapping ranges "
-                                      "yet ( {0} and {1} )"
-                                      .format(self_range, other_range))
+        if (
+            self.has_instants
+            and other.has_instants
+            and (self_range[1] > other_range[0] or other_range[1] < self_range[0])
+        ):
+            raise NotImplementedError(
+                "not implemented for overlapping ranges "
+                "yet ( {0} and {1} )".format(self_range, other_range)
+            )
 
         self_comes_first = self.range[1] <= other_range[0]
         if self_comes_first:
@@ -420,7 +430,9 @@ class EasyStepTimeline(object):
             other_end = len(other.instants)
             if other.has_instants and self_range[0] == other_range[1]:
                 other_end -= 1
-            self.instants[0:0] = [instant.copy() for instant in other.instants[:other_end]]
+            self.instants[0:0] = [
+                instant.copy() for instant in other.instants[:other_end]
+            ]
             self.steps[0:0] = other.steps
         self._assert_instants_and_steps_consistent()
 
@@ -450,8 +462,10 @@ class EasyStepTimeline(object):
         """
         factor, remainder = divmod(new_fps, self.fps)
         if remainder != 0:
-            raise ValueError("cannot rescale timeline to new fps: new fps is "
-                             "not an integer multiple of the old fps")
+            raise ValueError(
+                "cannot rescale timeline to new fps: new fps is "
+                "not an integer multiple of the old fps"
+            )
         if factor == 1:
             return
 
@@ -515,17 +529,18 @@ class EasyStepTimeline(object):
             # fade time, so when interpolating, we need to take the wait time
             # into account, and also update the "wait time" and "fade time"
             # of instants[pos-1].
-            instant_before = self.instants[pos-1]
+            instant_before = self.instants[pos - 1]
             end_of_wait = instant_before.end_of_wait
             instant_before.fade = max(at - end_of_wait, 0)
             if instant_before.fade == 0:
-                value = self.steps[pos-1].value
+                value = self.steps[pos - 1].value
                 instant_before.end_of_wait = at
             else:
                 dt = self.instants[pos].time - end_of_wait
                 ratio = (at - end_of_wait) / dt
-                value = (1-ratio) * self.steps[pos-1].value + \
-                    ratio * self.steps[pos].value
+                value = (1 - ratio) * self.steps[pos - 1].value + ratio * self.steps[
+                    pos
+                ].value
 
             # Discard the part of the list after pos
             del self.instants[pos:]
@@ -566,19 +581,14 @@ class Time(object):
 
     @classmethod
     def from_xml(cls, tag, time=0):
-        result = cls(
-            time=time,
-            fade=int(tag.get("Fade")),
-            wait=int(tag.get("Wait"))
-        )
+        result = cls(time=time, fade=int(tag.get("Fade")), wait=int(tag.get("Wait")))
         result.tag = tag
         return result
 
     def copy(self, shift_by=0):
         """Returns a deep copy of the time step, optionally shifted by a given
         number of frames"""
-        return self.__class__(time=self.time + shift_by,
-                              fade=self.fade, wait=self.wait)
+        return self.__class__(time=self.time + shift_by, fade=self.fade, wait=self.wait)
 
     @property
     def end(self):
@@ -623,8 +633,11 @@ class Time(object):
         return self.wait + self.fade
 
     def __eq__(self, other):
-        return self.time == other.time and self.fade == other.fade and \
-            self.wait == other.wait
+        return (
+            self.time == other.time
+            and self.fade == other.fade
+            and self.wait == other.wait
+        )
 
     def __lt__(self, other):
         if self.time < other.time:
@@ -638,7 +651,9 @@ class Time(object):
     __hash__ = None
 
     def __repr__(self):
-        return "{0.__class__.__name__}(time={0.time!r}, fade={0.fade!r}, wait={0.wait!r})".format(self)
+        return "{0.__class__.__name__}(time={0.time!r}, fade={0.fade!r}, wait={0.wait!r})".format(
+            self
+        )
 
 
 class Step(object):
@@ -647,7 +662,7 @@ class Step(object):
     This type is immutable.
     """
 
-    __slots__ = ("_value", )
+    __slots__ = ("_value",)
 
     def __init__(self, value=0):
         self._value = value
@@ -692,15 +707,19 @@ class Button(object):
 
     @classmethod
     def from_xml(cls, tag):
-        result = cls(position=int(tag.get("position", 0)),
-                     size=int(tag.get("size", 0)),
-                     name=tag.get("name"))
+        result = cls(
+            position=int(tag.get("position", 0)),
+            size=int(tag.get("size", 0)),
+            name=tag.get("name"),
+        )
         result.tag = tag
         return result
 
     def __repr__(self):
-        return "{0.__class__.__name__}(position={0.position!r}, "\
+        return (
+            "{0.__class__.__name__}(position={0.position!r}, "
             "size={0.size!r}, name={0.name!r})".format(self)
+        )
 
 
 class SwitchFile(object):
@@ -726,9 +745,7 @@ class SwitchFile(object):
 
         # Parse the button entries
         button_tags = tag.findall("./time_line/tl_light_data/switch/button")
-        result.buttons = [
-            Button.from_xml(button_tag) for button_tag in button_tags
-        ]
+        result.buttons = [Button.from_xml(button_tag) for button_tag in button_tags]
 
         return result
 
@@ -744,6 +761,7 @@ class SunliteSuiteSceneFileParser(object):
         :type fp: file-like
         """
         from lxml import etree
+
         tree = etree.parse(fp)
         return SceneFile.from_xml(tree, filename=getattr(fp, "name", None))
 
@@ -759,5 +777,6 @@ class SunliteSuiteSwitchFileParser(object):
         :type fp: file-like
         """
         from lxml import etree
+
         tree = etree.parse(fp)
         return SwitchFile.from_xml(tree, filename=getattr(fp, "name", None))

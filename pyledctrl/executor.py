@@ -9,6 +9,7 @@ __all__ = ("Color", "ExecutorState", "Executor")
 _Color = namedtuple("Color", "red green blue")
 _Color.__new__.__defaults__ = (0, 0, 0)
 
+
 class Color(_Color):
     """Color of LEDs on a LED strip."""
 
@@ -32,8 +33,9 @@ class Color(_Color):
         and ``blue`` properties containing numeric abstract syntax tree nodes,
         and returns the updated color.
         """
-        return self._replace(red=obj.red.value, green=obj.green.value,
-                             blue=obj.blue.value)
+        return self._replace(
+            red=obj.red.value, green=obj.green.value, blue=obj.blue.value
+        )
 
 
 class ExecutorState(object):
@@ -114,9 +116,9 @@ class Executor(object):
             Color(
                 red=node.color.red.value,
                 green=node.color.green.value,
-                blue=node.color.blue.value
+                blue=node.color.blue.value,
             ),
-            node.duration
+            node.duration,
         ):
             yield state
 

@@ -2,10 +2,22 @@
 
 from itertools import islice
 from operator import attrgetter
-from pyledctrl.compiler.ast import Duration, Node, NodeTransformer, \
-    SetBlackCommand, SetGrayCommand, SetWhiteCommand, SetColorCommand, \
-    FadeToBlackCommand, FadeToGrayCommand, FadeToWhiteCommand, \
-    FadeToColorCommand, SleepCommand, LoopBlock, StatementSequence
+from pyledctrl.compiler.ast import (
+    Duration,
+    Node,
+    NodeTransformer,
+    SetBlackCommand,
+    SetGrayCommand,
+    SetWhiteCommand,
+    SetColorCommand,
+    FadeToBlackCommand,
+    FadeToGrayCommand,
+    FadeToWhiteCommand,
+    FadeToColorCommand,
+    SleepCommand,
+    LoopBlock,
+    StatementSequence,
+)
 from pyledctrl.compiler.utils import TimestampWrapper
 
 
@@ -107,8 +119,7 @@ class ColorCommandShortener(ASTOptimiser):
             elif node.color.is_black:
                 return SetBlackCommand(duration=node.duration)
             elif node.color.is_gray:
-                return SetGrayCommand(value=node.color.red,
-                                      duration=node.duration)
+                return SetGrayCommand(value=node.color.red, duration=node.duration)
             else:
                 return node
 
@@ -126,8 +137,7 @@ class ColorCommandShortener(ASTOptimiser):
             elif node.color.is_black:
                 return FadeToBlackCommand(duration=node.duration)
             elif node.color.is_gray:
-                return FadeToGrayCommand(value=node.color.red,
-                                         duration=node.duration)
+                return FadeToGrayCommand(value=node.color.red, duration=node.duration)
             else:
                 return node
 
@@ -181,11 +191,13 @@ class CommandMerger(ASTOptimiser):
             color = original_command.color
             duration, length = 0, 0
             for statement in islice(body, index, None):
-                if isinstance(statement, SetColorCommand) and \
-                        statement.color.equals(color):
+                if isinstance(statement, SetColorCommand) and statement.color.equals(
+                    color
+                ):
                     duration += statement.duration.value
-                elif isinstance(statement, FadeToColorCommand) and \
-                        statement.color.equals(color):
+                elif isinstance(
+                    statement, FadeToColorCommand
+                ) and statement.color.equals(color):
                     duration += statement.duration.value
                 elif isinstance(statement, SleepCommand):
                     duration += statement.duration.value
@@ -206,11 +218,13 @@ class CommandMerger(ASTOptimiser):
             color = original_command.color
             duration, length = 0, 1
             for statement in islice(body, index + 1, None):
-                if isinstance(statement, SetColorCommand) and \
-                        statement.color.equals(color):
+                if isinstance(statement, SetColorCommand) and statement.color.equals(
+                    color
+                ):
                     duration += statement.duration.value
-                elif isinstance(statement, FadeToColorCommand) and \
-                        statement.color.equals(color):
+                elif isinstance(
+                    statement, FadeToColorCommand
+                ) and statement.color.equals(color):
                     duration += statement.duration.value
                 elif isinstance(statement, SleepCommand):
                     duration += statement.duration.value
@@ -220,10 +234,7 @@ class CommandMerger(ASTOptimiser):
 
             if length > 1:
                 duration = Duration(value=duration)
-                replacement = [
-                    original_command,
-                    SleepCommand(duration=duration)
-                ]
+                replacement = [original_command, SleepCommand(duration=duration)]
                 return length, replacement
             else:
                 return None, None
@@ -253,18 +264,21 @@ class CommandMerger(ASTOptimiser):
             while index < num_statements:
                 statement = body[index]
                 if isinstance(statement, SetColorCommand):
-                    length_to_replace, replacement = \
-                        self._handle_set_color_command(body, index)
+                    length_to_replace, replacement = self._handle_set_color_command(
+                        body, index
+                    )
                 elif isinstance(statement, FadeToColorCommand):
-                    length_to_replace, replacement = \
-                        self._handle_fade_to_color_command(body, index)
+                    length_to_replace, replacement = self._handle_fade_to_color_command(
+                        body, index
+                    )
                 elif isinstance(statement, SleepCommand):
-                    length_to_replace, replacement = \
-                        self._handle_sleep_command(body, index)
+                    length_to_replace, replacement = self._handle_sleep_command(
+                        body, index
+                    )
                 else:
                     replacement = None
                 if replacement is not None:
-                    body[index:(index + length_to_replace)] = replacement
+                    body[index : (index + length_to_replace)] = replacement
                     index += len(replacement)
                     num_statements = len(body)
                 else:
@@ -291,16 +305,18 @@ class LoopDetector(ASTOptimiser):
             super(LoopDetector.Transformer, self).__init__()
             self.max_loop_len = 8
 
-        def _identify_loop_iteration_count(self, statements, start_index,
-                                           loop_body_length):
+        def _identify_loop_iteration_count(
+            self, statements, start_index, loop_body_length
+        ):
             """Identifies the maximum iteration count of a potential loop
             that starts at the given index and has the given assumed body
             length.
             """
             num_statements = len(statements)
             first, second = start_index, start_index + loop_body_length
-            while second < num_statements and \
-                    statements[first].is_equivalent_to(statements[second]):
+            while second < num_statements and statements[first].is_equivalent_to(
+                statements[second]
+            ):
                 first += 1
                 second += 1
 
@@ -342,12 +358,17 @@ class LoopDetector(ASTOptimiser):
                     # Find the best loop, i.e. the one that takes the smallest
                     # amount of space, and replace the body with the best
                     # loop
-                    blocks = [LoopBlock(iterations=iterations_,
-                                        body=StatementSequence(body[index:end]))
-                              for end, iterations_ in potential_loops]
+                    blocks = [
+                        LoopBlock(
+                            iterations=iterations_,
+                            body=StatementSequence(body[index:end]),
+                        )
+                        for end, iterations_ in potential_loops
+                    ]
                     best_block = min(blocks, key=attrgetter("length_in_bytes"))
-                    end = index + best_block.iterations.value * \
-                        len(best_block.body.statements)
+                    end = index + best_block.iterations.value * len(
+                        best_block.body.statements
+                    )
                     body[index:end] = [best_block]
                     num_statements = len(body)
                     index += 1

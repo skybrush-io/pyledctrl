@@ -3,12 +3,14 @@
 
 class CompilerError(RuntimeError):
     """Base class for all errors thrown by the bytecode compiler."""
+
     pass
 
 
 class FeatureNotImplementedError(CompilerError):
     """Exception thrown when the compiler encounters a feature that has not
     been implemented yet."""
+
     pass
 
 
@@ -75,5 +77,7 @@ class InvalidASTFormatError(RuntimeError):
         if self.format is None:
             return "The AST file {0.filename!r} has an unknown format".format(self)
         else:
-            return "The AST file {0.filename!r} has an unknown format: "\
+            return (
+                "The AST file {0.filename!r} has an unknown format: "
                 "{0.format!r}".format(self)
+            )

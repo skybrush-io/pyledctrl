@@ -196,11 +196,12 @@ class TimestampedLineCollector(object):
         if not result:
             seconds, residual = divmod(frames, self.fps)
             minutes, seconds = divmod(seconds, 60)
-            result = "{minutes}:{seconds:02}+{residual:02} "\
-                "({frames} frames)".format(
-                    minutes=int(minutes), seconds=int(seconds),
-                    residual=int(residual), frames=int(frames)
-                )
+            result = "{minutes}:{seconds:02}+{residual:02} " "({frames} frames)".format(
+                minutes=int(minutes),
+                seconds=int(seconds),
+                residual=int(residual),
+                frames=int(frames),
+            )
             self._formatted_ticks_cache[frames] = result
         return result
 
@@ -251,8 +252,7 @@ class UnifiedTimeline(object):
             self.times.append(time)
             self.channels.append(list(channels))
         else:
-            raise ValueError("UnifiedTimeline.add() must be called in "
-                             "sorted order")
+            raise ValueError("UnifiedTimeline.add() must be called in " "sorted order")
         self._last_time = time.time
 
     def ensure_min_channel_count(self, num_channels):
@@ -354,8 +354,7 @@ class UnifiedTimeline(object):
                     prev_time.fade -= fade_time_to_consume
                     next_channels = self.channels[place]
                     new_channels = [
-                        (1 - ratio) * next_channels[i] +
-                        ratio * new_channels[i]
+                        (1 - ratio) * next_channels[i] + ratio * new_channels[i]
                         for i in xrange(len(new_channels))
                     ]
                     diff -= fade_time_to_consume

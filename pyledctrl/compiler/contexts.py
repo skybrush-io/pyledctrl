@@ -12,11 +12,9 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import wraps
 from pyledctrl.compiler import bytecode
-from pyledctrl.compiler.ast import EndCommand, LoopBlock, Node, \
-    StatementSequence
+from pyledctrl.compiler.ast import EndCommand, LoopBlock, Node, StatementSequence
 from pyledctrl.compiler.bytecode import Marker
-from pyledctrl.compiler.errors import DuplicateLabelError, \
-    MarkerNotResolvableError
+from pyledctrl.compiler.errors import DuplicateLabelError, MarkerNotResolvableError
 from pyledctrl.utils import ensure_tuple
 
 
@@ -122,7 +120,7 @@ class ExecutionContext(object):
             "set_color": wrapper_for(bytecode.set_color),
             "set_gray": wrapper_for(bytecode.set_gray),
             "set_white": wrapper_for(bytecode.set_white),
-            "sleep": wrapper_for(bytecode.sleep)
+            "sleep": wrapper_for(bytecode.sleep),
         }
         aliases = dict(off="set_black", on="set_white", goto="jump")
         for alias, func in aliases.items():
@@ -146,13 +144,16 @@ class ExecutionContext(object):
             if isinstance(node, (Node, Marker)):
                 self._ast_stack[-1].append(node)
             else:
-                raise ValueError("unknown value returned from bytecode "
-                                 "function: {0!r}".format(node))
+                raise ValueError(
+                    "unknown value returned from bytecode "
+                    "function: {0!r}".format(node)
+                )
             if isinstance(node, bytecode.LabelMarker):
                 if node.name in self._labels:
                     raise DuplicateLabelError(node.name)
                 else:
                     self._labels[node.name] = node
+
         return wrapped
 
     def _postprocess_syntax_tree(self):
@@ -208,6 +209,6 @@ class ExecutionContext(object):
                     replacement = marker.to_ast_node()
                 if replacement is not None:
                     replacement = _flatten_bytes(ensure_tuple(replacement))
-                    self._bytecode[index:(index + 1)] = replacement
+                    self._bytecode[index : (index + 1)] = replacement
                     length += len(replacement) - 1
             index += 1

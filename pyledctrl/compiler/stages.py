@@ -3,9 +3,9 @@
 import os
 
 try:
-    import cPickle as pickle     # for Python 2.x
+    import cPickle as pickle  # for Python 2.x
 except ImportError:
-    import pickle                # for Python 3.x
+    import pickle  # for Python 3.x
 
 import logging
 
@@ -14,12 +14,25 @@ from decimal import Decimal
 from functools import partial
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
-from pyledctrl.compiler.utils import get_timestamp_of, \
-    TimestampedLineCollector, TimestampWrapper, UnifiedTimeline
-from pyledctrl.parsers.sunlite import SunliteSuiteSceneFileParser, \
-    SunliteSuiteSwitchFileParser, FX, EasyStepTimeline
-from pyledctrl.utils import changed_indexes, consecutive_pairs, first, \
-    format_frame_count, grouper
+from pyledctrl.compiler.utils import (
+    get_timestamp_of,
+    TimestampedLineCollector,
+    TimestampWrapper,
+    UnifiedTimeline,
+)
+from pyledctrl.parsers.sunlite import (
+    SunliteSuiteSceneFileParser,
+    SunliteSuiteSwitchFileParser,
+    FX,
+    EasyStepTimeline,
+)
+from pyledctrl.utils import (
+    changed_indexes,
+    consecutive_pairs,
+    first,
+    format_frame_count,
+    grouper,
+)
 from textwrap import dedent
 
 
@@ -103,7 +116,7 @@ class FileSourceMixin(object):
         """
         input_files = self.input_files
         if not input_files:
-            return float('inf')
+            return float("inf")
         if any(not os.path.exists(filename) for filename in input_files):
             raise ValueError("a required input file is missing")
         return max(os.path.getmtime(filename) for filename in input_files)
@@ -127,9 +140,9 @@ class FileTargetMixin(object):
         """
         output_files = self.output
         if not output_files:
-            return float('-inf')
+            return float("-inf")
         if any(not os.path.exists(filename) for filename in output_files):
-            return float('inf')
+            return float("inf")
         return min(os.path.getmtime(filename) for filename in output_files)
 
 
@@ -182,8 +195,9 @@ class ObjectTargetMixin(object):
             return output
 
 
-class FileToObjectCompilationStage(CompilationStage, FileSourceMixin,
-                                   ObjectTargetMixin):
+class FileToObjectCompilationStage(
+    CompilationStage, FileSourceMixin, ObjectTargetMixin
+):
     """Abstract compilation phase that turns a set of input files into an
     in-memory object. This phase is executed unconditionally.
     """
@@ -193,8 +207,9 @@ class FileToObjectCompilationStage(CompilationStage, FileSourceMixin,
         return True
 
 
-class ObjectToFileCompilationStage(CompilationStage, ObjectSourceMixin,
-                                   FileTargetMixin):
+class ObjectToFileCompilationStage(
+    CompilationStage, ObjectSourceMixin, FileTargetMixin
+):
     """Abstract compilation phase that turns an in-memory object into a set of
     output files. This phase is executed unconditionally if the in-memory
     object is not timestamped (i.e. does not have a ``timestamp`` property);
@@ -208,13 +223,15 @@ class ObjectToFileCompilationStage(CompilationStage, ObjectSourceMixin,
         The compilation step is executed if the timestamp of the input
         object is later than the timestamp of the youngest output file.
         """
-        input_timestamp = get_timestamp_of(self.input_object,
-                                           default_value=float('inf'))
+        input_timestamp = get_timestamp_of(
+            self.input_object, default_value=float("inf")
+        )
         return input_timestamp >= self.youngest_output_file_timestamp
 
 
-class ObjectToObjectCompilationStage(CompilationStage, ObjectSourceMixin,
-                                     ObjectTargetMixin):
+class ObjectToObjectCompilationStage(
+    CompilationStage, ObjectSourceMixin, ObjectTargetMixin
+):
     """Abstract compilation phase that transforms an in-memory object into
     another in-memory object. This phase is executed unconditionally.
     """
@@ -224,8 +241,7 @@ class ObjectToObjectCompilationStage(CompilationStage, ObjectSourceMixin,
         return True
 
 
-class FileToFileCompilationStage(CompilationStage, FileSourceMixin,
-                                 FileTargetMixin):
+class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMixin):
     """Abstract compilation phase that turns a set of input files into a set
     of output files. The phase is not executed if all the input files are
     older than all the output files.
@@ -324,8 +340,7 @@ class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
                 pickler(context.ast, output)
 
     def _choose_pickler(self):
-        return u"pickle", partial(pickle.dump,
-                                  protocol=pickle.HIGHEST_PROTOCOL)
+        return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 class ASTOptimisationStage(ObjectToObjectCompilationStage):
@@ -401,8 +416,9 @@ def _write_led_source_from_ast_to_file(ast, filename):
 def _write_progmem_header_from_ast_to_file(ast, filename, device_id=None):
     device_id = int(device_id) if device_id is not None else -1
 
-    HEADER = dedent(
-        """\
+    HEADER = (
+        dedent(
+            """\
         /* This is an autogenerated file; do not edit */
         #include <avr/pgmspace.h>
         #include "bytecode_store.h"
@@ -410,21 +426,27 @@ def _write_progmem_header_from_ast_to_file(ast, filename, device_id=None):
         #define LEDCTRL_DEVICE_ID %d
 
         static const u8 _bytecode[] PROGMEM = {
-        """) % device_id
+        """
+        )
+        % device_id
+    )
 
     FOOTER = dedent(
         """\
         };
 
         PROGMEMBytecodeStore bytecodeStore(_bytecode);
-        """)
+        """
+    )
 
     with open(filename, "w") as output:
         output.write(HEADER)
         for bytes_in_row in grouper(ast.to_bytecode(), 16):
-            output.write("  {0},\n".format(
-                ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
-            ))
+            output.write(
+                "  {0},\n".format(
+                    ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
+                )
+            )
         output.write(FOOTER)
 
 
@@ -446,11 +468,12 @@ class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
 
     def run(self, environment):
         """Inherited."""
-        _write_led_source_from_ast_to_file(
-            self.input_object, self._output_file)
+        _write_led_source_from_ast_to_file(self.input_object, self._output_file)
 
 
-class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage):      # noqa
+class ASTObjectToProgmemHeaderCompilationStage(
+    ASTObjectToOutputCompilationStage
+):  # noqa
     """Compilation stage that turns a pickled abstract syntax tree from a
     file into a header file that can be compiled into the ``ledctrl`` source
     code with an ``#include`` directive.
@@ -458,11 +481,14 @@ class ASTObjectToProgmemHeaderCompilationStage(ASTObjectToOutputCompilationStage
 
     def run(self, environment):
         """Inherited."""
-        _write_progmem_header_from_ast_to_file(self.input_object,
-                                               self._output_file, self.id)
+        _write_progmem_header_from_ast_to_file(
+            self.input_object, self._output_file, self.id
+        )
 
 
-class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationStage):  # noqa
+class ParsedSunliteScenesToPythonSourceCompilationStage(
+    ObjectToFileCompilationStage
+):  # noqa
 
     # TODO(ntamas): make these configurable
     FPS = Decimal(100)
@@ -484,8 +510,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 starts at 2 seconds into the input timelines, assuming
                 100 frames per second.
         """
-        super(ParsedSunliteScenesToPythonSourceCompilationStage,
-              self).__init__()
+        super(ParsedSunliteScenesToPythonSourceCompilationStage, self).__init__()
 
         self._input = input
 
@@ -541,18 +566,22 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
             return
 
         timeline = first(channel.timeline for channel in channels)
-        if not all(channel.timeline.has_same_instants(timeline)
-                   for channel in channels):
-            raise RuntimeError("channel merging is supported only if all the "
-                               "channels share the same timeline")
+        if not all(
+            channel.timeline.has_same_instants(timeline) for channel in channels
+        ):
+            raise RuntimeError(
+                "channel merging is supported only if all the "
+                "channels share the same timeline"
+            )
 
         # Run the steps and maintain a list containing the current state of
         # each channel
         result = UnifiedTimeline()
         for index, time in enumerate(timeline.instants):
             steps = [channel.timeline.steps[index] for channel in channels]
-            result.add(time, tuple(step.value if step is not None else 0
-                                   for step in steps))
+            result.add(
+                time, tuple(step.value if step is not None else 0 for step in steps)
+            )
 
         # TODO: if first time instant is not at zero time, insert a fake
         # entry.
@@ -574,8 +603,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         try:
             # Process each single scene and build the global timeline
             for shift, size, scene_file in self.input_object:
-                self._process_single_scene_file(scene_file, shift=shift,
-                                                trim=size)
+                self._process_single_scene_file(scene_file, shift=shift, trim=size)
 
             # For each FX...
             for fx_id in sorted(self.fx_map.keys()):
@@ -659,9 +687,12 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
 
             # Add markers to the FX object so we know where this scene starts
             # and ends
-            fx.add_marker(shift, "{0!r} starts at {1}".format(
-                filename, self._format_frame_count_as_time(shift)
-            ))
+            fx.add_marker(
+                shift,
+                "{0!r} starts at {1}".format(
+                    filename, self._format_frame_count_as_time(shift)
+                ),
+            )
 
             # Compare the list of channels in our FX object and in the
             # FX object from the scene file. If there are any channels in
@@ -681,8 +712,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 our_timeline = our_channel.timeline
                 our_fps = our_timeline.fps
 
-                timeline = channel_in_scene_file.timeline.scaled_to_fps(
-                    our_fps)
+                timeline = channel_in_scene_file.timeline.scaled_to_fps(our_fps)
                 timeline.loop_until(trim)
                 timeline.shift(by=shift)
 
@@ -725,8 +755,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
         for marker in fx.markers:
             marker.time -= self._start_at
             comment = Comment(value=marker.value)
-            lines.add_marker(comment.to_led_source(),
-                             time=marker.time)
+            lines.add_marker(comment.to_led_source(), time=marker.time)
 
         with closing(lines):
             channel_iter = consecutive_pairs(merged_channels)
@@ -745,9 +774,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # We are at 'time'. First, we handle the pyro channels.
                 # Check whether any pyro channels have changed since the
                 # previous step
-                changed_pyro_channels = [
-                    ch for ch in changed_indexes(last_pyro, pyro)
-                ]
+                changed_pyro_channels = [ch for ch in changed_indexes(last_pyro, pyro)]
 
                 if changed_pyro_channels:
                     # Validate the pyro channels; they should always be either
@@ -756,9 +783,7 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     if any(value not in (0, 255) for value in pyro):
                         self.env.warn(
                             "Pyro channel values are invalid at frame {0.time}"
-                            " for FX {1}: {2!r}".format(
-                                time, fx.id, list(pyro)
-                            )
+                            " for FX {1}: {2!r}".format(time, fx.id, list(pyro))
                         )
 
                     if len(changed_pyro_channels) == 1:
@@ -773,7 +798,8 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                         # More than one channel changed so we generate a
                         # pyro_set_all() command
                         enabled_pyro_channels = [
-                            index for index, value in enumerate(pyro)
+                            index
+                            for index, value in enumerate(pyro)
                             if value >= self.PYRO_THRESHOLD
                         ]
                         if enabled_pyro_channels:
@@ -791,13 +817,13 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                 # have emitted the last time.
                 time_to_wait = next_time.time - time.time - next_time.fade
                 if time_to_wait != time.wait:
-                    self.env.warn("Jump in timeline from frame {0} to frame {1}"
-                                  " in FX {2}"
-                                  .format(time.end, next_time.time, fx.id))
+                    self.env.warn(
+                        "Jump in timeline from frame {0} to frame {1}"
+                        " in FX {2}".format(time.end, next_time.time, fx.id)
+                    )
                 already_waited = False
                 if last_color != color:
-                    command = "set_color({r}, {g}, {b}, duration=@DT@)"\
-                              .format(**color)
+                    command = "set_color({r}, {g}, {b}, duration=@DT@)".format(**color)
                     if next_time.fade == 0:
                         lines.add(command, time_to_wait)
                         already_waited = True
@@ -810,17 +836,17 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(ObjectToFileCompilationS
                     # next color
                     next_color, _ = self._split_channels(next_channels)
                     lines.add(
-                        "fade_to_color({r}, {g}, {b}, duration=@DT@)"
-                        .format(**next_color), next_time.fade
+                        "fade_to_color({r}, {g}, {b}, duration=@DT@)".format(
+                            **next_color
+                        ),
+                        next_time.fade,
                     )
                     last_color = next_color
 
                 if time_to_wait > 0 and not already_waited:
                     # Wait for the specified amount of time if we did not wait
                     # already in the set_color() command emitted above
-                    lines.add(
-                        "sleep(duration=@DT@)", time_to_wait
-                    )
+                    lines.add("sleep(duration=@DT@)", time_to_wait)
 
         if fx.name:
             comment = Comment(value="{0!r} ends here".format(fx.name))

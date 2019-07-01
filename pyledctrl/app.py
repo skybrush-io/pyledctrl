@@ -13,16 +13,20 @@ from pyledctrl.compiler import BytecodeCompiler
 from pyledctrl.config import DEFAULT_BAUD
 from pyledctrl.executor import Executor
 from pyledctrl.upload import BytecodeUploader
-from pyledctrl.utils import error, get_serial_port_filename, \
-    get_serial_connection, parse_as_frame_count
+from pyledctrl.utils import (
+    error,
+    get_serial_port_filename,
+    get_serial_connection,
+    parse_as_frame_count,
+)
 
 pyledctrl = baker.Baker()
 
 
-@pyledctrl.command(shortopts=dict(output="o", keep="k", optimisation="O",
-                                  verbose="v", shift="s"))
-def compile(filename, output=None, keep=False, optimisation=2, shift="",
-            verbose=False):
+@pyledctrl.command(
+    shortopts=dict(output="o", keep="k", optimisation="O", verbose="v", shift="s")
+)
+def compile(filename, output=None, keep=False, optimisation=2, shift="", verbose=False):
     """\
     Compiles a LedCtrl source file to a bytecode file.
 
@@ -46,11 +50,11 @@ def compile(filename, output=None, keep=False, optimisation=2, shift="",
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
 
-    logging.basicConfig(level=logging.INFO if verbose else logging.WARNING,
-                        format="%(message)s")
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING, format="%(message)s"
+    )
 
-    compiler = BytecodeCompiler(keep_intermediate_files=keep,
-                                verbose=verbose)
+    compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=verbose)
     compiler.optimisation_level = optimisation
 
     # TODO(ntamas): don't hardcode 100 fps here
@@ -98,9 +102,13 @@ def dump(filename, output=None, keep=False):
         """Converts an ExecutorState_ object to the row that we want to
         write into the output file.
         """
-        return ["%g" % state.timestamp,
-                state.color.red, state.color.green, state.color.blue,
-                state.is_fade]
+        return [
+            "%g" % state.timestamp,
+            state.color.red,
+            state.color.green,
+            state.color.blue,
+            state.is_fade,
+        ]
 
     compiler = BytecodeCompiler(keep_intermediate_files=False)
     compiler.compile(filename)

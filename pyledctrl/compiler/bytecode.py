@@ -3,8 +3,10 @@ abstract syntax tree fragments."""
 
 from pyledctrl.compiler import ast
 from pyledctrl.compiler.colors import parse_color
-from pyledctrl.compiler.errors import MarkerNotResolvableError, \
-    FeatureNotImplementedError
+from pyledctrl.compiler.errors import (
+    MarkerNotResolvableError,
+    FeatureNotImplementedError,
+)
 
 
 def _check_easing_is_supported(easing):
@@ -71,6 +73,7 @@ class JumpMarker(Marker):
 
 class UnconditionalJumpMarker(JumpMarker):
     """Marker object for an unconditional jump instruction."""
+
     pass
 
 
@@ -152,8 +155,10 @@ def set_color(red, green=None, blue=None, duration=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
     red, green, blue = int(round(red)), int(round(green)), int(round(blue))
-    return ast.SetColorCommand(color=ast.RGBColor.cached(red, green, blue),
-                               duration=ast.Duration.from_seconds(duration))
+    return ast.SetColorCommand(
+        color=ast.RGBColor.cached(red, green, blue),
+        duration=ast.Duration.from_seconds(duration),
+    )
 
 
 def set_gray(value, duration=None):

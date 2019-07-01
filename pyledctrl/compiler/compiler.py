@@ -7,21 +7,21 @@ import os
 
 from functools import partial
 
-from pyledctrl.compiler.errors import CompilerError, \
-    UnsupportedInputFileFormatError
+from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFileFormatError
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
-from pyledctrl.compiler.stages import \
-    DummyStage, \
-    CompilationStageExecutionEnvironment, \
-    ParsedSunliteScenesToPythonSourceCompilationStage, \
-    PythonSourceToASTObjectCompilationStage, \
-    SunliteSceneParsingStage, \
-    SunliteSwitchParsingStage, \
-    ASTObjectToBytecodeCompilationStage, \
-    ASTObjectToLEDFileCompilationStage, \
-    ASTObjectToProgmemHeaderCompilationStage, \
-    ASTOptimisationStage
+from pyledctrl.compiler.stages import (
+    DummyStage,
+    CompilationStageExecutionEnvironment,
+    ParsedSunliteScenesToPythonSourceCompilationStage,
+    PythonSourceToASTObjectCompilationStage,
+    SunliteSceneParsingStage,
+    SunliteSwitchParsingStage,
+    ASTObjectToBytecodeCompilationStage,
+    ASTObjectToLEDFileCompilationStage,
+    ASTObjectToProgmemHeaderCompilationStage,
+    ASTOptimisationStage,
+)
 from pyledctrl.utils import TemporaryDirectory
 
 log = logging.getLogger("pyledctrl.compiler.compiler")
@@ -114,8 +114,7 @@ class BytecodeCompiler(object):
     def _compile(self, input_file, output_file, force):
         plan = Plan()
         self._collect_stages(input_file, output_file, plan)
-        self.output = plan.execute(self.environment,
-                                   force=force, verbose=self.verbose)
+        self.output = plan.execute(self.environment, force=force, verbose=self.verbose)
 
     def _collect_stages(self, input_file, output_file, plan):
         """Collects the compilation stages that will turn the given input
@@ -151,8 +150,7 @@ class BytecodeCompiler(object):
 
         # Shifting is supported for ``.sce`` and ``.ses`` only
         if ext not in (".sce", ".ses") and self.shift_by != 0:
-            raise CompilerError("Shifting is supported only for Sunlite "
-                                "Suite files")
+            raise CompilerError("Shifting is supported only for Sunlite " "Suite files")
 
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
@@ -191,23 +189,20 @@ class BytecodeCompiler(object):
                 else:
                     real_output_file = output_file
 
-                optimization_stage = ASTOptimisationStage(stage,
-                                                          self._optimiser)
+                optimization_stage = ASTOptimisationStage(stage, self._optimiser)
                 plan.add_step(optimization_stage)
 
-                output_stage = output_stage_factory(optimization_stage,
-                                                    real_output_file,
-                                                    id=stage.id)
+                output_stage = output_stage_factory(
+                    optimization_stage, real_output_file, id=stage.id
+                )
                 plan.add_step(output_stage)
 
-    def _add_stages_for_input_led_file(self, input_file, output_file, plan,
-                                       ast_only):
+    def _add_stages_for_input_led_file(self, input_file, output_file, plan, ast_only):
         stage = PythonSourceToASTObjectCompilationStage(input_file)
         plan.add_step(stage, output=ast_only)
         return stage
 
-    def _add_stages_for_input_sce_file(self, input_file, output_file, plan,
-                                       ast_only):
+    def _add_stages_for_input_sce_file(self, input_file, output_file, plan, ast_only):
         if ast_only:
             led_file_template = self._create_intermediate_filename(
                 "stage{}_" + input_file, ".led"
@@ -219,8 +214,7 @@ class BytecodeCompiler(object):
                     "FX identifier when compiling a Sunlite Suite scene "
                     "file"
                 )
-            led_file_template = self._create_intermediate_filename(
-                output_file, ".led")
+            led_file_template = self._create_intermediate_filename(output_file, ".led")
 
         parsing_stage = SunliteSceneParsingStage(input_file)
         plan.add_step(parsing_stage)
@@ -228,21 +222,20 @@ class BytecodeCompiler(object):
         @plan.when_step_is_done(parsing_stage)
         def create_next_stages(output):
             preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
-                [(0, None, output)], led_file_template,
-                start_at=self.shift_by
+                [(0, None, output)], led_file_template, start_at=self.shift_by
             )
             plan.add_step(preproc_stage)
 
             intermediate_files = preproc_stage.output_files_by_ids.items()
             for id, intermediate_file in intermediate_files:
                 stage = PythonSourceToASTObjectCompilationStage(
-                    intermediate_file, id=id)
+                    intermediate_file, id=id
+                )
                 plan.add_step(stage, output=ast_only)
 
         return parsing_stage
 
-    def _add_stages_for_input_ses_file(self, input_file, output_file, plan,
-                                       ast_only):
+    def _add_stages_for_input_ses_file(self, input_file, output_file, plan, ast_only):
         # Get the directory in which the input .ses file is contained --
         # we will assume that all the .sce files that the .ses file refers to
         # are in the same directory
@@ -260,8 +253,7 @@ class BytecodeCompiler(object):
                     "FX identifier when compiling a Sunlite Suite scene "
                     "file"
                 )
-            led_file_template = self._create_intermediate_filename(
-                output_file, ".led")
+            led_file_template = self._create_intermediate_filename(output_file, ".led")
 
         # Parse the .ses file, and find all the .sce files that we depend on
         ses_parsing_stage = SunliteSwitchParsingStage(input_file)
@@ -318,11 +310,9 @@ class BytecodeCompiler(object):
                 # Add the preprocessing stage that merges multiple Sunlite
                 # Suite scene files into .led (Python) source files, sorted
                 # by FX IDs
-                preproc_stage = \
-                    ParsedSunliteScenesToPythonSourceCompilationStage(
-                        scene_order, led_file_template,
-                        start_at=self.shift_by
-                    )
+                preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
+                    scene_order, led_file_template, start_at=self.shift_by
+                )
                 add_step(preproc_stage)
 
                 # For each intermediate .led (Python) file created in the
@@ -331,7 +321,8 @@ class BytecodeCompiler(object):
                 intermediate_files = preproc_stage.output_files_by_ids.items()
                 for id, intermediate_file in intermediate_files:
                     stage = PythonSourceToASTObjectCompilationStage(
-                        intermediate_file, id=id)
+                        intermediate_file, id=id
+                    )
                     add_step(stage, output=ast_only)
 
         return marker_stage
@@ -349,9 +340,11 @@ class BytecodeCompiler(object):
         """
         base, orig_ext = os.path.splitext(output_file)
         if orig_ext == ext:
-            raise ValueError("cannot create an intermediate file with "
-                             "extension {0!r} because the name of the output "
-                             "file has the same extension".format(orig_ext))
+            raise ValueError(
+                "cannot create an intermediate file with "
+                "extension {0!r} because the name of the output "
+                "file has the same extension".format(orig_ext)
+            )
         if self._tmpdir:
             base = os.path.basename(base)
             return os.path.join(self._tmpdir, base + ext)

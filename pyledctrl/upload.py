@@ -32,7 +32,6 @@ class BytecodeUploader(object):
             fd = self.port.fdspawn()
             fd = self.port.fdspawn()
 
-
             self.log("Waiting for device to finish booting...")
             while True:
                 response = self._wait_for_response(fd)
@@ -51,8 +50,12 @@ class BytecodeUploader(object):
 
             max_bytecode_size = int(response.message)
             if max_bytecode_size < length:
-                self.log("Cannot upload bytecode; maximum allowed size is {0} bytes "
-                         "but we tried to upload {1} bytes.".format(max_bytecode_size, length))
+                self.log(
+                    "Cannot upload bytecode; maximum allowed size is {0} bytes "
+                    "but we tried to upload {1} bytes.".format(
+                        max_bytecode_size, length
+                    )
+                )
                 return False
 
             self.log("Sending bytecode...")
@@ -87,15 +90,15 @@ class BytecodeUploader(object):
              indicating success.
         """
         while True:
-            index = fd.expect([
-                "\\+([^\r\n]*)\r?\n",
-                "-E([^\r\n]*)\r?\n",
-                ":([^\r\n]*)\r?\n"
-            ])
+            index = fd.expect(
+                ["\\+([^\r\n]*)\r?\n", "-E([^\r\n]*)\r?\n", ":([^\r\n]*)\r?\n"]
+            )
             if index == 2:
                 try:
                     bytes_uploaded = int(fd.match.group(1))
-                    sys.stderr.write("{0:.2f}%\r".format(100.0 * bytes_uploaded / self.length))
+                    sys.stderr.write(
+                        "{0:.2f}%\r".format(100.0 * bytes_uploaded / self.length)
+                    )
                 except:
                     pass
             elif index == 1:

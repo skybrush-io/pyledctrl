@@ -5,7 +5,7 @@ from __future__ import division
 from collections import defaultdict
 from tqdm import tqdm
 
-__all__ = ("Plan", )
+__all__ = ("Plan",)
 
 
 class Plan(object):
@@ -61,7 +61,7 @@ class Plan(object):
         with tqdm(total=num_steps, bar_format=bar_format) as progress_bar:
             while step_index < num_steps:
                 step = self._steps[step_index]
-                is_last = (step_index == num_steps - 1)
+                is_last = step_index == num_steps - 1
 
                 if force or is_last or step.should_run():
                     # Print information about the step being executed if
@@ -113,8 +113,7 @@ class Plan(object):
             output (bool): whether to mark the step as an output step
         """
         if (before is None) == (after is None):
-            raise ValueError("exactly one of before=... and after=... "
-                             "must be None")
+            raise ValueError("exactly one of before=... and after=... " "must be None")
         index = self._steps.index(before or after)
         if before is None:
             index += 1
@@ -153,9 +152,11 @@ class Plan(object):
         if func is not None:
             return self._register_callback(step, "done", func)
         else:
+
             def decorator(decorated):
                 self.when_step_is_done(step, decorated)
                 return decorated
+
             return decorator
 
     def _get_message_for_step(self, step):

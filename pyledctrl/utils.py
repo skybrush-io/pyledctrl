@@ -58,7 +58,7 @@ def ensure_tuple(obj):
     """Ensures that the given object is a tuple. If it is not a tuple,
     returns a tuple containing the object only.
     """
-    return obj if isinstance(obj, tuple) else obj,
+    return (obj if isinstance(obj, tuple) else obj,)
 
 
 def error(message, fatal=False):
@@ -107,7 +107,7 @@ def get_serial_port_filename(port=None):
         port
     """
     if port is None:
-        ttyusb = glob.glob('/dev/ttyUSB*') + ["/dev/ttyUSB0"]
+        ttyusb = glob.glob("/dev/ttyUSB*") + ["/dev/ttyUSB0"]
         return ttyusb[0]
     else:
         return str(port)
@@ -124,8 +124,8 @@ def get_serial_connection(port, baud=None):
     # Lazy import. This is important since groundctrl is not a strict
     # dependency of pyledctrl
     from groundctrl.serial_port import SerialPort
-    return SerialPort(port=get_serial_port_filename(port),
-                      baud=baud or DEFAULT_BAUD)
+
+    return SerialPort(port=get_serial_port_filename(port), baud=baud or DEFAULT_BAUD)
 
 
 def grouper(iterable, n):
@@ -151,6 +151,7 @@ def memoize(func):
     """Single-argument memoization decorator for a function. Caches the results
     of the function in a dictionary.
     """
+
     class memodict(dict):
         __slots__ = ()
 
@@ -203,8 +204,7 @@ class _TemporaryDirectory(object):
     name = None
     _closed = False
 
-    def __init__(self, suffix="", prefix=tempfile.template, dir=None,
-                 keep=False):
+    def __init__(self, suffix="", prefix=tempfile.template, dir=None, keep=False):
         self.name = tempfile.mkdtemp(suffix, prefix, dir)
         self.keep = keep
 
@@ -222,6 +222,7 @@ class _TemporaryDirectory(object):
             if not self.keep:
                 shutil.rmtree(self.name)
             self._closed = True
+
 
 try:
     from tempfile import TemporaryDirectory

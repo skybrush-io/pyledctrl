@@ -107,63 +107,63 @@ class CommandCode(object):
     ``ledctrl``\ 's bytecode.
     """
 
-    END = b'\x00'
-    NOP = b'\x01'
-    SLEEP = b'\x02'
-    WAIT_UNTIL = b'\x03'
-    SET_COLOR = b'\x04'
-    SET_GRAY = b'\x05'
-    SET_BLACK = b'\x06'
-    SET_WHITE = b'\x07'
-    FADE_TO_COLOR = b'\x08'
-    FADE_TO_GRAY = b'\x09'
-    FADE_TO_BLACK = b'\x0A'
-    FADE_TO_WHITE = b'\x0B'
-    LOOP_BEGIN = b'\x0C'
-    LOOP_END = b'\x0D'
-    RESET_TIMER = b'\x0E'
-    SET_COLOR_FROM_CHANNELS = b'\x10'
-    FADE_TO_COLOR_FROM_CHANNELS = b'\x11'
-    JUMP = b'\x12'
-    TRIGGERED_JUMP = b'\x13'
-    SET_PYRO = b'\x14'
-    SET_PYRO_ALL = b'\x15'
+    END = b"\x00"
+    NOP = b"\x01"
+    SLEEP = b"\x02"
+    WAIT_UNTIL = b"\x03"
+    SET_COLOR = b"\x04"
+    SET_GRAY = b"\x05"
+    SET_BLACK = b"\x06"
+    SET_WHITE = b"\x07"
+    FADE_TO_COLOR = b"\x08"
+    FADE_TO_GRAY = b"\x09"
+    FADE_TO_BLACK = b"\x0A"
+    FADE_TO_WHITE = b"\x0B"
+    LOOP_BEGIN = b"\x0C"
+    LOOP_END = b"\x0D"
+    RESET_TIMER = b"\x0E"
+    SET_COLOR_FROM_CHANNELS = b"\x10"
+    FADE_TO_COLOR_FROM_CHANNELS = b"\x11"
+    JUMP = b"\x12"
+    TRIGGERED_JUMP = b"\x13"
+    SET_PYRO = b"\x14"
+    SET_PYRO_ALL = b"\x15"
 
 
 class EasingMode(object):
     """Constants corresponding to the various easing modes in ``ledctrl``."""
 
-    LINEAR = b'\x00'
-    IN_SINE = b'\x01'
-    OUT_SINE = b'\x02'
-    IN_OUT_SINE = b'\x03'
-    IN_QUAD = b'\x04'
-    OUT_QUAD = b'\x05'
-    IN_OUT_QUAD = b'\x06'
-    IN_CUBIC = b'\x07'
-    OUT_CUBIC = b'\x08'
-    IN_OUT_CUBIC = b'\x09'
-    IN_QUART = b'\x0A'
-    OUT_QUART = b'\x0B'
-    IN_OUT_QUART = b'\x0C'
-    IN_QUINT = b'\x0D'
-    OUT_QUINT = b'\x0E'
-    IN_OUT_QUINT = b'\x0F'
-    IN_EXPO = b'\x10'
-    OUT_EXPO = b'\x11'
-    IN_OUT_EXPO = b'\x12'
-    IN_CIRC = b'\x13'
-    OUT_CIRC = b'\x14'
-    IN_OUT_CIRC = b'\x15'
-    IN_BACK = b'\x16'
-    OUT_BACK = b'\x17'
-    IN_OUT_BACK = b'\x18'
-    IN_ELASTIC = b'\x19'
-    OUT_ELASTIC = b'\x1A'
-    IN_OUT_ELASTIC = b'\x1B'
-    IN_BOUNCE = b'\x1C'
-    OUT_BOUNCE = b'\x1D'
-    IN_OUT_BOUNCE = b'\x1E'
+    LINEAR = b"\x00"
+    IN_SINE = b"\x01"
+    OUT_SINE = b"\x02"
+    IN_OUT_SINE = b"\x03"
+    IN_QUAD = b"\x04"
+    OUT_QUAD = b"\x05"
+    IN_OUT_QUAD = b"\x06"
+    IN_CUBIC = b"\x07"
+    OUT_CUBIC = b"\x08"
+    IN_OUT_CUBIC = b"\x09"
+    IN_QUART = b"\x0A"
+    OUT_QUART = b"\x0B"
+    IN_OUT_QUART = b"\x0C"
+    IN_QUINT = b"\x0D"
+    OUT_QUINT = b"\x0E"
+    IN_OUT_QUINT = b"\x0F"
+    IN_EXPO = b"\x10"
+    OUT_EXPO = b"\x11"
+    IN_OUT_EXPO = b"\x12"
+    IN_CIRC = b"\x13"
+    OUT_CIRC = b"\x14"
+    IN_OUT_CIRC = b"\x15"
+    IN_BACK = b"\x16"
+    OUT_BACK = b"\x17"
+    IN_OUT_BACK = b"\x18"
+    IN_ELASTIC = b"\x19"
+    OUT_ELASTIC = b"\x1A"
+    IN_OUT_ELASTIC = b"\x1B"
+    IN_BOUNCE = b"\x1C"
+    OUT_BOUNCE = b"\x1D"
+    IN_OUT_BOUNCE = b"\x1E"
 
     @classmethod
     def get(cls, spec):
@@ -256,11 +256,13 @@ class _NodeMeta(type):
             # Class should be abstract
             def __init__(self, *args, **kwds):
                 raise NotImplementedError("this node type is abstract")
+
             return __init__
 
         # Class is not abstract, so we need a real constructor
-        node_superclass = first(parent for parent in parents
-                                if issubclass(parent, Node))
+        node_superclass = first(
+            parent for parent in parents if issubclass(parent, Node)
+        )
         node_superclass_is_abstract = not hasattr(node_superclass, "_fields")
         num_fields = len(fields)
 
@@ -269,16 +271,19 @@ class _NodeMeta(type):
                 node_superclass.__init__(self)
             if args:
                 if num_fields < len(args):
-                    raise TypeError("__init__() takes at most {0} "
-                                    "arguments ({1} given)".format(
-                                        num_fields, len(args)))
+                    raise TypeError(
+                        "__init__() takes at most {0} "
+                        "arguments ({1} given)".format(num_fields, len(args))
+                    )
                 for arg_name, arg in zip(fields, args):
                     setattr(self, arg_name, arg)
             if kwds:
                 for arg_name, arg in kwds.items():
                     if arg_name not in fields:
-                        raise TypeError("__init__() got an unexpected keyword "
-                                        "argument: {0!r}".format(arg_name))
+                        raise TypeError(
+                            "__init__() got an unexpected keyword "
+                            "argument: {0!r}".format(arg_name)
+                        )
                     setattr(self, arg_name, arg)
             if defaults:
                 for arg_name, arg in defaults.items():
@@ -288,8 +293,10 @@ class _NodeMeta(type):
                         setattr(self, arg_name, arg)
             for arg_name in fields:
                 if not hasattr(self, arg_name):
-                    raise TypeError("__init__() did not receive an initial "
-                                    "value for field {0!r}".format(arg_name))
+                    raise TypeError(
+                        "__init__() did not receive an initial "
+                        "value for field {0!r}".format(arg_name)
+                    )
 
         return __init__
 
@@ -395,8 +402,10 @@ class Node(object):
             setattr(self, arg_name, value)
 
     def __repr__(self):
-        kvpairs = ["{0}={1!r}".format(arg_name, getattr(self, arg_name))
-                   for arg_name in self._fields]
+        kvpairs = [
+            "{0}={1!r}".format(arg_name, getattr(self, arg_name))
+            for arg_name in self._fields
+        ]
         return "{0.__class__.__name__}({1})".format(self, ", ".join(kvpairs))
 
 
@@ -404,11 +413,13 @@ class NodeList(list):
     """Subclass of list that adds no extra functionality but allows us to
     detect objects that are meant to hold lists of AST nodes.
     """
+
     pass
 
 
 class Literal(Node):
     """Base class for literal nodes."""
+
     pass
 
 
@@ -425,10 +436,8 @@ class UnsignedByte(Byte):
     of an RGB color that is stored on a single byte).
     """
 
-    _fields = ("value", )
-    _defaults = {
-        "value": 0
-    }
+    _fields = ("value",)
+    _defaults = {"value": 0}
 
     def __init__(self, value=0):
         """Constructor.
@@ -464,10 +473,8 @@ class UnsignedByte(Byte):
 class Varuint(Literal):
     """Node that represents an unsigned varint-encoded literal value."""
 
-    _fields = ("value", )
-    _defaults = {
-        "value": 0
-    }
+    _fields = ("value",)
+    _defaults = {"value": 0}
     _immutable = _fields
 
     def __init__(self, value=0):
@@ -497,9 +504,10 @@ class Varuint(Literal):
     def _set_value(self, value):
         if value < 0:
             raise ValueError("value must be non-negative")
-        elif value >= 2**28:
-            raise ValueError("varuints greater than 2**28 are not supported "
-                             "by the bytecode")
+        elif value >= 2 ** 28:
+            raise ValueError(
+                "varuints greater than 2**28 are not supported " "by the bytecode"
+            )
         self._value = value
 
 
@@ -507,10 +515,7 @@ class ChannelMask(Byte):
     """Literal that represents the channel mask of a SET_PYRO command."""
 
     _fields = ("enable", "channels")
-    _defaults = {
-        "enable": False,
-        "channels": ()
-    }
+    _defaults = {"enable": False, "channels": ()}
     _immutable = _fields
 
     def __init__(self, enable=False, channels=()):
@@ -533,7 +538,7 @@ class ChannelMask(Byte):
     def _to_byte(self):
         result = 0
         for bit in self._channels:
-            result |= (1 << bit)
+            result |= 1 << bit
         return (result & 127) + (128 if self._enable else 0)
 
     def to_bytecode(self):
@@ -555,10 +560,8 @@ class ChannelValues(Byte):
     """Literal that represents the channel value byte of a SET_PYRO_ALL
     command."""
 
-    _fields = ("channels", )
-    _defaults = {
-        "channels": ()
-    }
+    _fields = ("channels",)
+    _defaults = {"channels": ()}
 
     def __init__(self, channels=()):
         """Constructor.
@@ -578,7 +581,7 @@ class ChannelValues(Byte):
     def _to_byte(self):
         result = 0
         for bit in self._channels:
-            result |= (1 << bit)
+            result |= 1 << bit
         return result & 127
 
     def to_bytecode(self):
@@ -608,11 +611,7 @@ class RGBColor(Node):
     """Node that represents an RGB color."""
 
     _fields = ("red", "green", "blue")
-    _defaults = {
-        "red": UnsignedByte,
-        "green": UnsignedByte,
-        "blue": UnsignedByte
-    }
+    _defaults = {"red": UnsignedByte, "green": UnsignedByte, "blue": UnsignedByte}
     _immutable = _fields
     _instance_cache = {}
     _struct = Struct("BBB")
@@ -634,42 +633,46 @@ class RGBColor(Node):
         """Compares this color with another RGBColor to decide whether they
         are the same.
         """
-        return self._red.value == other._red.value and \
-            self._green.value == other._green.value and \
-            self._blue.value == other._blue.value
+        return (
+            self._red.value == other._red.value
+            and self._green.value == other._green.value
+            and self._blue.value == other._blue.value
+        )
 
     @property
     def is_black(self):
         """Returns ``True`` if the color is black."""
-        return self._red.value == 0 and self._green.value == 0 and \
-            self._blue.value == 0
+        return self._red.value == 0 and self._green.value == 0 and self._blue.value == 0
 
     @property
     def is_gray(self):
         """Returns ``True`` if the color is a shade of gray."""
-        return self._red.value == self._green.value and \
-            self._green.value == self._blue.value
+        return (
+            self._red.value == self._green.value
+            and self._green.value == self._blue.value
+        )
 
     @property
     def is_white(self):
         """Returns ``True`` if the color is white."""
-        return self._red.value == 255 and self._green.value == 255 and \
-            self._blue.value == 255
+        return (
+            self._red.value == 255
+            and self._green.value == 255
+            and self._blue.value == 255
+        )
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
         return 3
 
     def to_bytecode(self):
-        return self._struct.pack(self.red.value,
-                                 self.green.value,
-                                 self.blue.value)
+        return self._struct.pack(self.red.value, self.green.value, self.blue.value)
 
     def to_led_source(self):
         return "{0}, {1}, {2}".format(
             self.red.to_led_source(),
             self.green.to_led_source(),
-            self.blue.to_led_source()
+            self.blue.to_led_source(),
         )
 
 
@@ -713,9 +716,12 @@ class Duration(Varuint):
         getcontext().clear_flags()
         frame_count_as_int = int(frame_count.to_integral_exact())
         if getcontext().flags[Inexact]:
-            warn("Cannot convert {0} seconds into an integer number of frames "
-                 "at {1} FPS; this could be a problem in the ledctrl output"\
-                 .format(str(seconds), cls.FPS))
+            warn(
+                "Cannot convert {0} seconds into an integer number of frames "
+                "at {1} FPS; this could be a problem in the ledctrl output".format(
+                    str(seconds), cls.FPS
+                )
+            )
 
         return cls.from_frames(frame_count_as_int)
 
@@ -738,9 +744,7 @@ class StatementSequence(Node):
     """Node that represents a sequence of statements."""
 
     _fields = ["statements"]
-    _defaults = {
-        "statements": NodeList
-    }
+    _defaults = {"statements": NodeList}
 
     def append(self, node):
         """Appends a node to the sequence."""
@@ -754,8 +758,8 @@ class StatementSequence(Node):
         return b"".join(node.to_bytecode() for node in self.statements)
 
     def to_led_source(self):
-        return "\n".join(statement.to_led_source()
-                         for statement in self.statements)
+        return "\n".join(statement.to_led_source() for statement in self.statements)
+
 
 class Statement(Node):
     """Node that represents a single statement (e.g., a bytecode command or
@@ -766,8 +770,7 @@ class Statement(Node):
         some other statement.
         """
         return self is other or (
-            self.__class__ is other.__class__ and \
-            self._is_equivalent_to_inner(other)
+            self.__class__ is other.__class__ and self._is_equivalent_to_inner(other)
         )
 
     def _is_equivalent_to_inner(self, other):
@@ -785,7 +788,7 @@ class Comment(Statement):
     Python representation of the AST but is replaced by an empty byte
     sequence in the bytecode)."""
 
-    _fields = ("value", )
+    _fields = ("value",)
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
@@ -837,10 +840,8 @@ class SleepCommand(Command):
     """Node that represents a ``SLEEP`` command in the bytecode."""
 
     code = CommandCode.SLEEP
-    _fields = ("duration", )
-    _defaults = {
-        "duration": Varuint
-    }
+    _fields = ("duration",)
+    _defaults = {"duration": Varuint}
 
     def to_led_source(self):
         return "sleep(duration={0})".format(self.duration.to_led_source())
@@ -850,10 +851,8 @@ class WaitUntilCommand(Command):
     """Node that represents a ``WAIT_UNTIL`` command in the bytecode."""
 
     code = CommandCode.WAIT_UNTIL
-    _fields = ("timestamp", )
-    _defaults = {
-        "timestamp": Varuint
-    }
+    _fields = ("timestamp",)
+    _defaults = {"timestamp": Varuint}
 
 
 class SetColorCommand(Command):
@@ -861,10 +860,7 @@ class SetColorCommand(Command):
 
     code = CommandCode.SET_COLOR
     _fields = ("color", "duration")
-    _defaults = {
-        "color": RGBColor,
-        "duration": Duration
-    }
+    _defaults = {"color": RGBColor, "duration": Duration}
     _immutable = _fields
 
     def __init__(self, color, duration):
@@ -874,8 +870,9 @@ class SetColorCommand(Command):
         self._duration = duration
 
     def _is_equivalent_to_inner(self, other):
-        return self._color.equals(other._color) and \
-            self._duration.equals(other._duration)
+        return self._color.equals(other._color) and self._duration.equals(
+            other._duration
+        )
 
     def to_led_source(self):
         return "set_color({0}, duration={1})".format(
@@ -888,14 +885,12 @@ class SetGrayCommand(Command):
 
     code = CommandCode.SET_GRAY
     _fields = ("value", "duration")
-    _defaults = {
-        "value": UnsignedByte,
-        "duration": Varuint
-    }
+    _defaults = {"value": UnsignedByte, "duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
-        return self._value.equals(other._value) and \
-            self._duration.equals(other._duration)
+        return self._value.equals(other._value) and self._duration.equals(
+            other._duration
+        )
 
     def to_led_source(self):
         return "set_gray({0}, duration={1})".format(
@@ -907,10 +902,8 @@ class SetBlackCommand(Command):
     """Node that represents a ``SET_BLACK`` command in the bytecode."""
 
     code = CommandCode.SET_BLACK
-    _fields = ("duration", )
-    _defaults = {
-        "duration": Varuint
-    }
+    _fields = ("duration",)
+    _defaults = {"duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
         return self._duration.equals(other._duration)
@@ -923,10 +916,8 @@ class SetWhiteCommand(Command):
     """Node that represents a ``SET_WHITE`` command in the bytecode."""
 
     code = CommandCode.SET_WHITE
-    _fields = ("duration", )
-    _defaults = {
-        "duration": Varuint
-    }
+    _fields = ("duration",)
+    _defaults = {"duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
         return self._duration.equals(other._duration)
@@ -940,10 +931,7 @@ class FadeToColorCommand(Command):
 
     code = CommandCode.FADE_TO_COLOR
     _fields = ("color", "duration")
-    _defaults = {
-        "color": RGBColor,
-        "duration": Varuint
-    }
+    _defaults = {"color": RGBColor, "duration": Varuint}
     _immutable = _fields
 
     def __init__(self, color, duration):
@@ -953,8 +941,9 @@ class FadeToColorCommand(Command):
         self._duration = duration
 
     def _is_equivalent_to_inner(self, other):
-        return self._color.equals(other._color) and \
-            self._duration.equals(other._duration)
+        return self._color.equals(other._color) and self._duration.equals(
+            other._duration
+        )
 
     def to_led_source(self):
         return "fade_to_color({0}, duration={1})".format(
@@ -967,14 +956,12 @@ class FadeToGrayCommand(Command):
 
     code = CommandCode.FADE_TO_GRAY
     _fields = ("value", "duration")
-    _defaults = {
-        "value": UnsignedByte,
-        "duration": Varuint
-    }
+    _defaults = {"value": UnsignedByte, "duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
-        return self._value.equals(other._value) and \
-            self._duration.equals(other._duration)
+        return self._value.equals(other._value) and self._duration.equals(
+            other._duration
+        )
 
     def to_led_source(self):
         return "fade_to_gray({0}, duration={1})".format(
@@ -986,36 +973,28 @@ class FadeToBlackCommand(Command):
     """Node that represents a ``FADE_TO_BLACK`` command in the bytecode."""
 
     code = CommandCode.FADE_TO_BLACK
-    _fields = ("duration", )
-    _defaults = {
-        "duration": Varuint
-    }
+    _fields = ("duration",)
+    _defaults = {"duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
         return self._duration.equals(other._duration)
 
     def to_led_source(self):
-        return "fade_to_black(duration={0})".format(
-            self.duration.to_led_source()
-        )
+        return "fade_to_black(duration={0})".format(self.duration.to_led_source())
 
 
 class FadeToWhiteCommand(Command):
     """Node that represents a ``FADE_TO_WHITE`` command in the bytecode."""
 
     code = CommandCode.FADE_TO_WHITE
-    _fields = ("duration", )
-    _defaults = {
-        "duration": Varuint
-    }
+    _fields = ("duration",)
+    _defaults = {"duration": Varuint}
 
     def _is_equivalent_to_inner(self, other):
         return self._duration.equals(other._duration)
 
     def to_led_source(self):
-        return "fade_to_white(duration={0})".format(
-            self.duration.to_led_source()
-        )
+        return "fade_to_white(duration={0})".format(self.duration.to_led_source())
 
 
 class ResetTimerCommand(Command):
@@ -1035,7 +1014,7 @@ class SetColorFromChannelsCommand(Command):
         "red_channel": UnsignedByte,
         "green_channel": UnsignedByte,
         "blue_channel": UnsignedByte,
-        "duration": Varuint
+        "duration": Varuint,
     }
 
 
@@ -1049,7 +1028,7 @@ class FadeToColorFromChannelsCommand(Command):
         "red_channel": UnsignedByte,
         "green_channel": UnsignedByte,
         "blue_channel": UnsignedByte,
-        "duration": Varuint
+        "duration": Varuint,
     }
 
 
@@ -1057,20 +1036,16 @@ class JumpCommand(Command):
     """Node that represents a ``JUMP`` command in the bytecode."""
 
     code = CommandCode.JUMP
-    _fields = ("address", )
-    _defaults = {
-        "address": Varuint
-    }
+    _fields = ("address",)
+    _defaults = {"address": Varuint}
 
 
 class SetPyroCommand(Command):
     """Node that represents a ``SET_PYRO`` command in the bytecode."""
 
     code = CommandCode.SET_PYRO
-    _fields = ("mask", )
-    _defaults = {
-        "mask": ChannelMask
-    }
+    _fields = ("mask",)
+    _defaults = {"mask": ChannelMask}
     _immutable = _fields
 
     def __init__(self, mask):
@@ -1092,10 +1067,8 @@ class SetPyroAllCommand(Command):
     """Node that represents a ``SET_PYRO_ALL`` command in the bytecode."""
 
     code = CommandCode.SET_PYRO_ALL
-    _fields = ("values", )
-    _defaults = {
-        "values": ChannelValues
-    }
+    _fields = ("values",)
+    _defaults = {"values": ChannelValues}
     _immutable = _fields
 
     def __init__(self, values):
@@ -1117,10 +1090,7 @@ class LoopBlock(Statement):
     """Node that represents a loop in the bytecode."""
 
     _fields = ("iterations", "body")
-    _defaults = {
-        "iterations": UnsignedByte,
-        "body": StatementSequence
-    }
+    _defaults = {"iterations": UnsignedByte, "body": StatementSequence}
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
@@ -1140,8 +1110,12 @@ class LoopBlock(Statement):
         if self.iterations.value == 1:
             return body
         else:
-            return CommandCode.LOOP_BEGIN + self.iterations.to_bytecode() + \
-                body + CommandCode.LOOP_END
+            return (
+                CommandCode.LOOP_BEGIN
+                + self.iterations.to_bytecode()
+                + body
+                + CommandCode.LOOP_END
+            )
 
     def to_led_source(self):
         if not self.body.statements or self.iterations.value < 0:
@@ -1238,7 +1212,7 @@ class NodeTransformer(NodeVisitor):
         of the node will *not* be visited. You must call ``generic_visit()``
         explicitly if you want to visit the children."""
         generator = node.transform_child_nodes()
-        new_node = None            # for priming the generator
+        new_node = None  # for priming the generator
         while True:
             try:
                 child_node = generator.send(new_node)
@@ -1259,15 +1233,20 @@ iter_child_nodes = Node.iter_child_nodes
 
 
 if __name__ == "__main__":
-    node = StatementSequence([
-        LoopBlock(iterations=5, body=[
-            SetColorCommand(color=RGBColor(255, 127, 0), duration=50),
-            FadeToWhiteCommand(duration=50)
-        ]),
-        SleepCommand(4200),
-        NopCommand(),
-        EndCommand(),
-    ])
+    node = StatementSequence(
+        [
+            LoopBlock(
+                iterations=5,
+                body=[
+                    SetColorCommand(color=RGBColor(255, 127, 0), duration=50),
+                    FadeToWhiteCommand(duration=50),
+                ],
+            ),
+            SleepCommand(4200),
+            NopCommand(),
+            EndCommand(),
+        ]
+    )
     print(repr(node))
     print(repr(node.to_bytecode()))
     print(node.length_in_bytes)
