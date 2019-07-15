@@ -57,8 +57,8 @@ def compile(filename, output=None, keep=False, optimisation=2, shift="", verbose
     compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=verbose)
     compiler.optimisation_level = optimisation
 
-    # TODO(ntamas): don't hardcode 100 fps here
-    compiler.shift_by = parse_as_frame_count(shift, fps=100) if shift else 0
+    # TODO(ntamas): don't hardcode 25 fps here
+    compiler.shift_by = parse_as_frame_count(shift, fps=25) if shift else 0
     compiler.compile(filename, output)
 
 
@@ -84,7 +84,7 @@ def dump(filename, output=None, keep=False):
 
     The output of this command will be a tab-separated list of timestamps
     (in seconds), red, green and blue components (between 0 and 255, inclusive)
-    and a Boolean flag that denotes whether the entry represents an abrupt
+    and a boolean flag that denotes whether the entry represents an abrupt
     change or a fade.
 
     :param filename: The name of the source file to compile.

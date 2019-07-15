@@ -56,7 +56,7 @@ class TimestampWrapper(object):
 
         Parameters:
             wrapped (object): the object to wrap
-            timestamp (loat): the timestamp added to the object.
+            timestamp (float): the timestamp added to the object.
         """
         self._wrapped = wrapped
         self._timestamp = float(timestamp)

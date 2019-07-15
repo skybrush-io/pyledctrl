@@ -67,17 +67,16 @@ class BytecodeCompiler(object):
     def compile(self, input_file, output_file=None, force=True):
         """Runs the compiler.
 
-        :param input_file: the input file to compiler
-        :type input_file: str
-        :param output_file: the output file that the compiler will produce or
-            ``None`` if we only need the abstract syntax tree representation
-            of the input
-        :type output_file: str or None
-        :param force: force compilation even if the input file is older than
-           the output file. Ignored if ``output_file`` is ``None``.
-        :type force: bool
+        Parameters:
+            input_file (str): the input file to compile
+            output_file (Optional[str]): the output file that the compiler will
+                produce or ``None`` if we only need the abstract syntax tree
+                representation of the input
+            force (bool): force compilation even if the input file is older
+                than the output file. Ignored if ``output_file`` is ``None``
 
-        :raises CompilerError: in case of a compilation error
+        Raises:
+            CompilerError: in case of a compilation error
         """
         if self.keep_intermediate_files:
             return self._compile(input_file, output_file, force)
@@ -128,11 +127,6 @@ class BytecodeCompiler(object):
         :param plan: compilation plan where the collected stages will be
             added to
         :type plan: Plan
-
-        :return: list of stages that generate their outputs in memory and that
-            should be collected in the ``output`` property of the compiler at
-            the end of the compilation
-        :rtype: list of CompilationStage
 
         :raises UnsupportedInputFileFormatError: when the format of the input
             file is not known to the compiler

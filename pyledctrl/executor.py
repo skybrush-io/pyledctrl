@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 from itertools import count
+from numbers import Number
 
 __all__ = ("Color", "ExecutorState", "Executor")
 
@@ -47,7 +48,7 @@ class ExecutorState(object):
         self.is_fade = False
 
     def advance_time_by(self, duration):
-        if not isinstance(duration, (int, long, float)):
+        if not isinstance(duration, Number):
             # We assume that 'duration' is a numeric AST node and its value
             # gives the duration in units of 1/50 seconds
             duration = duration.value / 50.0

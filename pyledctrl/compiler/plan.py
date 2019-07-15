@@ -97,6 +97,10 @@ class Plan(object):
                     progress_bar.total = num_steps
                     progress_bar.update(delta_step_index)
 
+        # Unwrap timestamped objects from the result before returning them
+        result = [getattr(item, "wrapped", item) for item in result]
+        return result
+
     def insert_step(self, step, before=None, after=None, output=False):
         """Inserts the given step before or after some other step that is
         already part of the compilation plan.
@@ -113,7 +117,7 @@ class Plan(object):
             output (bool): whether to mark the step as an output step
         """
         if (before is None) == (after is None):
-            raise ValueError("exactly one of before=... and after=... " "must be None")
+            raise ValueError("exactly one of before=... and after=... must be None")
         index = self._steps.index(before or after)
         if before is None:
             index += 1
