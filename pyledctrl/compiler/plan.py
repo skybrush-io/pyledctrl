@@ -3,6 +3,7 @@
 from __future__ import division
 
 from collections import defaultdict
+from os.path import basename
 from tqdm import tqdm
 
 __all__ = ("Plan",)
@@ -13,8 +14,9 @@ class Plan(object):
     to execute. Each step must be an instance of CompilationStage_.
     """
 
-    def __init__(self):
+    def __init__(self, input_file=None):
         """Constructor."""
+        self._input_file = input_file
         self._steps = []
         self._output_steps = set()
         self._callbacks = defaultdict(list)
@@ -42,7 +44,7 @@ class Plan(object):
         """Executes the steps of the plan.
 
         Parameters:
-            environment (CompilationStageExecutionEnvironment): the exection
+            environment (CompilationStageExecutionEnvironment): the execution
                 environment of each compilation stage, provided by the
                 compiler that calls this function
             force (bool): force the execution of all steps even if the steps
@@ -54,14 +56,22 @@ class Plan(object):
             CompilerError: in case of a compilation error
         """
         result = []
-        bar_format = "{desc}{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}"
+        bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}{postfix}"
 
         step_index, num_steps = 0, len(self._steps)
 
-        with tqdm(total=num_steps, bar_format=bar_format) as progress_bar:
+        tqdm_kwds = {
+            "desc": basename(self._input_file) if self._input_file else None,
+            "bar_format": bar_format,
+            "total": num_steps,
+        }
+
+        with tqdm(**tqdm_kwds) as progress_bar:
             while step_index < num_steps:
                 step = self._steps[step_index]
                 is_last = step_index == num_steps - 1
+
+                progress_bar.set_postfix_str(getattr(step, "label", "working..."))
 
                 if force or is_last or step.should_run():
                     # Print information about the step being executed if
@@ -96,6 +106,8 @@ class Plan(object):
                     # Update the progress bar
                     progress_bar.total = num_steps
                     progress_bar.update(delta_step_index)
+
+            progress_bar.set_postfix_str("done.")
 
         # Unwrap timestamped objects from the result before returning them
         result = [getattr(item, "wrapped", item) for item in result]

@@ -111,7 +111,7 @@ class BytecodeCompiler(object):
         self._optimiser = create_optimiser_for_level(value)
 
     def _compile(self, input_file, output_file, force):
-        plan = Plan()
+        plan = Plan(input_file=input_file)
         self._collect_stages(input_file, output_file, plan)
         self.output = plan.execute(self.environment, force=force, verbose=self.verbose)
 

@@ -68,6 +68,8 @@ class CompilationStage(object):
     extension in the end.
     """
 
+    label = "compiling..."
+
     def run(self, environment):
         """Executes the compilation phase.
 
@@ -348,6 +350,8 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
     optimises it in-place.
     """
 
+    label = "optimizing..."
+
     def __init__(self, ast, optimiser):
         """Constructor.
 
@@ -379,6 +383,8 @@ class ASTObjectToOutputCompilationStage(ObjectToFileCompilationStage):
     """Abstract compilation stage that turns an in-memory abstract syntax tree
     into some output file.
     """
+
+    label = "writing..."
 
     def __init__(self, input, output_file, id=None):
         """Constructor.
@@ -869,6 +875,8 @@ class ParsedSunliteScenesToPythonSourceCompilationStage(
 
 
 class SunliteSceneParsingStage(FileToObjectCompilationStage):
+    label = "parsing..."
+
     def __init__(self, input, shift=0):
         super(SunliteSceneParsingStage, self).__init__()
 
@@ -900,6 +908,8 @@ class SunliteSceneParsingStage(FileToObjectCompilationStage):
 
 
 class SunliteSwitchParsingStage(FileToObjectCompilationStage):
+    label = "parsing..."
+
     def __init__(self, input):
         super(SunliteSwitchParsingStage, self).__init__()
 
