@@ -85,7 +85,7 @@ def dump(filename, output=None, keep=False):
     The output of this command will be a tab-separated list of timestamps
     (in seconds), red, green and blue components (between 0 and 255, inclusive)
     and a boolean flag that denotes whether the entry represents an abrupt
-    change or a fade.
+    change or a fade from the _previous_ step to the current one.
 
     :param filename: The name of the source file to compile.
     :param output: The name of the output file. When omitted, it will be

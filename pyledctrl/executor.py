@@ -4,6 +4,8 @@ from collections import namedtuple
 from itertools import count
 from numbers import Number
 
+from .compiler.ast import Duration
+
 __all__ = ("Color", "ExecutorState", "Executor")
 
 
@@ -50,8 +52,8 @@ class ExecutorState(object):
     def advance_time_by(self, duration):
         if not isinstance(duration, Number):
             # We assume that 'duration' is a numeric AST node and its value
-            # gives the duration in units of 1/50 seconds
-            duration = duration.value / 50.0
+            # gives the duration in units specified by Duration.FPS
+            duration = duration.value / Duration.FPS
         else:
             # We assume that 'duration' specifies the duration in seconds
             pass
