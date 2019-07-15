@@ -46,12 +46,14 @@ class BytecodeCompiler(object):
     various formats.
     """
 
-    def __init__(self, keep_intermediate_files=False, verbose=False):
+    def __init__(self, keep_intermediate_files=False, progress=True, verbose=False):
         """Constructor.
 
         Parameters:
             keep_intermediate_files (bool): whether to keep any intermediate
                 files that are created during compilation
+            progress (bool): whether to print a progress bar showing the
+                progress of the compilation
             verbose (bool): whether to print messages about the progress of
                 the compilation
         """
@@ -60,6 +62,7 @@ class BytecodeCompiler(object):
         self._optimiser = None
         self._optimisation_level = 0
         self.optimisation_level = 2
+        self.progress = progress
         self.shift_by = 0
         self.verbose = verbose
         self.environment = CompilationStageExecutionEnvironment(self)
@@ -113,7 +116,9 @@ class BytecodeCompiler(object):
     def _compile(self, input_file, output_file, force):
         plan = Plan(input_file=input_file)
         self._collect_stages(input_file, output_file, plan)
-        self.output = plan.execute(self.environment, force=force, verbose=self.verbose)
+        self.output = plan.execute(
+            self.environment, force=force, progress=self.progress, verbose=self.verbose
+        )
 
     def _collect_stages(self, input_file, output_file, plan):
         """Collects the compilation stages that will turn the given input

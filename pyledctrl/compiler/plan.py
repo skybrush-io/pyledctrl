@@ -40,7 +40,7 @@ class Plan(object):
             self._mark_as_output(step)
         return Continuation(self, step)
 
-    def execute(self, environment, force=False, verbose=False):
+    def execute(self, environment, force=False, progress=True, verbose=False):
         """Executes the steps of the plan.
 
         Parameters:
@@ -49,6 +49,8 @@ class Plan(object):
                 compiler that calls this function
             force (bool): force the execution of all steps even if the steps
                 indicate that they not need to be run
+            progress (bool): whether to show a progress bar to indicate the
+                progress of the plan execution
             verbose (bool): whether to print verbose messages about the
                 progress of the plan execution
 
@@ -62,6 +64,7 @@ class Plan(object):
 
         tqdm_kwds = {
             "desc": basename(self._input_file) if self._input_file else None,
+            "disable": not progress,
             "bar_format": bar_format,
             "total": num_steps,
         }
