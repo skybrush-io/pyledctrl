@@ -24,8 +24,6 @@ from pyledctrl.compiler.stages import (
 )
 from pyledctrl.utils import TemporaryDirectory
 
-log = logging.getLogger("pyledctrl.compiler.compiler")
-
 
 def _replace_extension(filename, ext):
     """Replaces the extension of the given filename with another one.

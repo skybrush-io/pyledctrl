@@ -7,11 +7,10 @@ try:
 except ImportError:
     import pickle  # for Python 3.x
 
-import logging
-
 from contextlib import closing
 from decimal import Decimal
 from functools import partial
+
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
 from pyledctrl.compiler.utils import (
@@ -20,6 +19,7 @@ from pyledctrl.compiler.utils import (
     TimestampWrapper,
     UnifiedTimeline,
 )
+from pyledctrl.logger import log
 from pyledctrl.parsers.sunlite import (
     SunliteSuiteSceneFileParser,
     SunliteSuiteSwitchFileParser,
@@ -34,9 +34,6 @@ from pyledctrl.utils import (
     grouper,
 )
 from textwrap import dedent
-
-
-log = logging.getLogger("pyledctrl.compiler.stages")
 
 
 class CompilationStageExecutionEnvironment(object):

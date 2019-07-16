@@ -3,7 +3,6 @@
 from __future__ import print_function
 
 import click
-import click_log
 import csv
 import os
 import subprocess
@@ -12,7 +11,6 @@ import sys
 from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
 from .executor import Executor
-from .logger import log
 from .upload import BytecodeUploader
 from .utils import (
     error,
@@ -21,17 +19,13 @@ from .utils import (
     parse_as_frame_count,
 )
 
-click_log.basic_config(log)
-
 
 @click.group()
-@click_log.simple_verbosity_option(log)
 def cli():
     pass
 
 
 @cli.command()
-@click.pass_context
 @click.option(
     "-o",
     "--output",
@@ -68,8 +62,9 @@ def cli():
     "``MIN:SEC+FRAMES`` where the minutes and the frames may be omitted.",
     default="",
 )
+@click.option("-v", "--verbose", default=False, is_flag=True)
 @click.argument("filename", required=True)
-def compile(ctx, filename, output, keep, optimisation, shift):
+def compile(filename, output, keep, optimisation, shift, verbose):
     """Compiles a LedCtrl source file to a bytecode file.
 
     Takes a single input filename as its only argument.
@@ -78,9 +73,7 @@ def compile(ctx, filename, output, keep, optimisation, shift):
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
 
-    compiler = BytecodeCompiler(
-        keep_intermediate_files=keep, verbose=ctx.obj["verbose"]
-    )
+    compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=verbose)
     compiler.optimisation_level = optimisation
 
     # TODO(ntamas): don't hardcode 25 fps here
