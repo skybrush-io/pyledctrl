@@ -2,7 +2,6 @@
 from input files in various formats.
 """
 
-import logging
 import os
 
 from functools import partial
