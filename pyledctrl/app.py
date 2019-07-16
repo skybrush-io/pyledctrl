@@ -10,7 +10,7 @@ import sys
 
 from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
-from .executor import Executor
+from .executor import Executor, unroll as unroll_sequence
 from .upload import BytecodeUploader
 from .utils import (
     error,
@@ -109,8 +109,15 @@ def connect(port, baud):
     help="name of the output file",
     default=sys.stdout,
 )
+@click.option(
+    "-u",
+    "--unroll/--no-unroll",
+    help="unroll fades into individual color steps",
+    default=False,
+    is_flag=True,
+)
 @click.argument("filename", required=True)
-def dump(filename, output):
+def dump(filename, output, unroll):
     """\
     Dumps the LED lighting sequence of a LedCtrl source file.
 
@@ -139,10 +146,14 @@ def dump(filename, output):
 
     for syntax_tree in syntax_trees:
         executor = Executor()
-        writer.writerow(state_to_row(executor.state))
-        for state in executor.execute(syntax_tree):
+        # writer.writerow(state_to_row(executor.state))
+
+        sequence = executor.execute(syntax_tree)
+        if unroll:
+            sequence = unroll_sequence(sequence)
+
+        for state in sequence:
             writer.writerow(state_to_row(state))
-        writer.writerow([])
 
 
 @cli.command()

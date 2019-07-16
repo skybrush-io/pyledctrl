@@ -147,6 +147,22 @@ def iterbytes(fp):
         yield b
 
 
+_last_default = object()
+
+
+def last(iterable):
+    """Returns the last element from the given iterable. Raises ``ValueError``
+    if the iterable is empty.
+    """
+    last = _last_default
+    for last in iterable:
+        pass
+    if last is _last_default:
+        raise ValueError("iterable is empty")
+    else:
+        return last
+
+
 def memoize(func):
     """Single-argument memoization decorator for a function. Caches the results
     of the function in a dictionary.
