@@ -2,7 +2,13 @@
 
 from setuptools import setup, find_packages
 
-requires = ["pyserial>=3.1.1", "baker>=1.0", "tqdm>=4.8.4", "lxml>=3.6.4"]
+requires = [
+    "pyserial>=3.1.1",
+    "click>=7.0",
+    "click_log>=0.3.2",
+    "tqdm>=4.8.4",
+    "lxml>=3.6.4",
+]
 
 __version__ = None
 __author__ = None
