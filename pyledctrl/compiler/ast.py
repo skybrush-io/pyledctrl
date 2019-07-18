@@ -709,6 +709,9 @@ class Duration(Varuint):
         # But we can cast the float value into a string, which rounds it off
         # nicely, and then we can pass it to the Decimal() constructor.
 
+        if seconds is None:
+            seconds = 0
+
         seconds = Decimal(str(seconds))
         frame_count = seconds * cls.FPS
         getcontext().clear_flags()
