@@ -1,6 +1,7 @@
 data/show/
 dist/
 out/
+venv/
 *.pyc
 *.egg-info
 .python-version
