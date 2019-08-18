@@ -1,5 +1,1 @@
-click>=7.0
-click_log>=0.3.2
-pyserial>=3.1.1
-lxml>=3.6.4
-tqdm>=4.8.4
+-e .

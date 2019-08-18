@@ -21,7 +21,15 @@ setup(
     author_email=__email__,
     version=__version__,
     description="Bytecode compiler and utilities for ledctrl",
+
     packages=find_packages(),
-    scripts=["bin/ledctrl"],
+    include_package_data=True,
+
     install_requires=requires,
+
+    entry_points={
+        "console_scripts": [
+            "ledctrl = pyledctrl.app:main"
+        ]
+    }
 )
