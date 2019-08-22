@@ -17,6 +17,7 @@ from pyledctrl.compiler.stages import (
     SunliteSceneParsingStage,
     SunliteSwitchParsingStage,
     ASTObjectToBytecodeCompilationStage,
+    ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDFileCompilationStage,
     ASTObjectToProgmemHeaderCompilationStage,
     ASTOptimisationStage,
@@ -168,6 +169,8 @@ class BytecodeCompiler(object):
             output_stage_factory = ASTObjectToProgmemHeaderCompilationStage
         elif output_ext == ".oled":
             output_stage_factory = ASTObjectToLEDFileCompilationStage
+        elif output_ext == ".json":
+            output_stage_factory = ASTObjectToJSONBytecodeCompilationStage
         else:
             output_stage_factory = ASTObjectToBytecodeCompilationStage
 
