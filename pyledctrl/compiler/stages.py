@@ -411,6 +411,18 @@ def _write_bytecode_from_ast_to_file(ast, filename):
         output.write(ast.to_bytecode())
 
 
+def _write_bytecode_from_ast_to_json(ast, filename):
+    from base64 import b64encode
+    from json import dump
+
+    with open(filename, "w") as output:
+        dump(
+            {"version": 1, "data": b64encode(ast.to_bytecode()).decode("ascii")},
+            output,
+            indent=2,
+        )
+
+
 def _write_led_source_from_ast_to_file(ast, filename):
     with open(filename, "w") as output:
         output.write(ast.to_led_source())
@@ -462,6 +474,17 @@ class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
     def run(self, environment):
         """Inherited."""
         _write_bytecode_from_ast_to_file(self.input_object, self._output_file)
+
+
+class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
+    """Compilation stage that turns an in-memory abstract syntax tree from a
+    file into a JSON file that contains the raw bytecode in base64-encoded
+    format.
+    """
+
+    def run(self, environment):
+        """Inherited."""
+        _write_bytecode_from_ast_to_json(self.input_object, self._output_file)
 
 
 class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
