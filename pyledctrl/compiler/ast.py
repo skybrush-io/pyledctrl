@@ -79,9 +79,11 @@ terminals and therefore are enclosed in quotes)::
 from __future__ import division
 
 from decimal import Decimal, Inexact, getcontext
-from pyledctrl.utils import first, memoize
 from struct import Struct
 from warnings import warn
+
+from pyledctrl.compiler.errors import BytecodeParserError, BytecodeParserEOFError
+from pyledctrl.utils import first, memoize
 
 
 @memoize
@@ -422,7 +424,7 @@ class Literal(Node):
 
 
 class Byte(Literal):
-    """Node that represents a single-byte literal value."""
+    """Node that represents a signed or unsigned single-byte literal value."""
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
@@ -430,12 +432,27 @@ class Byte(Literal):
 
 
 class UnsignedByte(Byte):
-    """Node that represents a single-byte literal value (such as a component
-    of an RGB color that is stored on a single byte).
+    """Node that represents an unsigned single-byte literal value (such as a
+    component of an RGB color that is stored on a single byte).
     """
 
     _fields = ("value",)
     _defaults = {"value": 0}
+
+    @classmethod
+    def from_bytecode(cls, data):
+        """Reads an UnsignedByte from a binary file-like object.
+
+        Parameters:
+            data (IOBase): the stream to read from
+
+        Returns:
+            UnsignedByte: the constructed object
+        """
+        value = data.read(1)
+        if not value:
+            raise BytecodeParserEOFError(cls)
+        return cls(value=ord(value))
 
     def __init__(self, value=0):
         """Constructor.
@@ -463,6 +480,8 @@ class UnsignedByte(Byte):
         return self._value
 
     def _set_value(self, value):
+        if isinstance(value, UnsignedByte):
+            value = value.value
         if value < 0 or value > 255:
             raise ValueError("value must be between 0 and 255 (inclusive)")
         self._value = value
@@ -474,6 +493,29 @@ class Varuint(Literal):
     _fields = ("value",)
     _defaults = {"value": 0}
     _immutable = _fields
+
+    @classmethod
+    def from_bytecode(cls, data):
+        """Reads a Varuint from a binary file-like object.
+
+        Parameters:
+            data (IOBase): the stream to read from
+
+        Returns:
+            Varuint: the constructed object
+        """
+        value = 0
+        while True:
+            x = data.read(1)
+            if not x:
+                raise BytecodeParserEOFError(cls)
+
+            x = ord(x)
+            value = (value << 7) | (x & 0x7F)
+            if x < 128:
+                break
+
+        return cls(value)
 
     def __init__(self, value=0):
         self._set_value(int(value))
@@ -515,6 +557,28 @@ class ChannelMask(Byte):
     _fields = ("enable", "channels")
     _defaults = {"enable": False, "channels": ()}
     _immutable = _fields
+
+    @classmethod
+    def from_bytecode(cls, data):
+        """Parses a ChannelValues object from its bytecode representation.
+
+        Parameters:
+            data (BufferedReader): the stream to read from
+
+        Returns:
+            StatementSequence: the constructed object
+        """
+        value = data.read(1)
+        if not value:
+            raise BytecodeParserEOFError(cls)
+
+        channels = []
+        value = ord(value)
+        for index in range(7):
+            if value & (1 << index):
+                channels.append(index)
+
+        return cls(enable=bool(value & 0x80), channels=tuple(channels))
 
     def __init__(self, enable=False, channels=()):
         """Constructor.
@@ -560,6 +624,28 @@ class ChannelValues(Byte):
 
     _fields = ("channels",)
     _defaults = {"channels": ()}
+
+    @classmethod
+    def from_bytecode(cls, data):
+        """Parses a ChannelValues object from its bytecode representation.
+
+        Parameters:
+            data (BufferedReader): the stream to read from
+
+        Returns:
+            StatementSequence: the constructed object
+        """
+        value = data.read(1)
+        if not value:
+            raise BytecodeParserEOFError(cls)
+
+        channels = []
+        value = ord(value)
+        for index in range(7):
+            if value & (1 << index):
+                channels.append(index)
+
+        return cls(tuple(channels))
 
     def __init__(self, channels=()):
         """Constructor.
@@ -747,6 +833,27 @@ class StatementSequence(Node):
     _fields = ["statements"]
     _defaults = {"statements": NodeList}
 
+    @classmethod
+    def from_bytecode(cls, data):
+        """Parses a StatementSequence object from its bytecode representation.
+
+        Parameters:
+            data (BufferedReader): the stream to read from
+
+        Returns:
+            StatementSequence: the constructed object
+        """
+        result = cls()
+
+        while True:
+            node = _parse_statement_from_bytecode(data)
+            if node is None:
+                break
+
+            result.append(node)
+
+        return result
+
     def append(self, node):
         """Appends a node to the sequence."""
         self.statements.append(node)
@@ -932,7 +1039,7 @@ class FadeToColorCommand(Command):
 
     code = CommandCode.FADE_TO_COLOR
     _fields = ("color", "duration")
-    _defaults = {"color": RGBColor, "duration": Varuint}
+    _defaults = {"color": RGBColor, "duration": Duration}
     _immutable = _fields
 
     def __init__(self, color, duration):
@@ -1093,6 +1200,35 @@ class LoopBlock(Statement):
     _fields = ("iterations", "body")
     _defaults = {"iterations": UnsignedByte, "body": StatementSequence}
 
+    @classmethod
+    def from_bytecode(cls, data):
+        """Reads a LoopBlock from a binary file-like object.
+
+        Parameters:
+            data (IOBase): the stream to read from
+
+        Returns:
+            LoopBlock: the constructed object
+        """
+        code = data.read(1)
+        if not code:
+            raise BytecodeParserEOFError(cls)
+
+        if code != CommandCode.LOOP_BEGIN:
+            raise ValueError("LoopBlock must start with CommandCode.LOOP_BEGIN")
+
+        iterations = UnsignedByte.from_bytecode(data)
+        body = StatementSequence.from_bytecode(data)
+
+        code = data.read(1)
+        if not code:
+            raise BytecodeParserEOFError(cls)
+
+        if code != CommandCode.LOOP_END:
+            raise ValueError("LoopBlock must end with CommandCode.LOOP_END")
+
+        return cls(iterations=iterations, body=body)
+
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
         if not self.body.statements or self.iterations.value <= 0:
@@ -1232,6 +1368,104 @@ iter_fields = Node.iter_fields
 iter_field_values = Node.iter_field_values
 iter_child_nodes = Node.iter_child_nodes
 
+
+#############################################################################
+# Helper functions for parsing
+
+
+def _parse_statement_from_bytecode(data):
+    """Parses a Statement object from its bytecode representation.
+
+    Parameters:
+        data (BufferedReader): the stream to read the statement from
+
+    Returns:
+        Optional[Statement]: the statement that was constructed, or `None` if
+            the next statement is the end of a loop block or if there are no
+            more statements to parse
+    """
+    # Peek the next character from the stream
+    code = data.peek(1)[:1]
+    if not code:
+        return None
+
+    # Try to identify the command that the code represents
+    for subcls in Command.__subclasses__():
+        if getattr(subcls, "code", None) == code:
+            break
+    else:
+        # No such command; maybe it's the start or end of a loop block?
+        if code == b"\x0c":
+            # CommandCode.LOOP_START
+            subcls = LoopBlock
+        elif code == b"\x0d":
+            # CommandCode.LOOP_END
+            return None
+        else:
+            subcls = None
+
+    if subcls is None:
+        raise BytecodeParserError("unknown command code: {0!r}".format(ord(code)))
+
+    return _parse_node_from_bytecode_by_class(subcls, data)
+
+
+def _parse_node_from_bytecode_by_class(cls, data):
+    """Parses a Node subclass from its bytecode representation, assuming that
+    we know what node class we expect to see next.
+
+    Parameters:
+        cls (class): the Node subclass to construct
+        data (IOBase): the stream to read the bytecode representation of the
+            node from
+
+    Returns:
+        Node: the node that was constructed
+    """
+    if hasattr(cls, "from_bytecode"):
+        # Node provides its own from_bytecode method so let it do the parsing
+        return cls.from_bytecode(data)
+
+    # Default implementation: we assume that we have a command code and a list
+    # of fields; the fields are defined in the `_fields` property of the node
+    # class and their types can be inferred from the `_defaults` property
+
+    # Consume the code marker, if any
+    if hasattr(cls, "code"):
+        code = data.read(1)
+        if not code:
+            raise BytecodeParserEOFError(cls)
+        if code != cls.code:
+            raise BytecodeParserError(
+                "{0} nodes must start with {1}".format(cls.__name__, ord(cls.code))
+            )
+
+    # Consume all the fields of the node
+    field_values = {}
+    for field in cls._fields:
+        if field not in cls._defaults:
+            raise BytecodeParserError(
+                "cannot parse {0}, default value for {1!r} "
+                "is not specified".format(cls.__name__, field)
+            )
+
+        default_value = cls._defaults[field]
+        if callable(default_value) and issubclass(default_value, Node):
+            field_value = _parse_node_from_bytecode_by_class(default_value, data)
+        else:
+            raise BytecodeParserError(
+                "cannot parse {0}.{1} of type {2!r}".format(
+                    cls.__name__, field, default_value
+                )
+            )
+
+        field_values[field] = field_value
+
+    # Construct the node
+    return cls(**field_values)
+
+
+#############################################################################
 
 if __name__ == "__main__":
     node = StatementSequence(

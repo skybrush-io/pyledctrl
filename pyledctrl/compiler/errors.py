@@ -81,3 +81,35 @@ class InvalidASTFormatError(RuntimeError):
                 "The AST file {0.filename!r} has an unknown format: "
                 "{0.format!r}".format(self)
             )
+
+
+class BytecodeParserError(RuntimeError):
+    """Exception thrown for all sorts of parsing errors when reading bytecode
+    representation of an AST from a stream.
+    """
+
+    pass
+
+
+class BytecodeParserEOFError(BytecodeParserError):
+    """Exception thrown when trying to read some bytecode object from a stream
+    and the end of the stream has been reached.
+    """
+
+    def __init__(self, cls, message=None):
+        """Constructor.
+
+        Parameters:
+            cls (callable): the AST node class that we have tried to read
+        """
+        self.cls = cls
+        message = message or self._get_default_message()
+        super(BytecodeParserEOFError, self).__init__(message)
+
+    def _get_default_message(self):
+        if self.cls is None:
+            return "EOF reached while parsing bytecode"
+        else:
+            return "EOF reached while parsing {0} from bytecode".format(
+                getattr(self.cls, "__name__", "unknown class instance")
+            )
