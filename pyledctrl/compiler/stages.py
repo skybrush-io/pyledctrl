@@ -20,6 +20,7 @@ from pyledctrl.compiler.utils import (
     UnifiedTimeline,
 )
 from pyledctrl.logger import log
+from pyledctrl.parsers.bytecode import BytecodeParser
 from pyledctrl.parsers.sunlite import (
     SunliteSuiteSceneFileParser,
     SunliteSuiteSwitchFileParser,
@@ -258,7 +259,20 @@ class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMi
         return oldest_input >= youngest_output
 
 
-class PythonSourceToASTObjectCompilationStage(FileToObjectCompilationStage):
+class FileToASTObjectCompilationStage(
+    CompilationStage, FileSourceMixin, ObjectTargetMixin
+):
+    """Abstract compilation phase that turns a set of input files into an
+    in-memory abstract syntax tree (AST) object. This phase is executed
+    unconditionally.
+    """
+
+    def should_run(self):
+        """Whether this compilation step should be executed."""
+        return True
+
+
+class PythonSourceToASTObjectCompilationStage(FileToASTObjectCompilationStage):
     """Compilation stage that turns a Python source file into an abstract
     syntax tree representation of the LED controller program in memory.
     """
@@ -340,6 +354,40 @@ class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
 
     def _choose_pickler(self):
         return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class BytecodeToASTObjectCompilationStage(FileToASTObjectCompilationStage):
+    """Compilation stage that turns compiled bytecode back into an abstract
+    syntax tree representation of the LED controller program in memory.
+    """
+
+    def __init__(self, input, id=None):
+        """Constructor.
+
+        Parameters:
+            input (str): the name of the bytecode file to parse
+        """
+        super(BytecodeToASTObjectCompilationStage, self).__init__()
+        self._input = input
+        self._output = None
+        self.id = id
+
+    @FileToObjectCompilationStage.input_files.getter
+    def input_files(self):
+        """Inherited."""
+        return [self._input]
+
+    @FileToObjectCompilationStage.output.getter
+    def output(self):
+        """Inherited."""
+        return self._output
+
+    def run(self, environment):
+        """Inherited."""
+        parser = BytecodeParser()
+        with open(self._input, "rb") as fp:
+            ast = parser.parse(fp)
+        self._output = TimestampWrapper.wrap(ast, self.oldest_input_file_timestamp)
 
 
 class ASTOptimisationStage(ObjectToObjectCompilationStage):

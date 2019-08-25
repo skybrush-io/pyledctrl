@@ -10,17 +10,19 @@ from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFileFormatE
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import (
-    DummyStage,
-    CompilationStageExecutionEnvironment,
-    ParsedSunliteScenesToPythonSourceCompilationStage,
-    PythonSourceToASTObjectCompilationStage,
-    SunliteSceneParsingStage,
-    SunliteSwitchParsingStage,
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDFileCompilationStage,
     ASTObjectToProgmemHeaderCompilationStage,
     ASTOptimisationStage,
+    BytecodeToASTObjectCompilationStage,
+    CompilationStageExecutionEnvironment,
+    DummyStage,
+    FileToASTObjectCompilationStage,
+    ParsedSunliteScenesToPythonSourceCompilationStage,
+    PythonSourceToASTObjectCompilationStage,
+    SunliteSceneParsingStage,
+    SunliteSwitchParsingStage,
 )
 from pyledctrl.utils import TemporaryDirectory
 
@@ -158,17 +160,21 @@ class BytecodeCompiler(object):
             func = self._add_stages_for_input_sce_file
         elif ext == ".ses":
             func = self._add_stages_for_input_ses_file
+        elif ext == ".bin":
+            func = self._add_stages_for_input_bin_file
         else:
             raise UnsupportedInputFileFormatError(ext)
         ast_step = func(input_file, output_file, plan, ast_only)
 
         # Determine which factory to use for the output stages
+        optimize = None
         if output_ext is None:
             output_stage_factory = None
         elif output_ext == ".h":
             output_stage_factory = ASTObjectToProgmemHeaderCompilationStage
-        elif output_ext == ".oled":
+        elif output_ext in (".led", ".oled"):
             output_stage_factory = ASTObjectToLEDFileCompilationStage
+            optimize = output_ext == ".oled"
         elif output_ext == ".json":
             output_stage_factory = ASTObjectToJSONBytecodeCompilationStage
         else:
@@ -181,14 +187,20 @@ class BytecodeCompiler(object):
         @plan.when_step_is_done(ast_step)
         def generate_output_files(output=None):
             # We need to generate an output file for each AST object.
-            ast_stage_class = PythonSourceToASTObjectCompilationStage
+            ast_stage_class = FileToASTObjectCompilationStage
             for stage in plan.iter_steps(ast_stage_class):
                 if getattr(stage, "id", None) is not None:
                     real_output_file = output_file.replace("{}", stage.id)
                 else:
                     real_output_file = output_file
 
-                optimization_stage = ASTOptimisationStage(stage, self._optimiser)
+                if optimize is None or optimize:
+                    optimization_stage = ASTOptimisationStage(stage, self._optimiser)
+                else:
+                    optimization_stage = ASTOptimisationStage(
+                        stage, create_optimiser_for_level(0)
+                    )
+
                 plan.add_step(optimization_stage)
 
                 if output_stage_factory:
@@ -196,6 +208,11 @@ class BytecodeCompiler(object):
                         optimization_stage, real_output_file, id=stage.id
                     )
                     plan.add_step(output_stage)
+
+    def _add_stages_for_input_bin_file(self, input_file, output_file, plan, ast_only):
+        stage = BytecodeToASTObjectCompilationStage(input_file)
+        plan.add_step(stage, output=ast_only)
+        return stage
 
     def _add_stages_for_input_led_file(self, input_file, output_file, plan, ast_only):
         stage = PythonSourceToASTObjectCompilationStage(input_file)
