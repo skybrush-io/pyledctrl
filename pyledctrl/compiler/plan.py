@@ -3,10 +3,32 @@
 from __future__ import division
 
 from collections import defaultdict
+from functools import partial
 from os.path import basename
-from tqdm import tqdm
 
 __all__ = ("Plan",)
+
+
+class _FakeProgressBar(object):
+    """Fake progress bar class that provides the same interface as `tqdm.tqdm()`
+    to be used in places where `tdqm` does not have to be present (e.g.,
+    Blender).
+    """
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwds):
+        pass
+
+    def set_postfix_str(self, *args, **kwds):
+        pass
+
+    def update(self, *args, **kwds):
+        pass
+
+    def write(self, *args, **kwds):
+        pass
 
 
 class Plan(object):
@@ -68,8 +90,14 @@ class Plan(object):
             "bar_format": bar_format,
             "total": num_steps,
         }
+        try:
+            from tqdm import tqdm
 
-        with tqdm(**tqdm_kwds) as progress_bar:
+            progress = partial(tqdm, **tqdm_kwds)
+        except ImportError:
+            progress = _FakeProgressBar
+
+        with progress() as progress_bar:
             while step_index < num_steps:
                 step = self._steps[step_index]
                 is_last = step_index == num_steps - 1
