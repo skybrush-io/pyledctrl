@@ -11,13 +11,7 @@ import sys
 from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
 from .executor import Executor, unroll as unroll_sequence
-from .upload import BytecodeUploader
-from .utils import (
-    error,
-    get_serial_port_filename,
-    get_serial_connection,
-    parse_as_frame_count,
-)
+from .utils import error, parse_as_frame_count
 
 
 @click.group()
@@ -94,6 +88,8 @@ def compile(filename, output, keep, optimisation, shift, verbose):
 )
 def connect(port, baud):
     """Connects to the LedCtrl serial console."""
+    from .utils import get_serial_port_filename
+
     port = get_serial_port_filename(port)
     if os.path.exists(port):
         return subprocess.call(["screen", port, str(baud or DEFAULT_BAUD)])
@@ -175,6 +171,9 @@ def upload(filename, port, baud):
 
     Takes the name of the bytecode file to upload as its only argument.
     """
+    from .utils import get_serial_connection
+    from .upload import BytecodeUploader
+
     port = get_serial_connection(port, baud)
     uploader = BytecodeUploader(port)
     sys.exit(0 if uploader.upload_file(filename) else 1)
