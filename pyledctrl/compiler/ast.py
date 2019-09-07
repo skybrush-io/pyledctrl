@@ -505,13 +505,16 @@ class Varuint(Literal):
             Varuint: the constructed object
         """
         value = 0
+        shift = 0
         while True:
             x = data.read(1)
             if not x:
                 raise BytecodeParserEOFError(cls)
 
             x = ord(x)
-            value = (value << 7) | (x & 0x7F)
+            value |= (x & 0x7F) << shift
+            shift += 7
+
             if x < 128:
                 break
 
