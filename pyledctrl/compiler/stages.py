@@ -2,14 +2,8 @@
 
 import os
 
-try:
-    import cPickle as pickle  # for Python 2.x
-except ImportError:
-    import pickle  # for Python 3.x
-
 from contextlib import closing
 from decimal import Decimal
-from functools import partial
 
 from pyledctrl.compiler.ast import Comment
 from pyledctrl.compiler.contexts import ExecutionContext
@@ -32,12 +26,10 @@ from pyledctrl.utils import (
     consecutive_pairs,
     first,
     format_frame_count,
-    grouper,
 )
-from textwrap import dedent
 
 
-class CompilationStageExecutionEnvironment(object):
+class CompilationStageExecutionEnvironment:
     """Execution environment of compilation stages that contains a few
     functions that the stages may use to access functionality of the
     compiler itself.
@@ -56,7 +48,7 @@ class CompilationStageExecutionEnvironment(object):
     warn = log.warn
 
 
-class CompilationStage(object):
+class CompilationStage:
     """Compilation stage that can be executed during a course of compilation.
 
     Stages typically produce a particular kind of output file from one or more
@@ -98,7 +90,7 @@ class DummyStage(CompilationStage):
         return True
 
 
-class FileSourceMixin(object):
+class FileSourceMixin:
     """Mixin class for compilation stages that assume that the source of
     the compilation stage is a set of files.
     """
@@ -122,7 +114,7 @@ class FileSourceMixin(object):
         return max(os.path.getmtime(filename) for filename in input_files)
 
 
-class FileTargetMixin(object):
+class FileTargetMixin:
     """Mixin class for compilation stages that assume that the target of
     the compilation stage is a set of files.
     """
@@ -146,7 +138,7 @@ class FileTargetMixin(object):
         return min(os.path.getmtime(filename) for filename in output_files)
 
 
-class ObjectSourceMixin(object):
+class ObjectSourceMixin:
     """Mixin class for compilation stages that assume that the source of
     the compilation stage is an in-memory object.
     """
@@ -171,7 +163,7 @@ class ObjectSourceMixin(object):
             return inp
 
 
-class ObjectTargetMixin(object):
+class ObjectTargetMixin:
     """Mixin class for compilation stages that assume that the target of
     the compilation stage is an in-memory object.
     """
@@ -259,17 +251,13 @@ class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMi
         return oldest_input >= youngest_output
 
 
-class FileToASTObjectCompilationStage(
-    CompilationStage, FileSourceMixin, ObjectTargetMixin
-):
+class FileToASTObjectCompilationStage(FileToObjectCompilationStage):
     """Abstract compilation phase that turns a set of input files into an
     in-memory abstract syntax tree (AST) object. This phase is executed
     unconditionally.
     """
 
-    def should_run(self):
-        """Whether this compilation step should be executed."""
-        return True
+    pass
 
 
 class PythonSourceToASTObjectCompilationStage(FileToASTObjectCompilationStage):
@@ -307,53 +295,6 @@ class PythonSourceToASTObjectCompilationStage(FileToASTObjectCompilationStage):
             self._output = TimestampWrapper.wrap(
                 context.ast, self.oldest_input_file_timestamp
             )
-
-
-class PythonSourceToASTFileCompilationStage(FileToFileCompilationStage):
-    """Compilation stage that turns a Python source file into an abstract
-    syntax tree representation of the LED controller program and saves this
-    representation to permanent storage.
-    """
-
-    def __init__(self, input, output, id=None):
-        super(PythonSourceToASTFileCompilationStage, self).__init__()
-        self._input = input
-        self._output = output
-        self.id = id
-
-    @FileToFileCompilationStage.input_files.getter
-    def input_files(self):
-        """Inherited."""
-        return [self._input]
-
-    @FileToFileCompilationStage.output_files.getter
-    def output_files(self):
-        """Inherited."""
-        return [self._output]
-
-    @property
-    def output(self):
-        """The name of the output file."""
-        return self._output
-
-    @output.setter
-    def output(self, value):
-        self._output = value
-
-    def run(self, environment):
-        """Inherited."""
-        pickle_format, pickler = self._choose_pickler()
-        with open(self._output, "wb") as output:
-            encoded_pickle_format = pickle_format.encode("utf-8")
-            output.write(b"# Format: {0}\n".format(encoded_pickle_format))
-            context = ExecutionContext()
-            with open(self._input) as fp:
-                code = compile(fp.read(), self.input_files[0], "exec")
-                context.evaluate(code, add_end_command=True)
-                pickler(context.ast, output)
-
-    def _choose_pickler(self):
-        return u"pickle", partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 class BytecodeToASTObjectCompilationStage(FileToASTObjectCompilationStage):
@@ -476,43 +417,6 @@ def _write_led_source_from_ast_to_file(ast, filename):
         output.write(ast.to_led_source())
 
 
-def _write_progmem_header_from_ast_to_file(ast, filename, device_id=None):
-    device_id = int(device_id) if device_id is not None else -1
-
-    HEADER = (
-        dedent(
-            """\
-        /* This is an autogenerated file; do not edit */
-        #include <avr/pgmspace.h>
-        #include "bytecode_store.h"
-
-        #define LEDCTRL_DEVICE_ID %d
-
-        static const u8 _bytecode[] PROGMEM = {
-        """
-        )
-        % device_id
-    )
-
-    FOOTER = dedent(
-        """\
-        };
-
-        PROGMEMBytecodeStore bytecodeStore(_bytecode);
-        """
-    )
-
-    with open(filename, "w") as output:
-        output.write(HEADER)
-        for bytes_in_row in grouper(ast.to_bytecode(), 16):
-            output.write(
-                "  {0},\n".format(
-                    ", ".join("0x{:02x}".format(ord(b)) for b in bytes_in_row)
-                )
-            )
-        output.write(FOOTER)
-
-
 class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree from a
     file into a bytecode file that can be uploaded to the Arduino using
@@ -543,21 +447,6 @@ class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
     def run(self, environment):
         """Inherited."""
         _write_led_source_from_ast_to_file(self.input_object, self._output_file)
-
-
-class ASTObjectToProgmemHeaderCompilationStage(
-    ASTObjectToOutputCompilationStage
-):  # noqa
-    """Compilation stage that turns a pickled abstract syntax tree from a
-    file into a header file that can be compiled into the ``ledctrl`` source
-    code with an ``#include`` directive.
-    """
-
-    def run(self, environment):
-        """Inherited."""
-        _write_progmem_header_from_ast_to_file(
-            self.input_object, self._output_file, self.id
-        )
 
 
 class ParsedSunliteScenesToPythonSourceCompilationStage(

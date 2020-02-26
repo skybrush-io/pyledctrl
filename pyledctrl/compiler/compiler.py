@@ -5,6 +5,7 @@ from input files in various formats.
 import os
 
 from functools import partial
+from typing import Optional
 
 from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFormatError
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
@@ -13,7 +14,6 @@ from pyledctrl.compiler.stages import (
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDFileCompilationStage,
-    ASTObjectToProgmemHeaderCompilationStage,
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
@@ -27,15 +27,15 @@ from pyledctrl.compiler.stages import (
 from pyledctrl.utils import TemporaryDirectory
 
 
-def _replace_extension(filename, ext):
+def _replace_extension(filename: str, ext: str) -> str:
     """Replaces the extension of the given filename with another one.
 
-    :param filename: the filename to modify
-    :type filename: str
-    :param ext: the desired extension of the file
-    :type ext: str
-    :return: the new filename
-    :rtype: str
+    Parameters:
+        filename: the filename to modify
+        ext: the desired extension of the file
+
+    Returns:
+        the new filename
     """
     base, _ = os.path.splitext(filename)
     return base + ext
@@ -137,21 +137,19 @@ class BytecodeCompiler:
             verbose=self.verbose,
         )
 
-    def _collect_stages(self, input_file, output_file, plan):
+    def _collect_stages(self, input_file: str, output_file: Optional[str], plan: Plan):
         """Collects the compilation stages that will turn the given input
         file into the given output file.
 
-        :param input_file: the name of the input file
-        :type input_file: str
-        :param output_file: the name of the output file or ``None`` if we only
-            need to generate an abstract syntax tree
-        :type output_file: str or None
-        :param plan: compilation plan where the collected stages will be
-            added to
-        :type plan: Plan
+        Parameters:
+            input_file: the name of the input file
+            output_file: the name of the output file or ``None`` if we only
+                need to generate an abstract syntax tree
+            plan: compilation plan where the collected stages will be added to
 
-        :raises UnsupportedInputFormatError: when the format of the input
-            file is not known to the compiler
+        Raises:
+            UnsupportedInputFormatError: when the format of the input file is
+                not known to the compiler
         """
         _, ext = os.path.splitext(input_file)
         ext = ext.lower()
@@ -166,7 +164,7 @@ class BytecodeCompiler:
 
         # Shifting is supported for ``.sce`` and ``.ses`` only
         if ext not in (".sce", ".ses") and self.shift_by != 0:
-            raise CompilerError("Shifting is supported only for Sunlite " "Suite files")
+            raise CompilerError("Shifting is supported only for Sunlite Suite files")
 
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
@@ -187,8 +185,6 @@ class BytecodeCompiler:
         optimize = None
         if output_ext is None:
             output_stage_factory = None
-        elif output_ext == ".h":
-            output_stage_factory = ASTObjectToProgmemHeaderCompilationStage
         elif output_ext in (".led", ".oled"):
             output_stage_factory = ASTObjectToLEDFileCompilationStage
             optimize = output_ext == ".oled"
