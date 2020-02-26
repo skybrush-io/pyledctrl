@@ -11,7 +11,7 @@ import sys
 from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
 from .executor import Executor, unroll as unroll_sequence
-from .utils import error, parse_as_frame_count
+from .utils import error, parse_as_frame_count, replace_extension
 
 
 @click.group()
@@ -77,8 +77,7 @@ def compile(filename, output, keep, optimisation, shift, progress, verbose):
     Takes a single input filename as its only argument.
     """
     if output is None:
-        base, _ = os.path.splitext(filename)
-        output = base + ".bin"
+        output = replace_extension(filename, ".bin")
 
     compiler = BytecodeCompiler(
         optimisation_level=optimisation,

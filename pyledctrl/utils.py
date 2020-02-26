@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import glob
+import os
 import shutil
 import sys
 import tempfile
@@ -193,6 +194,20 @@ def parse_as_frame_count(value, fps):
     seconds = float(seconds) if seconds else 0
     residual = float(residual) if residual else 0
     return int((minutes * 60 + seconds) * fps + residual)
+
+
+def replace_extension(filename: str, ext: str) -> str:
+    """Replaces the extension of the given filename with another one.
+
+    Parameters:
+        filename: the filename to modify
+        ext: the desired extension of the file
+
+    Returns:
+        the new filename
+    """
+    base, _ = os.path.splitext(filename)
+    return base + ext
 
 
 class _TemporaryDirectory(object):

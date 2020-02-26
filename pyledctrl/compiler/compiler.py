@@ -4,7 +4,6 @@ from input files in various formats.
 
 import os
 
-from functools import partial
 from typing import Optional
 
 from pyledctrl.utils import TemporaryDirectory
@@ -20,27 +19,9 @@ from .stages import (
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
-    DummyStage,
     FileToASTObjectCompilationStage,
-    ParsedSunliteScenesToPythonSourceCompilationStage,
     PythonSourceToASTObjectCompilationStage,
-    SunliteSceneParsingStage,
-    SunliteSwitchParsingStage,
 )
-
-
-def _replace_extension(filename: str, ext: str) -> str:
-    """Replaces the extension of the given filename with another one.
-
-    Parameters:
-        filename: the filename to modify
-        ext: the desired extension of the file
-
-    Returns:
-        the new filename
-    """
-    base, _ = os.path.splitext(filename)
-    return base + ext
 
 
 class BytecodeCompiler:
@@ -69,14 +50,11 @@ class BytecodeCompiler:
                 process above the progress bar
         """
         self._tmpdir = None
-        self._optimiser = None
         self._optimisation_level = 0
 
         self._input_format_to_ast_stage_factory = {
             InputFormat.LEDCTRL_BINARY: self._add_stages_for_input_bin_file,
             InputFormat.LEDCTRL_SOURCE: self._add_stages_for_input_led_file,
-            InputFormat.SUNLITE_STUDIO_SCE: self._add_stages_for_input_sce_file,
-            InputFormat.SUNLITE_STUDIO_SES: self._add_stages_for_input_ses_file,
         }
         self._output_format_to_output_stage_factory = {
             OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
@@ -92,7 +70,7 @@ class BytecodeCompiler:
 
         self.environment = CompilationStageExecutionEnvironment(self)
 
-    def compile(self, input_file, output_file=None, force=True):
+    def compile(self, input_file, output_file=None, *, force=True):
         """Runs the compiler.
 
         Parameters:
@@ -111,8 +89,10 @@ class BytecodeCompiler:
         else:
             with TemporaryDirectory() as tmpdir:
                 self._tmpdir = tmpdir
-                result = self._compile(input_file, output_file, force)
-                self._tmpdir = None
+                try:
+                    result = self._compile(input_file, output_file, force)
+                finally:
+                    self._tmpdir = None
             return result
 
     @property
@@ -132,11 +112,7 @@ class BytecodeCompiler:
 
     @optimisation_level.setter
     def optimisation_level(self, value):
-        if self._optimisation_level == value:
-            return
-
-        self._optimisation_level = value
-        self._optimiser = create_optimiser_for_level(value)
+        self._optimisation_level = max(0, int(value))
 
     def _compile(self, input_file, output_file, force):
         description = os.path.basename(input_file) if input_file is not None else None
@@ -172,6 +148,7 @@ class BytecodeCompiler:
         else:
             output_format = OutputFormat.AST
 
+        """
         # Shifting is supported for ``.sce`` and ``.ses`` only
         if (
             input_format
@@ -179,6 +156,7 @@ class BytecodeCompiler:
             and self.shift_by != 0
         ):
             raise CompilerError("Shifting is supported only for Sunlite Suite files")
+        """
 
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
@@ -186,17 +164,17 @@ class BytecodeCompiler:
         create_ast_stage = self._input_format_to_ast_stage_factory.get(input_format)
         if create_ast_stage is None:
             raise UnsupportedInputFormatError(format=input_format)
-        ast_stage = create_ast_stage(
-            input_file, output_file, plan, ast_only=output_format is OutputFormat.AST
-        )
+
+        ast_stage = create_ast_stage(input_file, output_file, plan)
+        if output_format is OutputFormat.AST:
+            plan.mark_as_output(ast_stage)
 
         # Determine the final optimization level to use
         # TODO(ntamas): if the output is ".led", don't optimize; otherwise
         # respect the setting of the user
-        # TODO(ntamas): when forced not to optimize, set create_optimisation_stage
-        # to None
         def create_optimisation_stage(ast_stage):
-            return ASTOptimisationStage(ast_stage, self._optimiser)
+            optimiser = create_optimiser_for_level(self.optimisation_level)
+            return ASTOptimisationStage(ast_stage, optimiser)
 
         # Determine which factory to use for the output stages
         create_output_stage = self._output_format_to_output_stage_factory.get(
@@ -226,29 +204,25 @@ class BytecodeCompiler:
                     )
                     plan.add_step(output_stage)
 
-    def _add_stages_for_input_bin_file(self, input_file, output_file, plan, ast_only):
+    def _add_stages_for_input_bin_file(self, input_file, output_file, plan):
         stage = BytecodeToASTObjectCompilationStage(input_file)
-        plan.add_step(stage, output=ast_only)
+        plan.add_step(stage)
         return stage
 
-    def _add_stages_for_input_led_file(self, input_file, output_file, plan, ast_only):
+    def _add_stages_for_input_led_file(self, input_file, output_file, plan):
         stage = PythonSourceToASTObjectCompilationStage(input_file)
-        plan.add_step(stage, output=ast_only)
+        plan.add_step(stage)
         return stage
 
-    def _add_stages_for_input_sce_file(self, input_file, output_file, plan, ast_only):
-        if ast_only:
-            led_file_template = self._create_intermediate_filename(
-                "stage{}_" + input_file, ".led"
+    """
+    def _add_stages_for_input_sce_file(self, input_file, output_file, plan):
+        if "{}" not in output_file:
+            raise CompilerError(
+                "output file needs to include a {} placeholder for the "
+                "FX identifier when compiling a Sunlite Suite scene "
+                "file"
             )
-        else:
-            if "{}" not in output_file:
-                raise CompilerError(
-                    "output file needs to include a {} placeholder for the "
-                    "FX identifier when compiling a Sunlite Suite scene "
-                    "file"
-                )
-            led_file_template = self._create_intermediate_filename(output_file, ".led")
+        led_file_template = self._create_intermediate_filename(output_file, ".led")
 
         parsing_stage = SunliteSceneParsingStage(input_file)
         plan.add_step(parsing_stage)
@@ -265,29 +239,24 @@ class BytecodeCompiler:
                 stage = PythonSourceToASTObjectCompilationStage(
                     intermediate_file, id=id
                 )
-                plan.add_step(stage, output=ast_only)
+                plan.add_step(stage)
 
         return parsing_stage
 
-    def _add_stages_for_input_ses_file(self, input_file, output_file, plan, ast_only):
+    def _add_stages_for_input_ses_file(self, input_file, output_file, plan):
         # Get the directory in which the input .ses file is contained --
         # we will assume that all the .sce files that the .ses file refers to
         # are in the same directory
         dirname = os.path.dirname(input_file)
 
         # Create filename templates for the LED files
-        if ast_only:
-            led_file_template = self._create_intermediate_filename(
-                "stage{}_" + input_file, ".led"
+        if "{}" not in output_file:
+            raise CompilerError(
+                "output file needs to include a {} placeholder for the "
+                "FX identifier when compiling a Sunlite Suite scene "
+                "file"
             )
-        else:
-            if "{}" not in output_file:
-                raise CompilerError(
-                    "output file needs to include a {} placeholder for the "
-                    "FX identifier when compiling a Sunlite Suite scene "
-                    "file"
-                )
-            led_file_template = self._create_intermediate_filename(output_file, ".led")
+        led_file_template = self._create_intermediate_filename(output_file, ".led")
 
         # Parse the .ses file, and find all the .sce files that we depend on
         ses_parsing_stage = SunliteSwitchParsingStage(input_file)
@@ -357,12 +326,12 @@ class BytecodeCompiler:
                     stage = PythonSourceToASTObjectCompilationStage(
                         intermediate_file, id=id
                     )
-                    add_step(stage, output=ast_only)
+                    add_step(stage, output)
 
         return marker_stage
 
     def _create_intermediate_filename(self, output_file, ext):
-        """Creates an intermediate filename or filename template from the
+        \"""Creates an intermediate filename or filename template from the
         given output filename by replacing its extension with another one.
 
         :param output_file: the name of the output file as asked by the user
@@ -371,7 +340,7 @@ class BytecodeCompiler:
         :type ext: str
         :return: the name of the intermediate file
         :rtype: str
-        """
+        \"""
         base, orig_ext = os.path.splitext(output_file)
         if orig_ext == ext:
             raise ValueError(
@@ -384,3 +353,4 @@ class BytecodeCompiler:
             return os.path.join(self._tmpdir, base + ext)
         else:
             return base + ext
+    """

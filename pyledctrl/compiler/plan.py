@@ -41,23 +41,18 @@ class Plan(object):
         self._output_steps = set()
         self._callbacks = defaultdict(list)
 
-    def add_step(self, step, output=False):
+    def add_step(self, step):
         """Adds the given step to the plan after any other step that has been
         added previously.
 
         Parameters:
             step (CompilationStage): the step to add
-            output (bool): whether to mark the step as an output step. The
-                results of steps marked as an output step will be returned
-                by the ``execute()`` method.
 
         Returns:
             Continuation: a helper object that can be used to attach hook
                 functions to the execution of the step
         """
         self._steps.append(step)
-        if output:
-            self._mark_as_output(step)
         return Continuation(self, step)
 
     def execute(
@@ -152,7 +147,7 @@ class Plan(object):
         result = [getattr(item, "wrapped", item) for item in result]
         return result
 
-    def insert_step(self, step, before=None, after=None, output=False):
+    def insert_step(self, step, before=None, after=None):
         """Inserts the given step before or after some other step that is
         already part of the compilation plan.
 
@@ -165,7 +160,6 @@ class Plan(object):
                 new step is to be inserted
             after (Optional[CompilationStage]): the step after which the
                 new step is to be inserted
-            output (bool): whether to mark the step as an output step
         """
         if (before is None) == (after is None):
             raise ValueError("exactly one of before=... and after=... must be None")
@@ -173,8 +167,6 @@ class Plan(object):
         if before is None:
             index += 1
         self._steps.insert(index, step)
-        if output:
-            self._mark_as_output(step)
         return Continuation(self, step)
 
     def iter_steps(self, cls=None):
@@ -225,11 +217,14 @@ class Plan(object):
         else:
             return "Executing {0}...".format(class_name, step_id)
 
-    def _mark_as_output(self, step):
+    def mark_as_output(self, step):
         """Marks the given compilation step as an output step. The results of
         the output steps will be returned by the ``execute()`` method of the
         plan.
         """
+        if step not in self._steps:
+            raise RuntimeError("step is not part of the plan")
+
         self._output_steps.add(step)
 
     def _register_callback(self, step, callback_type, func):
@@ -260,5 +255,16 @@ class Continuation(object):
 
         Parameters:
             func (callable): the callable to call when the step finishes
+
+        Returns:
+            the continuation object itself for easy chaining
         """
         self.plan.when_step_is_done(self.step, func)
+        return self
+
+    def mark_as_output(self):
+        """Marks the compilation step as an output step so the plan knows that
+        the output of the compilation step has to be exposed explicitly in the
+        result object.
+        """
+        self.plan.mark_as_output(self.step)
