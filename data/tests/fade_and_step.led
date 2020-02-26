@@ -1,0 +1,10 @@
+# When running this test, you should see a fade to green for one second,
+# followed by an abrupt jump to light blue, held for one second.
+#
+# If the executor cannot handle fades-followed-by-jumps properly, you will
+# see a fade to light blue instead.
+with loop():
+	set_color(0, 0, 0)
+	fade_to_color(0, 255, 0, duration=1)
+	set_color(0, 128, 255)
+	sleep(1)

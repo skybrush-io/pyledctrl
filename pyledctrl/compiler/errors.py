@@ -14,14 +14,14 @@ class FeatureNotImplementedError(CompilerError):
     pass
 
 
-class UnsupportedInputFileFormatError(RuntimeError):
+class UnsupportedInputFormatError(RuntimeError):
     """Exception thrown when the input file format is not supported by the
     compiler."""
 
     def __init__(self, format, message=None):
         self.format = format
         message = message or "Unsupported file format: {0}".format(format)
-        super(UnsupportedInputFileFormatError, self).__init__(message)
+        super(UnsupportedInputFormatError, self).__init__(message)
 
 
 class InvalidColorError(RuntimeError):

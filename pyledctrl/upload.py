@@ -99,7 +99,7 @@ class BytecodeUploader(object):
                     sys.stderr.write(
                         "{0:.2f}%\r".format(100.0 * bytes_uploaded / self.length)
                     )
-                except:
+                except Exception:
                     pass
             elif index == 1:
                 self.log("Device returned error code {0}.".format(fd.match.group(1)))

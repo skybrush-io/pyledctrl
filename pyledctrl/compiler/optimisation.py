@@ -21,6 +21,13 @@ from pyledctrl.compiler.ast import (
 from pyledctrl.compiler.utils import TimestampWrapper
 
 
+def are_statements_equivalent(first, second):
+    """Returns whether two statements in the syntax tree are equivalent for
+    the purposes of loop identification and optimization.
+    """
+    return hasattr(first, "is_equivalent_to") and first.is_equivalent_to(second)
+
+
 class ASTOptimiser(object):
     """Base class for optimiser objects that take an AST and mutate it in
     order to reduce the size of the final bytecode.
@@ -343,7 +350,7 @@ class LoopDetector(ASTOptimiser):
                 max_end = min(num_statements, index + self.max_loop_len)
                 for end in range(index + 1, max_end):
                     end_statement = body[end]
-                    if statement.is_equivalent_to(end_statement):
+                    if are_statements_equivalent(statement, end_statement):
                         # A potential loop starts at index with a body
                         # length of end-index. Check how long the loop
                         # would be.

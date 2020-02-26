@@ -384,7 +384,10 @@ class Node(object, metaclass=_NodeMeta):
                 index, length = 0, len(value)
                 while index < length:
                     old_node = value[index]
-                    new_node = yield old_node
+                    if isinstance(old_node, Node):
+                        new_node = yield old_node
+                    else:
+                        new_node = old_node
                     if new_node is None:
                         del value[index]
                         length -= 1
@@ -1269,7 +1272,7 @@ class LoopBlock(Statement):
         return "with loop(iterations={0}):\n    {1}".format(self.iterations, body)
 
 
-class NodeVisitor(object):
+class NodeVisitor:
     """Base class for node visitors that walk the abstract syntax tree in a
     top-down manner and call a visitor function for every node found.
 
@@ -1289,8 +1292,9 @@ class NodeVisitor(object):
         generic visitor will *not* be called by default and the children
         of the node will *not* be visited. You must call ``generic_visit()``
         explicitly if you want to visit the children."""
-        for child_node in node.iter_child_nodes():
-            self._visit(child_node)
+        if isinstance(node, Node):
+            for child_node in node.iter_child_nodes():
+                self._visit(child_node)
 
     def visit(self, node):
         """Visits the given node in the abstract syntax tree. The default
@@ -1309,7 +1313,7 @@ class NodeVisitor(object):
         ``visit_{classname}`` in ``self`` and fall back to ``generic_visit``
         if such a method does not exist.
 
-        Args:
+        Parameters:
             node (Node): the node to visit
 
         Returns:

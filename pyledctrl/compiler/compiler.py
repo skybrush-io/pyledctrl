@@ -6,7 +6,7 @@ import os
 
 from functools import partial
 
-from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFileFormatError
+from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFormatError
 from pyledctrl.compiler.optimisation import create_optimiser_for_level
 from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import (
@@ -41,30 +41,41 @@ def _replace_extension(filename, ext):
     return base + ext
 
 
-class BytecodeCompiler(object):
+class BytecodeCompiler:
     """Bytecode compiler that produces raw bytecode from input files in
     various formats.
     """
 
-    def __init__(self, keep_intermediate_files=False, progress=True, verbose=False):
+    def __init__(
+        self,
+        *,
+        optimisation_level: int = 2,
+        keep_intermediate_files: bool = False,
+        progress: bool = False,
+        verbose: bool = False
+    ):
         """Constructor.
 
         Parameters:
-            keep_intermediate_files (bool): whether to keep any intermediate
+            optimisation_level: the optimisation level that the compiler
+                will use. Defaults to optimising for the smallest bytecode.
+            keep_intermediate_files: whether to keep any intermediate
                 files that are created during compilation
-            progress (bool): whether to print a progress bar showing the
+            progress: whether to print a progress bar showing the
                 progress of the compilation
-            verbose (bool): whether to print messages about the progress of
-                the compilation
+            verbose: whether to print additional messages about the compilation
+                process above the progress bar
         """
-        self.keep_intermediate_files = keep_intermediate_files
         self._tmpdir = None
         self._optimiser = None
         self._optimisation_level = 0
-        self.optimisation_level = 2
+
+        self.keep_intermediate_files = keep_intermediate_files
+        self.optimisation_level = int(optimisation_level)
         self.progress = progress
         self.shift_by = 0
         self.verbose = verbose
+
         self.environment = CompilationStageExecutionEnvironment(self)
 
     def compile(self, input_file, output_file=None, force=True):
@@ -114,10 +125,16 @@ class BytecodeCompiler(object):
         self._optimiser = create_optimiser_for_level(value)
 
     def _compile(self, input_file, output_file, force):
-        plan = Plan(input_file=input_file)
+        description = os.path.basename(input_file) if input_file is not None else None
+
+        plan = Plan()
         self._collect_stages(input_file, output_file, plan)
         self.output = plan.execute(
-            self.environment, force=force, progress=self.progress, verbose=self.verbose
+            self.environment,
+            force=force,
+            progress=self.progress,
+            description=description,
+            verbose=self.verbose,
         )
 
     def _collect_stages(self, input_file, output_file, plan):
@@ -133,7 +150,7 @@ class BytecodeCompiler(object):
             added to
         :type plan: Plan
 
-        :raises UnsupportedInputFileFormatError: when the format of the input
+        :raises UnsupportedInputFormatError: when the format of the input
             file is not known to the compiler
         """
         _, ext = os.path.splitext(input_file)
@@ -163,7 +180,7 @@ class BytecodeCompiler(object):
         elif ext == ".bin":
             func = self._add_stages_for_input_bin_file
         else:
-            raise UnsupportedInputFileFormatError(ext)
+            raise UnsupportedInputFormatError(ext)
         ast_step = func(input_file, output_file, plan, ast_only)
 
         # Determine which factory to use for the output stages

@@ -45,6 +45,13 @@ def cli():
     default=2,
 )
 @click.option(
+    "-p",
+    "--progress",
+    default=False,
+    is_flag=True,
+    help="Show the progress of the compilation process with a progress bar.",
+)
+@click.option(
     "-s",
     "--shift",
     metavar="TIME",
@@ -56,9 +63,15 @@ def cli():
     "``MIN:SEC+FRAMES`` where the minutes and the frames may be omitted.",
     default="",
 )
-@click.option("-v", "--verbose", default=False, is_flag=True)
+@click.option(
+    "-v",
+    "--verbose",
+    default=False,
+    is_flag=True,
+    help="Print additional messages about the compilation process above the progress bar.",
+)
 @click.argument("filename", required=True)
-def compile(filename, output, keep, optimisation, shift, verbose):
+def compile(filename, output, keep, optimisation, shift, progress, verbose):
     """Compiles a LedCtrl source file to a bytecode file.
 
     Takes a single input filename as its only argument.
@@ -67,11 +80,16 @@ def compile(filename, output, keep, optimisation, shift, verbose):
         base, _ = os.path.splitext(filename)
         output = base + ".bin"
 
-    compiler = BytecodeCompiler(keep_intermediate_files=keep, verbose=verbose)
-    compiler.optimisation_level = optimisation
+    compiler = BytecodeCompiler(
+        optimisation_level=optimisation,
+        keep_intermediate_files=keep,
+        progress=progress,
+        verbose=verbose,
+    )
 
-    # TODO(ntamas): don't hardcode 25 fps here
-    compiler.shift_by = parse_as_frame_count(shift, fps=25) if shift else 0
+    if shift:
+        compiler.shift_by = parse_as_frame_count(shift, fps=25)
+
     compiler.compile(filename, output)
 
 
@@ -136,7 +154,7 @@ def dump(filename, output, unroll):
             state.is_fade,
         ]
 
-    compiler = BytecodeCompiler(keep_intermediate_files=False)
+    compiler = BytecodeCompiler()
     compiler.compile(filename)
     syntax_trees = compiler.output
 

@@ -2,6 +2,7 @@ data/show/
 dist/
 out/
 venv/
+.venv/
 *.pyc
 *.egg-info
 .python-version

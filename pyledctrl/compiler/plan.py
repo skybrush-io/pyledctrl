@@ -4,7 +4,6 @@ from __future__ import division
 
 from collections import defaultdict
 from functools import partial
-from os.path import basename
 
 __all__ = ("Plan",)
 
@@ -36,9 +35,8 @@ class Plan(object):
     to execute. Each step must be an instance of CompilationStage_.
     """
 
-    def __init__(self, input_file=None):
+    def __init__(self):
         """Constructor."""
-        self._input_file = input_file
         self._steps = []
         self._output_steps = set()
         self._callbacks = defaultdict(list)
@@ -62,19 +60,29 @@ class Plan(object):
             self._mark_as_output(step)
         return Continuation(self, step)
 
-    def execute(self, environment, force=False, progress=True, verbose=False):
+    def execute(
+        self,
+        environment,
+        *,
+        description: str = None,
+        force: bool = False,
+        progress: bool = False,
+        verbose: bool = False,
+    ):
         """Executes the steps of the plan.
 
         Parameters:
             environment (CompilationStageExecutionEnvironment): the execution
                 environment of each compilation stage, provided by the
                 compiler that calls this function
-            force (bool): force the execution of all steps even if the steps
-                indicate that they not need to be run
-            progress (bool): whether to show a progress bar to indicate the
-                progress of the plan execution
-            verbose (bool): whether to print verbose messages about the
-                progress of the plan execution
+            force: force the execution of all steps even if the steps indicate
+                that they not need to be run
+            progress: whether to show a progress bar to indicate the progress of
+                the plan execution
+            description: a short string to display next to the progress bar that
+                tells the user what we are compiling now
+            verbose: whether to print verbose messages about the progress of the
+                plan execution
 
         Raises:
             CompilerError: in case of a compilation error
@@ -85,7 +93,7 @@ class Plan(object):
         step_index, num_steps = 0, len(self._steps)
 
         tqdm_kwds = {
-            "desc": basename(self._input_file) if self._input_file else None,
+            "desc": description,
             "disable": not progress,
             "bar_format": bar_format,
             "total": num_steps,

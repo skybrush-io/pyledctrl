@@ -19,7 +19,7 @@ def _check_easing_is_supported(easing):
         raise FeatureNotImplementedError("only linear easing is supported")
 
 
-class Marker(object):
+class Marker:
     """Superclass for marker objects placed in the bytecode stream that are
     resolved to actual bytecode in a later compilation stage."""
 
@@ -55,11 +55,22 @@ class JumpMarker(Marker):
 
     def __init__(self, destination):
         self.destination = destination
+        self.destination_marker = None
         self.address = None
 
-    def resolve_to_address(self, address):
+    def _resolve_to_address(self, address):
         assert self.address is None
         self.address = address
+
+    def _resolve_to_marker(self, marker):
+        assert self.destination_marker is None
+        self.destination_marker = marker
+
+    def resolve_to(self, address_or_marker):
+        if isinstance(address_or_marker, int):
+            self._resolve_to_address(address_or_marker)
+        else:
+            self._resolve_to_marker(address_or_marker)
 
     def to_ast_node(self):
         if self.address is None:

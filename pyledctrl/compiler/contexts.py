@@ -8,14 +8,16 @@ user can use in a LED control file.
 
 from __future__ import absolute_import
 
-from collections import defaultdict
 from contextlib import contextmanager
 from functools import wraps
-from pyledctrl.compiler import bytecode
-from pyledctrl.compiler.ast import EndCommand, LoopBlock, Node, StatementSequence
-from pyledctrl.compiler.bytecode import Marker
-from pyledctrl.compiler.errors import DuplicateLabelError, MarkerNotResolvableError
+
 from pyledctrl.utils import ensure_tuple
+
+from . import bytecode
+from .ast import EndCommand, LoopBlock, Node, StatementSequence
+from .bytecode import LabelMarker, Marker
+from .errors import DuplicateLabelError, MarkerNotResolvableError
+from .jumps import JumpMarkerCollector, JumpMarkerResolver
 
 
 def _flatten_bytes(iterable):
@@ -148,7 +150,7 @@ class ExecutionContext(object):
                     "unknown value returned from bytecode "
                     "function: {0!r}".format(node)
                 )
-            if isinstance(node, bytecode.LabelMarker):
+            if isinstance(node, LabelMarker):
                 if node.name in self._labels:
                     raise DuplicateLabelError(node.name)
                 else:
@@ -161,14 +163,20 @@ class ExecutionContext(object):
         collected in ``self._ast`` at the end of an execution, finalizes
         jump addresses etc.
         """
-        return
-        # TODO(ntamas): fix this
-        # Find all the jump instructions in the bytecode
-        jumps_by_destination = defaultdict(list)
-        for item in self._bytecode:
-            if isinstance(item, bytecode.JumpMarker):
-                jumps_by_destination[item.destination].append(item)
+        collector = JumpMarkerCollector()
+        collector.visit(self._ast)
 
+        if collector.has_labels:
+            raise NotImplementedError("Jumps and labels are not supported yet")
+
+        resolver = JumpMarkerResolver(collector.result)
+        resolver.visit(self._ast)
+
+        # At this point all the jump markers know the _identity_ of the label
+        # they should jump to, but not their _address_ in the compiled bytecode.
+        # This comes later.
+
+        """
         if jumps_by_destination:
             # Process the bytecode from the front. If we encounter a label,
             # resolve the corresponding jumps to the address (that we know
@@ -177,7 +185,7 @@ class ExecutionContext(object):
             for address, item in enumerate(self._bytecode):
                 if isinstance(item, bytecode.LabelMarker):
                     for jump in jumps_by_destination.get(item.name, []):
-                        jump.resolve_to_address(address - address_offset)
+                        jump.resolve_to(address - address_offset)
                     address_offset += 1
 
             # We can now eliminate all label markers.
@@ -185,6 +193,7 @@ class ExecutionContext(object):
 
             # And then all other markers (including jump markers) as well
             self._resolve_markers()
+        """
 
     def _resolve_markers(self, cls=Marker, graceful=False):
         """Tries to resolve all markers of the given class within the abstract
