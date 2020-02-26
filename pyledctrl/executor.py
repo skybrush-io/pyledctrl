@@ -25,7 +25,7 @@ class Color(_Color):
     @classmethod
     def black(cls):
         """Returns an instance of the color black."""
-        return cls.gray(0)
+        return cls.BLACK
 
     @classmethod
     def gray(cls, value):
@@ -72,6 +72,9 @@ class Color(_Color):
         return self._replace(
             red=obj.red.value, green=obj.green.value, blue=obj.blue.value
         )
+
+
+Color.BLACK = Color.gray(0)
 
 
 class ExecutorState:
