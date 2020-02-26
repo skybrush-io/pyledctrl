@@ -6,13 +6,11 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from contextlib import closing
 from decimal import Decimal
 
-from pyledctrl.compiler.ast import Comment
-from pyledctrl.compiler.contexts import ExecutionContext
-from pyledctrl.compiler.utils import (
-    get_timestamp_of,
-    TimestampedLineCollector,
-    UnifiedTimeline,
-)
+from .ast import Comment
+from .contexts import ExecutionContext
+from .errors import CompilerError
+from .utils import get_timestamp_of, TimestampedLineCollector, UnifiedTimeline
+
 from pyledctrl.logger import log
 from pyledctrl.parsers.bytecode import BytecodeParser
 from pyledctrl.parsers.sunlite import (
@@ -310,6 +308,32 @@ class BytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStage):
         return BytecodeParser().parse(input)
 
 
+class JSONBytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStage):
+    """Compilation stage that turns compiled bytecode in JSON format back into
+    an abstract syntax tree representation of the LED controller program in
+    memory.
+    """
+
+    def _create_output(self, input, environment):
+        """Inherited."""
+        from base64 import b64decode
+        from json import loads
+
+        try:
+            input = loads(input)
+        except Exception:
+            raise CompilerError("input must be a JSON object")
+
+        if not isinstance(input, dict):
+            raise CompilerError("input must be a JSON object")
+
+        if input.get("version") != 1:
+            raise CompilerError("only version 1 is supported")
+
+        input = b64decode(input.get("data", "").encode("ascii"))
+        return BytecodeParser().parse(input)
+
+
 class ASTOptimisationStage(ObjectToObjectCompilationStage):
     """Compilation stage that takes an in-memory abstract syntax tree and
     optimises it in-place.
@@ -414,7 +438,10 @@ class ASTObjectToLEDSourceCodeCompilationStage(ASTObjectToRawBytesCompilationSta
 
     def _create_output(self, input, environment):
         """Inherited."""
-        return input.to_led_source().encode("utf-8")
+        output = input.to_led_source().encode("utf-8")
+        if output:
+            output += b"\n"
+        return output
 
 
 class ParsedSunliteScenesToPythonSourceCompilationStage(

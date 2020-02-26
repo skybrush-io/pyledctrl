@@ -137,10 +137,7 @@ def dump(filename, output, unroll):
     syntax_trees = compiler.compile(filename, output_format="ast")
 
     for syntax_tree in syntax_trees:
-        executor = Executor()
-        # writer.writerow(state_to_row(executor.state))
-
-        sequence = executor.execute(syntax_tree)
+        sequence = Executor().execute(syntax_tree)
         if unroll:
             sequence = unroll_sequence(sequence)
 

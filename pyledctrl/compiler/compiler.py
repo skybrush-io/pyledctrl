@@ -17,6 +17,7 @@ from .stages import (
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
+    JSONBytecodeToASTObjectCompilationStage,
     LEDSourceCodeToASTObjectCompilationStage,
 )
 
@@ -48,6 +49,7 @@ class BytecodeCompiler:
         self._input_format_to_ast_stage_factory = {
             InputFormat.LEDCTRL_BINARY: BytecodeToASTObjectCompilationStage,
             InputFormat.LEDCTRL_SOURCE: LEDSourceCodeToASTObjectCompilationStage,
+            InputFormat.LEDCTRL_JSON: JSONBytecodeToASTObjectCompilationStage,
         }
         self._output_format_to_output_stage_factory = {
             OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
