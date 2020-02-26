@@ -6,8 +6,6 @@ import os
 
 from typing import Optional
 
-from pyledctrl.utils import TemporaryDirectory
-
 from .errors import CompilerError, UnsupportedInputFormatError
 from .formats import InputFormat, OutputFormat
 from .optimisation import create_optimiser_for_level
@@ -15,11 +13,10 @@ from .plan import Plan
 from .stages import (
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
-    ASTObjectToLEDFileCompilationStage,
+    ASTObjectToLEDSourceCodeCompilationStage,
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
-    FileToASTObjectCompilationStage,
     PythonSourceToASTObjectCompilationStage,
 )
 
@@ -32,8 +29,7 @@ class BytecodeCompiler:
     def __init__(
         self,
         *,
-        optimisation_level: int = 2,
-        keep_intermediate_files: bool = False,
+        optimisation_level: int = 0,
         progress: bool = False,
         verbose: bool = False
     ):
@@ -41,59 +37,77 @@ class BytecodeCompiler:
 
         Parameters:
             optimisation_level: the optimisation level that the compiler
-                will use. Defaults to optimising for the smallest bytecode.
-            keep_intermediate_files: whether to keep any intermediate
-                files that are created during compilation
+                will use. Defaults to not optimising the bytecode at all.
             progress: whether to print a progress bar showing the
                 progress of the compilation
             verbose: whether to print additional messages about the compilation
                 process above the progress bar
         """
-        self._tmpdir = None
         self._optimisation_level = 0
 
         self._input_format_to_ast_stage_factory = {
-            InputFormat.LEDCTRL_BINARY: self._add_stages_for_input_bin_file,
-            InputFormat.LEDCTRL_SOURCE: self._add_stages_for_input_led_file,
+            InputFormat.LEDCTRL_BINARY: BytecodeToASTObjectCompilationStage,
+            InputFormat.LEDCTRL_SOURCE: PythonSourceToASTObjectCompilationStage,
         }
         self._output_format_to_output_stage_factory = {
             OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
-            OutputFormat.LEDCTRL_SOURCE: ASTObjectToLEDFileCompilationStage,
+            OutputFormat.LEDCTRL_SOURCE: ASTObjectToLEDSourceCodeCompilationStage,
             OutputFormat.LEDCTRL_JSON: ASTObjectToJSONBytecodeCompilationStage,
         }
 
-        self.keep_intermediate_files = keep_intermediate_files
         self.optimisation_level = int(optimisation_level)
         self.progress = progress
-        self.shift_by = 0
         self.verbose = verbose
 
         self.environment = CompilationStageExecutionEnvironment(self)
+        self.output = None
 
-    def compile(self, input_file, output_file=None, *, force=True):
+    def compile(
+        self,
+        input_file: str,
+        output_file: Optional[str] = None,
+        *,
+        output_format: Optional[OutputFormat] = None
+    ):
         """Runs the compiler.
 
         Parameters:
             input_file (str): the input file to compile
             output_file (Optional[str]): the output file that the compiler will
-                produce or ``None`` if we only need the abstract syntax tree
-                representation of the input
-            force (bool): force compilation even if the input file is older
-                than the output file. Ignored if ``output_file`` is ``None``
+                produce. When the compiler is expected to produce multiple
+                output objects, the output file is expected to contain a
+                ``{}`` placeholder where the index of the output object will be
+                substituted. The output file may also be ``None`` if the
+                compiler should only return the output
+            output_file: the name of the output file or ``None`` if we do not
+                want to write the result to a file
+            output_format: the preferred output format or ``None`` if it should
+                be inferred from the extension of the output file
 
         Raises:
             CompilerError: in case of a compilation error
         """
-        if self.keep_intermediate_files:
-            return self._compile(input_file, output_file, force)
-        else:
-            with TemporaryDirectory() as tmpdir:
-                self._tmpdir = tmpdir
-                try:
-                    result = self._compile(input_file, output_file, force)
-                finally:
-                    self._tmpdir = None
-            return result
+        description = os.path.basename(input_file) if input_file is not None else None
+
+        if output_format is None:
+            if output_file is not None:
+                output_format = OutputFormat.detect_from_filename(output_file)
+            else:
+                output_format = OutputFormat.AST
+
+        plan = Plan()
+        self._collect_stages(plan, input_file, output_format)
+        self.output = plan.execute(
+            self.environment,
+            force=True,
+            progress=self.progress,
+            description=description,
+            verbose=self.verbose,
+        )
+        if output_file:
+            self._write_outputs_to_file(self.output, output_file)
+
+        return self.output
 
     @property
     def optimisation_level(self):
@@ -114,49 +128,20 @@ class BytecodeCompiler:
     def optimisation_level(self, value):
         self._optimisation_level = max(0, int(value))
 
-    def _compile(self, input_file, output_file, force):
-        description = os.path.basename(input_file) if input_file is not None else None
-
-        plan = Plan()
-        self._collect_stages(input_file, output_file, plan)
-        self.output = plan.execute(
-            self.environment,
-            force=force,
-            progress=self.progress,
-            description=description,
-            verbose=self.verbose,
-        )
-
-    def _collect_stages(self, input_file: str, output_file: Optional[str], plan: Plan):
+    def _collect_stages(self, plan: Plan, input_file: str, output_format: OutputFormat):
         """Collects the compilation stages that will turn the given input
         file into the given output file.
 
         Parameters:
-            input_file: the name of the input file
-            output_file: the name of the output file or ``None`` if we only
-                need to generate an abstract syntax tree
             plan: compilation plan where the collected stages will be added to
+            input_file: the name of the input file
+            output_format: the preferred output format
 
         Raises:
             UnsupportedInputFormatError: when the format of the input file is
                 not known to the compiler
         """
         input_format = InputFormat.detect_from_filename(input_file)
-
-        if output_file is not None:
-            output_format = OutputFormat.detect_from_filename(output_file)
-        else:
-            output_format = OutputFormat.AST
-
-        """
-        # Shifting is supported for ``.sce`` and ``.ses`` only
-        if (
-            input_format
-            not in (InputFormat.SUNLITE_STUDIO_SCE, InputFormat.SUNLITE_STUDIO_SES)
-            and self.shift_by != 0
-        ):
-            raise CompilerError("Shifting is supported only for Sunlite Suite files")
-        """
 
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
@@ -165,13 +150,15 @@ class BytecodeCompiler:
         if create_ast_stage is None:
             raise UnsupportedInputFormatError(format=input_format)
 
-        ast_stage = create_ast_stage(input_file, output_file, plan)
-        if output_format is OutputFormat.AST:
-            plan.mark_as_output(ast_stage)
+        ast_stage = create_ast_stage(input_file)
+        plan.add_step(ast_stage)
 
-        # Determine the final optimization level to use
-        # TODO(ntamas): if the output is ".led", don't optimize; otherwise
-        # respect the setting of the user
+        # Create a list containing our only AST stage; this may be useful later
+        # when one input file may produce multiple ASTs
+        ast_stages = [ast_stage]
+
+        # Create a function that adds an optimization stage for the AST stage
+        # given as an input
         def create_optimisation_stage(ast_stage):
             optimiser = create_optimiser_for_level(self.optimisation_level)
             return ASTOptimisationStage(ast_stage, optimiser)
@@ -181,38 +168,36 @@ class BytecodeCompiler:
             output_format
         )
 
-        # When the execution of the AST step is done, we need to generate
-        # an output file for each AST object. We cannot do this in advance
-        # because it may happen that there are already some callbacks
-        # registered on the AST step that create new steps in the plan.
-        @plan.when_step_is_done(ast_stage)
-        def generate_output_files(output=None):
-            # We need to generate an output file for each AST object.
-            for stage in plan.iter_steps(FileToASTObjectCompilationStage):
-                if getattr(stage, "id", None) is not None:
-                    real_output_file = output_file.replace("{}", stage.id)
-                else:
-                    real_output_file = output_file
+        # Create the optimization stages and the output stages for each AST
+        for index, ast_stage in enumerate(ast_stages):
+            optimisation_stage = create_optimisation_stage(ast_stage)
+            plan.add_step(optimisation_stage)
 
-                if create_optimisation_stage:
-                    optimization_stage = create_optimisation_stage(stage)
-                    plan.add_step(optimization_stage)
+            if create_output_stage:
+                output_stage = create_output_stage(optimisation_stage)
+                plan.add_step(output_stage)
+            else:
+                output_stage = optimisation_stage
 
-                if create_output_stage:
-                    output_stage = create_output_stage(
-                        optimization_stage, real_output_file, id=stage.id
-                    )
-                    plan.add_step(output_stage)
+            plan.mark_as_output(output_stage)
 
-    def _add_stages_for_input_bin_file(self, input_file, output_file, plan):
-        stage = BytecodeToASTObjectCompilationStage(input_file)
-        plan.add_step(stage)
-        return stage
+    def _write_outputs_to_file(self, outputs, output_file):
+        if not outputs:
+            return
 
-    def _add_stages_for_input_led_file(self, input_file, output_file, plan):
-        stage = PythonSourceToASTObjectCompilationStage(input_file)
-        plan.add_step(stage)
-        return stage
+        if len(outputs) > 1 and "{}" not in output_file:
+            raise CompilerError(
+                "output filename needs to include a {} placeholder if the "
+                "compiler produces multiple outputs"
+            )
+
+        num_digits = len(str(len(outputs) - 1))
+        id_format = "{0:0" + str(num_digits) + "}"
+
+        for index, output in enumerate(outputs):
+            id = id_format.format(index)
+            with open(output_file.format(id), "wb") as fp:
+                fp.write(output)
 
     """
     def _add_stages_for_input_sce_file(self, input_file, output_file, plan):
@@ -230,7 +215,7 @@ class BytecodeCompiler:
         @plan.when_step_is_done(parsing_stage)
         def create_next_stages(output):
             preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
-                [(0, None, output)], led_file_template, start_at=self.shift_by
+                [(0, None, output)], led_file_template, start_at=0
             )
             plan.add_step(preproc_stage)
 
@@ -314,7 +299,7 @@ class BytecodeCompiler:
                 # Suite scene files into .led (Python) source files, sorted
                 # by FX IDs
                 preproc_stage = ParsedSunliteScenesToPythonSourceCompilationStage(
-                    scene_order, led_file_template, start_at=self.shift_by
+                    scene_order, led_file_template, start_at=0
                 )
                 add_step(preproc_stage)
 

@@ -38,7 +38,7 @@ class Plan(object):
     def __init__(self):
         """Constructor."""
         self._steps = []
-        self._output_steps = set()
+        self._output_steps = []
         self._callbacks = defaultdict(list)
 
     def add_step(self, step):
@@ -79,10 +79,14 @@ class Plan(object):
             verbose: whether to print verbose messages about the progress of the
                 plan execution
 
+        Returns:
+            a list containing one object for each step in the execution plan
+            that was marked as an output step, in exactly the same order as
+            the output steps were marked as such
+
         Raises:
             CompilerError: in case of a compilation error
         """
-        result = []
         bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}{postfix}"
 
         step_index, num_steps = 0, len(self._steps)
@@ -103,11 +107,11 @@ class Plan(object):
         with progress() as progress_bar:
             while step_index < num_steps:
                 step = self._steps[step_index]
-                is_last = step_index == num_steps - 1
+                is_output_step = step in self._output_steps
 
                 progress_bar.set_postfix_str(getattr(step, "label", "working..."))
 
-                if force or is_last or step.should_run():
+                if force or is_output_step or step.should_run():
                     # Print information about the step being executed if
                     # needed
                     if verbose:
@@ -121,14 +125,12 @@ class Plan(object):
                     callbacks = self._callbacks.get((step, "done"))
                     if callbacks:
                         for callback in callbacks:
-                            if hasattr(step, "output"):
+                            if hasattr(step, "output_object"):
+                                callback(step.output_object)
+                            elif hasattr(step, "output"):
                                 callback(step.output)
                             else:
                                 callback()
-
-                    # If this was an output step, collect the result
-                    if step in self._output_steps:
-                        result.append(step.output)
 
                     # Re-evaluate num_steps because the last step may have
                     # appended more steps to the plan on-the-fly
@@ -143,8 +145,12 @@ class Plan(object):
 
             progress_bar.set_postfix_str("done.")
 
+        # Collect the results of the output steps into a result list
+        result = [step.output_object for step in self._output_steps]
+
         # Unwrap timestamped objects from the result before returning them
         result = [getattr(item, "wrapped", item) for item in result]
+
         return result
 
     def insert_step(self, step, before=None, after=None):
@@ -225,7 +231,7 @@ class Plan(object):
         if step not in self._steps:
             raise RuntimeError("step is not part of the plan")
 
-        self._output_steps.add(step)
+        self._output_steps.append(step)
 
     def _register_callback(self, step, callback_type, func):
         self._callbacks[step, callback_type].append(func)

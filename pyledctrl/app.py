@@ -11,7 +11,7 @@ import sys
 from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
 from .executor import Executor, unroll as unroll_sequence
-from .utils import error, parse_as_frame_count, replace_extension
+from .utils import error, replace_extension
 
 
 @click.group()
@@ -28,11 +28,6 @@ def cli():
     "the same as the input file but the extension will be replaced with "
     ".bin",
     default=None,
-)
-@click.option(
-    "--keep/--no-keep",
-    help="whether to keep intermediate files generated during compilation",
-    default=False,
 )
 @click.option(
     "-O",
@@ -52,18 +47,6 @@ def cli():
     help="Show the progress of the compilation process with a progress bar.",
 )
 @click.option(
-    "-s",
-    "--shift",
-    metavar="TIME",
-    type=str,
-    help="Time interval with which the time axis parsed from the "
-    "input file should be shifted *to the left*. This means that, e.g., "
-    "a shift of ``2:00`` would mean that the output file will start at "
-    "2 minutes into the input file. The duration must be specified as "
-    "``MIN:SEC+FRAMES`` where the minutes and the frames may be omitted.",
-    default="",
-)
-@click.option(
     "-v",
     "--verbose",
     default=False,
@@ -71,7 +54,7 @@ def cli():
     help="Print additional messages about the compilation process above the progress bar.",
 )
 @click.argument("filename", required=True)
-def compile(filename, output, keep, optimisation, shift, progress, verbose):
+def compile(filename, output, optimisation, shift, progress, verbose):
     """Compiles a LedCtrl source file to a bytecode file.
 
     Takes a single input filename as its only argument.
@@ -80,15 +63,8 @@ def compile(filename, output, keep, optimisation, shift, progress, verbose):
         output = replace_extension(filename, ".bin")
 
     compiler = BytecodeCompiler(
-        optimisation_level=optimisation,
-        keep_intermediate_files=keep,
-        progress=progress,
-        verbose=verbose,
+        optimisation_level=optimisation, progress=progress, verbose=verbose
     )
-
-    if shift:
-        compiler.shift_by = parse_as_frame_count(shift, fps=25)
-
     compiler.compile(filename, output)
 
 
@@ -158,8 +134,7 @@ def dump(filename, output, unroll):
         return row
 
     compiler = BytecodeCompiler()
-    compiler.compile(filename)
-    syntax_trees = compiler.output
+    syntax_trees = compiler.compile(filename)
 
     for syntax_tree in syntax_trees:
         executor = Executor()

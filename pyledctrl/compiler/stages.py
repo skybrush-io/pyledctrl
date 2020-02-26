@@ -365,51 +365,33 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
         self.optimiser.optimise(self.input_object)
 
 
-class ASTObjectToOutputCompilationStage(ObjectToFileCompilationStage):
+class ASTObjectToRawBytesCompilationStage(ObjectToObjectCompilationStage):
     """Abstract compilation stage that turns an in-memory abstract syntax tree
-    into some output file.
+    into some output format as raw bytes.
     """
 
     label = "writing..."
 
-    def __init__(self, input, output_file, id=None):
+    def __init__(self, input, id=None):
         """Constructor.
 
         Parameters:
             input: the in-memory abstract syntax tree
-            output_file (str): the name of the output file to write into
         """
-        super(ASTObjectToOutputCompilationStage, self).__init__()
+        super().__init__()
         self._input = input
-        self._output_file = output_file
+        self._output = None
         self.id = id
 
-    @ObjectToFileCompilationStage.input.getter
+    @ObjectToObjectCompilationStage.input.getter
     def input(self):
         """Inherited."""
         return self._input
 
-    @ObjectToFileCompilationStage.output_files.getter
-    def output_files(self):
+    @ObjectToObjectCompilationStage.output.getter
+    def output(self):
         """Inherited."""
-        return [self._output_file]
-
-
-def _write_bytecode_from_ast_to_file(ast, filename):
-    with open(filename, "wb") as output:
-        output.write(ast.to_bytecode())
-
-
-def _write_bytecode_from_ast_to_json(ast, filename):
-    from base64 import b64encode
-    from json import dump
-
-    with open(filename, "w") as output:
-        dump(
-            {"version": 1, "data": b64encode(ast.to_bytecode()).decode("ascii")},
-            output,
-            indent=2,
-        )
+        return self._output
 
 
 def _write_led_source_from_ast_to_file(ast, filename):
@@ -417,18 +399,18 @@ def _write_led_source_from_ast_to_file(ast, filename):
         output.write(ast.to_led_source())
 
 
-class ASTObjectToBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
+class ASTObjectToBytecodeCompilationStage(ASTObjectToRawBytesCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree from a
-    file into a bytecode file that can be uploaded to the Arduino using
-    ``ledctrl upload``.
+    file into an in-memory bytecode that can be written directly to an output
+    file or stream.
     """
 
     def run(self, environment):
         """Inherited."""
-        _write_bytecode_from_ast_to_file(self.input_object, self._output_file)
+        self._output = self.input_object.to_bytecode()
 
 
-class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToOutputCompilationStage):
+class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToRawBytesCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree from a
     file into a JSON file that contains the raw bytecode in base64-encoded
     format.
@@ -436,17 +418,23 @@ class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToOutputCompilationStage)
 
     def run(self, environment):
         """Inherited."""
-        _write_bytecode_from_ast_to_json(self.input_object, self._output_file)
+        from base64 import b64encode
+        from json import dumps
+
+        bytecode = self.input_object.to_bytecode()
+        self._output = dumps(
+            {"version": 1, "data": b64encode(bytecode).decode("ascii")}, indent=2
+        ).encode("ascii")
 
 
-class ASTObjectToLEDFileCompilationStage(ASTObjectToOutputCompilationStage):
+class ASTObjectToLEDSourceCodeCompilationStage(ASTObjectToRawBytesCompilationStage):
     """Compilation stage that turns an in-memory abstract syntax tree back into a
     (functionally equivalent) ``.led`` file.
     """
 
     def run(self, environment):
         """Inherited."""
-        _write_led_source_from_ast_to_file(self.input_object, self._output_file)
+        self._output = self.input_object.to_led_source().encode("utf-8")
 
 
 class ParsedSunliteScenesToPythonSourceCompilationStage(
