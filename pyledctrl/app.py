@@ -139,6 +139,8 @@ def dump(filename, output, unroll):
     (in seconds), red, green and blue components (between 0 and 255, inclusive)
     and a boolean flag that denotes whether the entry represents an abrupt
     change or a fade from the _previous_ step to the current one.
+
+    The last column is omitted if `--unroll` is specified.
     """
     writer = csv.writer(output, dialect="excel-tab")
 
@@ -146,13 +148,15 @@ def dump(filename, output, unroll):
         """Converts an ExecutorState_ object to the row that we want to
         write into the output file.
         """
-        return [
+        row = [
             "%g" % state.timestamp,
             state.color.red,
             state.color.green,
             state.color.blue,
-            state.is_fade,
         ]
+        if not unroll:
+            row.append(state.is_fade)
+        return row
 
     compiler = BytecodeCompiler()
     compiler.compile(filename)

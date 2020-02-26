@@ -1,5 +1,7 @@
 """Exceptions thrown by the bytecode compiler."""
 
+from typing import Optional
+
 
 class CompilerError(RuntimeError):
     """Base class for all errors thrown by the bytecode compiler."""
@@ -18,10 +20,25 @@ class UnsupportedInputFormatError(RuntimeError):
     """Exception thrown when the input file format is not supported by the
     compiler."""
 
-    def __init__(self, format, message=None):
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        *,
+        format=None,
+        filename: Optional[str] = None
+    ):
         self.format = format
-        message = message or "Unsupported file format: {0}".format(format)
-        super(UnsupportedInputFormatError, self).__init__(message)
+        self.filename = filename
+
+        if message is None:
+            if format is not None:
+                message = "Unsupported file format: {0}".format(format)
+            elif filename is not None:
+                message = "Unsupported file format: {0}".format(filename)
+            else:
+                message = "Unsupported file format"
+
+        super().__init__(message)
 
 
 class InvalidColorError(RuntimeError):

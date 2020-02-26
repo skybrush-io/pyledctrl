@@ -7,10 +7,13 @@ import os
 from functools import partial
 from typing import Optional
 
-from pyledctrl.compiler.errors import CompilerError, UnsupportedInputFormatError
-from pyledctrl.compiler.optimisation import create_optimiser_for_level
-from pyledctrl.compiler.plan import Plan
-from pyledctrl.compiler.stages import (
+from pyledctrl.utils import TemporaryDirectory
+
+from .errors import CompilerError, UnsupportedInputFormatError
+from .formats import InputFormat, OutputFormat
+from .optimisation import create_optimiser_for_level
+from .plan import Plan
+from .stages import (
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDFileCompilationStage,
@@ -24,7 +27,6 @@ from pyledctrl.compiler.stages import (
     SunliteSceneParsingStage,
     SunliteSwitchParsingStage,
 )
-from pyledctrl.utils import TemporaryDirectory
 
 
 def _replace_extension(filename: str, ext: str) -> str:
@@ -69,6 +71,18 @@ class BytecodeCompiler:
         self._tmpdir = None
         self._optimiser = None
         self._optimisation_level = 0
+
+        self._input_format_to_ast_stage_factory = {
+            InputFormat.LEDCTRL_BINARY: self._add_stages_for_input_bin_file,
+            InputFormat.LEDCTRL_SOURCE: self._add_stages_for_input_led_file,
+            InputFormat.SUNLITE_STUDIO_SCE: self._add_stages_for_input_sce_file,
+            InputFormat.SUNLITE_STUDIO_SES: self._add_stages_for_input_ses_file,
+        }
+        self._output_format_to_output_stage_factory = {
+            OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
+            OutputFormat.LEDCTRL_SOURCE: ASTObjectToLEDFileCompilationStage,
+            OutputFormat.LEDCTRL_JSON: ASTObjectToJSONBytecodeCompilationStage,
+        }
 
         self.keep_intermediate_files = keep_intermediate_files
         self.optimisation_level = int(optimisation_level)
@@ -151,73 +165,63 @@ class BytecodeCompiler:
             UnsupportedInputFormatError: when the format of the input file is
                 not known to the compiler
         """
-        _, ext = os.path.splitext(input_file)
-        ext = ext.lower()
+        input_format = InputFormat.detect_from_filename(input_file)
 
         if output_file is not None:
-            _, output_ext = os.path.splitext(output_file)
-            output_ext = output_ext.lower()
-            ast_only = False
+            output_format = OutputFormat.detect_from_filename(output_file)
         else:
-            output_ext = None
-            ast_only = True
+            output_format = OutputFormat.AST
 
         # Shifting is supported for ``.sce`` and ``.ses`` only
-        if ext not in (".sce", ".ses") and self.shift_by != 0:
+        if (
+            input_format
+            not in (InputFormat.SUNLITE_STUDIO_SCE, InputFormat.SUNLITE_STUDIO_SES)
+            and self.shift_by != 0
+        ):
             raise CompilerError("Shifting is supported only for Sunlite Suite files")
 
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
-        if ext == ".led" or ext == ".oled":
-            func = self._add_stages_for_input_led_file
-        elif ext == ".sce":
-            func = self._add_stages_for_input_sce_file
-        elif ext == ".ses":
-            func = self._add_stages_for_input_ses_file
-        elif ext == ".bin":
-            func = self._add_stages_for_input_bin_file
-        else:
-            raise UnsupportedInputFormatError(ext)
-        ast_step = func(input_file, output_file, plan, ast_only)
+        create_ast_stage = self._input_format_to_ast_stage_factory.get(input_format)
+        if create_ast_stage is None:
+            raise UnsupportedInputFormatError(format=input_format)
+        ast_stage = create_ast_stage(
+            input_file, output_file, plan, ast_only=output_format is OutputFormat.AST
+        )
+
+        # Determine the final optimization level to use
+        # TODO(ntamas): if the output is ".led", don't optimize; otherwise
+        # respect the setting of the user
+        # TODO(ntamas): when forced not to optimize, set create_optimisation_stage
+        # to None
+        def create_optimisation_stage(ast_stage):
+            return ASTOptimisationStage(ast_stage, self._optimiser)
 
         # Determine which factory to use for the output stages
-        optimize = None
-        if output_ext is None:
-            output_stage_factory = None
-        elif output_ext in (".led", ".oled"):
-            output_stage_factory = ASTObjectToLEDFileCompilationStage
-            optimize = output_ext == ".oled"
-        elif output_ext == ".json":
-            output_stage_factory = ASTObjectToJSONBytecodeCompilationStage
-        else:
-            output_stage_factory = ASTObjectToBytecodeCompilationStage
+        create_output_stage = self._output_format_to_output_stage_factory.get(
+            output_format
+        )
 
         # When the execution of the AST step is done, we need to generate
         # an output file for each AST object. We cannot do this in advance
         # because it may happen that there are already some callbacks
         # registered on the AST step that create new steps in the plan.
-        @plan.when_step_is_done(ast_step)
+        @plan.when_step_is_done(ast_stage)
         def generate_output_files(output=None):
             # We need to generate an output file for each AST object.
-            ast_stage_class = FileToASTObjectCompilationStage
-            for stage in plan.iter_steps(ast_stage_class):
+            for stage in plan.iter_steps(FileToASTObjectCompilationStage):
                 if getattr(stage, "id", None) is not None:
                     real_output_file = output_file.replace("{}", stage.id)
                 else:
                     real_output_file = output_file
 
-                if optimize is None or optimize:
-                    optimization_stage = ASTOptimisationStage(stage, self._optimiser)
-                else:
-                    optimization_stage = ASTOptimisationStage(
-                        stage, create_optimiser_for_level(0)
-                    )
+                if create_optimisation_stage:
+                    optimization_stage = create_optimisation_stage(stage)
+                    plan.add_step(optimization_stage)
 
-                plan.add_step(optimization_stage)
-
-                if output_stage_factory:
-                    output_stage = output_stage_factory(
+                if create_output_stage:
+                    output_stage = create_output_stage(
                         optimization_stage, real_output_file, id=stage.id
                     )
                     plan.add_step(output_stage)

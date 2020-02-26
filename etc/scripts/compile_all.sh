@@ -12,9 +12,15 @@ for subdir in simple tests; do
 			# skip this file
 			true
 		else
-			outfname="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.bin/'`"
-			mkdir -p "`dirname $outfname`"
-			bin/ledctrl compile --progress "$fname" -o "$outfname" "$@"
+			outfname_bin="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.bin/'`"
+			outfname_json="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.json/'`"
+			outfname_oled="`echo $fname | sed -e 's/^data\//out\//' | sed -e 's/\.led$/.oled/'`"
+
+			mkdir -p "`dirname $outfname_bin`"
+
+			bin/ledctrl compile --progress "$fname" -o "$outfname_bin" "$@"
+			bin/ledctrl compile --progress "$fname" -o "$outfname_json" "$@"
+			bin/ledctrl compile --progress "$fname" -o "$outfname_oled" "$@"
 		fi
 	done
 done
