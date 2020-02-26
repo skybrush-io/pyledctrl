@@ -4,10 +4,10 @@ from input files in various formats.
 
 import os
 
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 from .errors import CompilerError, UnsupportedInputFormatError
-from .formats import InputFormat, OutputFormat
+from .formats import InputFormat, InputFormatLike, OutputFormat, OutputFormatLike
 from .optimisation import create_optimiser_for_level
 from .plan import Plan
 from .stages import (
@@ -17,7 +17,7 @@ from .stages import (
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
-    PythonSourceToASTObjectCompilationStage,
+    LEDSourceCodeToASTObjectCompilationStage,
 )
 
 
@@ -47,7 +47,7 @@ class BytecodeCompiler:
 
         self._input_format_to_ast_stage_factory = {
             InputFormat.LEDCTRL_BINARY: BytecodeToASTObjectCompilationStage,
-            InputFormat.LEDCTRL_SOURCE: PythonSourceToASTObjectCompilationStage,
+            InputFormat.LEDCTRL_SOURCE: LEDSourceCodeToASTObjectCompilationStage,
         }
         self._output_format_to_output_stage_factory = {
             OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
@@ -64,30 +64,61 @@ class BytecodeCompiler:
 
     def compile(
         self,
-        input_file: str,
+        input: Any,
         output_file: Optional[str] = None,
         *,
-        output_format: Optional[OutputFormat] = None
-    ):
+        input_format: Optional[InputFormatLike] = None,
+        output_format: Optional[OutputFormatLike] = None
+    ) -> Tuple[Any]:
         """Runs the compiler.
 
         Parameters:
-            input_file (str): the input file to compile
-            output_file (Optional[str]): the output file that the compiler will
+            input: the input to compile. When it is a string, it is assumed to
+                be the name of a file that contains the input. When it is a
+                bytes object, it is assumed to contain the raw data to compile;
+                in this case, the ``input_format`` parameter must be specified.
+                When it is a dictionary, it is assumed to be the Python
+                representation of a JSON object and the ``input_format`` will
+                be assumed to be ``InputFormat.LEDCTRL_JSON``.
+            output_file: the name of the output file that the compiler will
                 produce. When the compiler is expected to produce multiple
                 output objects, the output file is expected to contain a
                 ``{}`` placeholder where the index of the output object will be
                 substituted. The output file may also be ``None`` if the
                 compiler should only return the output
-            output_file: the name of the output file or ``None`` if we do not
-                want to write the result to a file
+            input_format: the preferred input format or ``None`` if it should
+                be inferred from the extension of the input file
             output_format: the preferred output format or ``None`` if it should
                 be inferred from the extension of the output file
+
+        Returns:
+            a tuple containing all the objects that the compiler returned.
+            Typically the tuple will contain a single item only (if the
+            compilation yields a single output).
 
         Raises:
             CompilerError: in case of a compilation error
         """
-        description = os.path.basename(input_file) if input_file is not None else None
+        if isinstance(input, str):
+            if input_format is None:
+                input_format = InputFormat.detect_from_filename(input)
+
+            description = os.path.basename(input)
+            with open(input, "rb") as fp:
+                input = fp.read()
+
+        elif isinstance(input, bytes):
+            description = "<<raw bytes>>"
+
+        elif isinstance(input, dict):
+            from json import dumps
+
+            description = "<<JSON>>"
+            input = dumps(input).encode("utf-8")
+            input_format = InputFormat.LEDCTRL_JSON
+
+        if input_format is None:
+            raise CompilerError("input format must be specified")
 
         if output_format is None:
             if output_file is not None:
@@ -95,8 +126,11 @@ class BytecodeCompiler:
             else:
                 output_format = OutputFormat.AST
 
+        input_format = InputFormat(input_format)
+        output_format = OutputFormat(output_format)
+
         plan = Plan()
-        self._collect_stages(plan, input_file, output_format)
+        self._collect_stages(plan, input, input_format, output_format)
         self.output = plan.execute(
             self.environment,
             force=True,
@@ -128,21 +162,26 @@ class BytecodeCompiler:
     def optimisation_level(self, value):
         self._optimisation_level = max(0, int(value))
 
-    def _collect_stages(self, plan: Plan, input_file: str, output_format: OutputFormat):
+    def _collect_stages(
+        self,
+        plan: Plan,
+        input_data: bytes,
+        input_format: InputFormat,
+        output_format: OutputFormat,
+    ):
         """Collects the compilation stages that will turn the given input
         file into the given output file.
 
         Parameters:
             plan: compilation plan where the collected stages will be added to
-            input_file: the name of the input file
+            input_data: the input data to work on
+            input_format: the format of the input data
             output_format: the preferred output format
 
         Raises:
             UnsupportedInputFormatError: when the format of the input file is
                 not known to the compiler
         """
-        input_format = InputFormat.detect_from_filename(input_file)
-
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
@@ -150,7 +189,7 @@ class BytecodeCompiler:
         if create_ast_stage is None:
             raise UnsupportedInputFormatError(format=input_format)
 
-        ast_stage = create_ast_stage(input_file)
+        ast_stage = create_ast_stage(input_data)
         plan.add_step(ast_stage)
 
         # Create a list containing our only AST stage; this may be useful later
@@ -221,7 +260,7 @@ class BytecodeCompiler:
 
             intermediate_files = preproc_stage.output_files_by_ids.items()
             for id, intermediate_file in intermediate_files:
-                stage = PythonSourceToASTObjectCompilationStage(
+                stage = LEDSourceCodeToASTObjectCompilationStage(
                     intermediate_file, id=id
                 )
                 plan.add_step(stage)
@@ -308,7 +347,7 @@ class BytecodeCompiler:
                 # corresponding .ast file
                 intermediate_files = preproc_stage.output_files_by_ids.items()
                 for id, intermediate_file in intermediate_files:
-                    stage = PythonSourceToASTObjectCompilationStage(
+                    stage = LEDSourceCodeToASTObjectCompilationStage(
                         intermediate_file, id=id
                     )
                     add_step(stage, output)
@@ -339,3 +378,60 @@ class BytecodeCompiler:
         else:
             return base + ext
     """
+
+
+def compile(
+    input: Any,
+    output_file: Optional[str] = None,
+    *,
+    input_format: Optional[InputFormatLike] = None,
+    output_format: Optional[OutputFormatLike] = None,
+    **kwds
+):
+    """Runs the compiler.
+
+    This function is a syntactic sugar for one-time throwaway compilations.
+    For more sophisticated use-cases, use the BytecodeCompiler_ class.
+
+    Keyword arguments not mentioned here are forwarded to the BytecodeCompiler_
+    constructor.
+
+    Parameters:
+        input: the input to compile. When it is a string, it is assumed to
+            be the name of a file that contains the input. When it is a
+            bytes object, it is assumed to contain the raw data to compile;
+            in this case, the ``input_format`` parameter must be specified.
+            When it is a dictionary, it is assumed to be the Python
+            representation of a JSON object and the ``input_format`` will
+            be assumed to be ``InputFormat.LEDCTRL_JSON``.
+        output_file: the name of the output file that the compiler will
+            produce. When the compiler is expected to produce multiple
+            output objects, the output file is expected to contain a
+            ``{}`` placeholder where the index of the output object will be
+            substituted. The output file may also be ``None`` if the
+            compiler should only return the output
+        input_format: the preferred input format or ``None`` if it should
+            be inferred from the extension of the input file
+        output_format: the preferred output format or ``None`` if it should
+            be inferred from the extension of the output file
+
+    Returns:
+        None if the compiler returned nothing; the result of the compilation if
+        the compiler returned a single object only, or a tuple containing the
+        result of the compilation if the compiler returned multiple objects
+
+    Raises:
+        CompilerError: in case of a compilation error
+    """
+    compiler = BytecodeCompiler(**kwds)
+    result = compiler.compile(
+        input, output_file, input_format=input_format, output_format=output_format
+    )
+
+    if not result:
+        return None
+
+    if len(result) == 1:
+        return result[0]
+
+    return result

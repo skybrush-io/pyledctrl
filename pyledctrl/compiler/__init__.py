@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from .compiler import BytecodeCompiler
+from .compiler import BytecodeCompiler, compile
 from .errors import (
     CompilerError,
     UnsupportedInputFormatError,
@@ -14,4 +14,5 @@ __all__ = (
     "InvalidColorError",
     "InvalidDurationError",
     "UnsupportedInputFormatError",
+    "compile",
 )

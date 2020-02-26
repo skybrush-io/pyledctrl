@@ -151,7 +151,8 @@ class Plan(object):
         # Unwrap timestamped objects from the result before returning them
         result = [getattr(item, "wrapped", item) for item in result]
 
-        return result
+        # Return a tuple to prevent mutation
+        return tuple(result)
 
     def insert_step(self, step, before=None, after=None):
         """Inserts the given step before or after some other step that is

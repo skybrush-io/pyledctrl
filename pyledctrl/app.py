@@ -54,7 +54,7 @@ def cli():
     help="Print additional messages about the compilation process above the progress bar.",
 )
 @click.argument("filename", required=True)
-def compile(filename, output, optimisation, shift, progress, verbose):
+def compile(filename, output, optimisation, progress, verbose):
     """Compiles a LedCtrl source file to a bytecode file.
 
     Takes a single input filename as its only argument.
@@ -134,7 +134,7 @@ def dump(filename, output, unroll):
         return row
 
     compiler = BytecodeCompiler()
-    syntax_trees = compiler.compile(filename)
+    syntax_trees = compiler.compile(filename, output_format="ast")
 
     for syntax_tree in syntax_trees:
         executor = Executor()

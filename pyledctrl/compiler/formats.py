@@ -5,10 +5,11 @@ by the compiler.
 import os
 
 from enum import Enum
+from typing import Union
 
 from .errors import UnsupportedInputFormatError
 
-__all__ = ("InputFormat",)
+__all__ = ("InputFormat", "InputFormatLike", "OutputFormat", "OutputFormatLike")
 
 
 class InputFormat(Enum):
@@ -84,3 +85,10 @@ class OutputFormat(Enum):
             return OutputFormat.LEDCTRL_JSON
         else:
             return OutputFormat.LEDCTRL_BINARY
+
+
+#: Type specification for objects that can be cast into an InputFormat
+InputFormatLike = Union[InputFormat, str]
+
+#: Type specification for objects that can be cast into an OutputFormat
+OutputFormatLike = Union[OutputFormat, str]

@@ -8,7 +8,7 @@ from pyledctrl.compiler.errors import BytecodeParserError, BytecodeParserEOFErro
 __all__ = ("BytecodeParser", "BytecodeParserError", "BytecodeParserEOFError")
 
 
-class BytecodeParser(object):
+class BytecodeParser:
     """Parser implementation for the compiled LedCtrl bytecode format.
 
     This parser can be used to restore the abstract syntax tree (AST) of a
