@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "pyledctrl"
+version = "3.1.0"
+description = "Compiler to convert LED light show scripts to bytecode format"
+authors = ["Tamas Nepusz <tamas@collmot.com>"]
+packages = [
+    { include = "pyledctrl", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+click = "^7.1.2"
+tqdm = "^4.47.0"
+lxml = {version = "^4.5.2", optional = true}
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.4.3"
+coverage = {extras = ["toml"], version = "^5.2"}
+pytest-cov = "^2.10.0"
+
+[tool.poetry.extras]
+sunlite = ["lxml"]
+
+[tool.poetry.scripts]
+ledctrl = "pyledctrl.app:main"
+
+[[tool.poetry.source]]
+name = "collmot"
+url = "https://pypi.collmot.com/simple/"
+
+[tool.coverage.paths]
+source = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
