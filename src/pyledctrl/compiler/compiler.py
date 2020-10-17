@@ -4,6 +4,7 @@ from input files in various formats.
 
 import os
 
+from pathlib import Path
 from typing import Any, Optional, Tuple
 
 from .errors import CompilerError, UnsupportedInputFormatError
@@ -75,9 +76,9 @@ class BytecodeCompiler:
         """Runs the compiler.
 
         Parameters:
-            input: the input to compile. When it is a string, it is assumed to
-                be the name of a file that contains the input. When it is a
-                bytes object, it is assumed to contain the raw data to compile;
+            input: the input to compile. When it is a string or a Path object, it is
+                assumed to be the name of a file that contains the input. When it is
+                a bytes object, it is assumed to contain the raw data to compile;
                 in this case, the ``input_format`` parameter must be specified.
                 When it is a dictionary, it is assumed to be the Python
                 representation of a JSON object and the ``input_format`` will
@@ -101,6 +102,9 @@ class BytecodeCompiler:
         Raises:
             CompilerError: in case of a compilation error
         """
+        if isinstance(input, Path):
+            input = str(input)
+
         if isinstance(input, str):
             if input_format is None:
                 input_format = InputFormat.detect_from_filename(input)
