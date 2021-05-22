@@ -2,7 +2,6 @@
 
 from __future__ import print_function
 
-import click
 import csv
 import os
 import subprocess
@@ -12,6 +11,13 @@ from .compiler import BytecodeCompiler
 from .config import DEFAULT_BAUD
 from .executor import Executor, unroll as unroll_sequence
 from .utils import error, replace_extension
+
+try:
+    import click
+except ImportError:
+    print("You need to install pyledctrl with the 'cli' extra to use the")
+    print("command line interface.")
+    sys.exit(1)
 
 
 @click.group()

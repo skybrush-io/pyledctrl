@@ -100,11 +100,11 @@ class Plan(object):
         try:
             from tqdm import tqdm
 
-            progress = partial(tqdm, **tqdm_kwds)
+            progress_bar_factory = partial(tqdm, **tqdm_kwds)
         except ImportError:
-            progress = _FakeProgressBar
+            progress_bar_factory = _FakeProgressBar
 
-        with progress() as progress_bar:
+        with progress_bar_factory() as progress_bar:
             while step_index < num_steps:
                 step = self._steps[step_index]
                 is_output_step = step in self._output_steps
