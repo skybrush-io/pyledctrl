@@ -9,7 +9,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-click = {version = "^7.1.2", optional = true}
+click = {version = "^8.0.0", optional = true}
 tqdm = {version = "^4.47.0", optional = true}
 lxml = {version = "^4.5.2", optional = true}
 
