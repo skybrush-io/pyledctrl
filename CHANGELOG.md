@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed support for Sunlite Suite files.
 
+- Removed unused `connect` and `upload` subcommands.
+
 ## [3.2.1] - 2021-06-08
 
 This is the release that serves as a basis for changelog entries above. Refer

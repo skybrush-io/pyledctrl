@@ -1,14 +1,11 @@
 """Main application class for PyLedCtrl"""
 
 import csv
-import os
-import subprocess
 import sys
 
 from .compiler import BytecodeCompiler
-from .config import DEFAULT_BAUD
 from .executor import Executor, unroll as unroll_sequence
-from .utils import error, replace_extension
+from .utils import replace_extension
 
 try:
     import click
@@ -74,28 +71,6 @@ def compile(filename, output, optimisation, progress, verbose):
 
 @cli.command()
 @click.option(
-    "-p",
-    "--port",
-    type=str,
-    help="the port to which the device is attached",
-    default=None,
-)
-@click.option(
-    "-b", "--baud", type=int, help="the baud rate to use", default=DEFAULT_BAUD
-)
-def connect(port, baud):
-    """Connects to the LedCtrl serial console."""
-    from .utils import get_serial_port_filename
-
-    port = get_serial_port_filename(port)
-    if os.path.exists(port):
-        return subprocess.call(["screen", port, str(baud or DEFAULT_BAUD)])
-    else:
-        error("No such port: {0}".format(port), fatal=True)
-
-
-@cli.command()
-@click.option(
     "-o",
     "--output",
     type=click.File("w"),
@@ -147,33 +122,6 @@ def dump(filename, output, unroll):
 
         for state in sequence:
             writer.writerow(state_to_row(state))
-
-
-@cli.command()
-@click.option(
-    "-p",
-    "--port",
-    type=str,
-    help="the port to which the device is attached",
-    default=None,
-)
-@click.option(
-    "-b", "--baud", type=int, help="the baud rate to use", default=DEFAULT_BAUD
-)
-@click.argument("filename", required=True)
-def upload(filename, port, baud):
-    """\
-    Uploads a compiled LedCtrl bytecode file to an attached device using
-    a serial port.
-
-    Takes the name of the bytecode file to upload as its only argument.
-    """
-    from .utils import get_serial_connection
-    from .upload import BytecodeUploader
-
-    port = get_serial_connection(port, baud)
-    uploader = BytecodeUploader(port)
-    sys.exit(0 if uploader.upload_file(filename) else 1)
 
 
 def main():

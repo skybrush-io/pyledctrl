@@ -3,6 +3,7 @@ dist/
 out/
 venv/
 .venv/
+.vscode/
 *.pyc
 *.egg-info
 .python-version
