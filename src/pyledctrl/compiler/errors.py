@@ -1,6 +1,6 @@
 """Exceptions thrown by the bytecode compiler."""
 
-from typing import Optional
+from typing import Any, Optional
 
 
 class CompilerError(RuntimeError):
@@ -24,7 +24,7 @@ class UnsupportedInputFormatError(RuntimeError):
         self,
         message: Optional[str] = None,
         *,
-        format=None,
+        format: Optional[str] = None,
         filename: Optional[str] = None
     ):
         self.format = format
@@ -45,19 +45,19 @@ class InvalidColorError(RuntimeError):
     """Exception thrown when the input file contains an invalid or unknown
     color specification."""
 
-    def __init__(self, color, message=None):
+    def __init__(self, color: Any, message: Optional[str] = None):
         self.color = color
         message = message or "Invalid color in input: {0!r}".format(color)
-        super(InvalidColorError, self).__init__(message)
+        super().__init__(message)
 
 
 class InvalidDurationError(RuntimeError):
     """Exception thrown when the input file contains an invalid duration."""
 
-    def __init__(self, duration, message=None):
+    def __init__(self, duration: Any, message: Optional[str] = None):
         self.duration = duration
         message = message or "Invalid duration in input: {0!r}".format(duration)
-        super(InvalidDurationError, self).__init__(message)
+        super().__init__(message)
 
 
 class DuplicateLabelError(RuntimeError):
@@ -66,7 +66,7 @@ class DuplicateLabelError(RuntimeError):
     def __init__(self, label, message=None):
         self.label = label
         message = message or "Duplicate label in input: {0!r}".format(label)
-        super(DuplicateLabelError, self).__init__(message)
+        super().__init__(message)
 
 
 class MarkerNotResolvableError(CompilerError):
@@ -77,7 +77,7 @@ class MarkerNotResolvableError(CompilerError):
     def __init__(self, marker, message=None):
         self.marker = marker
         message = message or "Marker not resolvable; {0!r}".format(marker)
-        super(MarkerNotResolvableError, self).__init__(message)
+        super().__init__(message)
 
 
 class InvalidASTFormatError(RuntimeError):
@@ -88,7 +88,7 @@ class InvalidASTFormatError(RuntimeError):
         self.filename = filename
         self.format = format
         message = message or self._get_default_message()
-        super(InvalidASTFormatError, self).__init__(message)
+        super().__init__(message)
 
     def _get_default_message(self):
         if self.format is None:
@@ -113,7 +113,7 @@ class BytecodeParserEOFError(BytecodeParserError):
     and the end of the stream has been reached.
     """
 
-    def __init__(self, cls, message=None):
+    def __init__(self, cls, message: Optional[str] = None):
         """Constructor.
 
         Parameters:
@@ -121,9 +121,9 @@ class BytecodeParserEOFError(BytecodeParserError):
         """
         self.cls = cls
         message = message or self._get_default_message()
-        super(BytecodeParserEOFError, self).__init__(message)
+        super().__init__(message)
 
-    def _get_default_message(self):
+    def _get_default_message(self) -> str:
         if self.cls is None:
             return "EOF reached while parsing bytecode"
         else:

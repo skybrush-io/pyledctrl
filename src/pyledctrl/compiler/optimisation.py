@@ -309,7 +309,7 @@ class LoopDetector(ASTOptimiser):
         """
 
         def __init__(self):
-            super(LoopDetector.Transformer, self).__init__()
+            super().__init__()
             self.max_loop_len = 8
 
         def _identify_loop_iteration_count(

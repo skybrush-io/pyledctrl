@@ -211,7 +211,7 @@ class _NodeMeta(type):
         if "__init__" not in dct:
             dct["__init__"] = cls._create_init_method(parents, fields, defaults)
         cls._add_setters_for_literals(defaults, dct, immutables, name)
-        return super(_NodeMeta, cls).__new__(cls, name, parents, dct)
+        return super().__new__(cls, name, parents, dct)
 
     @classmethod
     def _add_setters_for_literals(cls, defaults, dct, immutables, name):
@@ -550,7 +550,7 @@ class Varuint(Literal):
             raise ValueError("value must be non-negative")
         elif value >= 2 ** 28:
             raise ValueError(
-                "varuints greater than 2**28 are not supported " "by the bytecode"
+                "varuints greater than 2**28 are not supported by the bytecode"
             )
         self._value = value
 
@@ -774,7 +774,7 @@ class Duration(Varuint):
     def __init__(self, value=0):
         # Don't remove this constructor -- it prevents NodeMeta from generating
         # one for Duration
-        super(Duration, self).__init__(value)
+        super().__init__(value)
 
     @classmethod
     def from_frames(cls, frames):
@@ -1340,7 +1340,7 @@ class NodeTransformer(NodeVisitor):
     original visited node)."""
 
     def __init__(self):
-        super(NodeTransformer, self).__init__()
+        super().__init__()
         self.changed = False
 
     def generic_visit(self, node):
@@ -1366,7 +1366,7 @@ class NodeTransformer(NodeVisitor):
 
     def visit(self, node):
         self.changed = False
-        return super(NodeTransformer, self).visit(node)
+        return super().visit(node)
 
 
 iter_fields = Node.iter_fields

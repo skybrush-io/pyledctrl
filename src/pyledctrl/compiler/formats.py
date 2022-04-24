@@ -22,7 +22,7 @@ class InputFormat(Enum):
     LEDCTRL_JSON = "ledctrl_json"
 
     @staticmethod
-    def detect_from_filename(filename: str):
+    def detect_from_filename(filename: str) -> "InputFormat":
         """Proposes an input format to use for a file with the given filename.
 
         Parameters:
@@ -59,7 +59,7 @@ class OutputFormat(Enum):
     AST = "ast"
 
     @staticmethod
-    def detect_from_filename(filename: str):
+    def detect_from_filename(filename: str) -> "OutputFormat":
         """Proposes an output format to use for a file with the given filename.
 
         Parameters:
@@ -81,8 +81,8 @@ class OutputFormat(Enum):
             return OutputFormat.LEDCTRL_BINARY
 
 
-#: Type specification for objects that can be cast into an InputFormat
 InputFormatLike = Union[InputFormat, str]
+"""Type specification for objects that can be cast into an InputFormat"""
 
-#: Type specification for objects that can be cast into an OutputFormat
 OutputFormatLike = Union[OutputFormat, str]
+"""Type specification for objects that can be cast into an OutputFormat"""
