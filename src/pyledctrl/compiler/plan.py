@@ -1,19 +1,31 @@
 """Compilation plan being used in the bytecode compiler."""
 
 from collections import defaultdict
+from contextlib import AbstractContextManager
 from functools import partial
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+    TypeVar,
+    overload,
+)
+
+if TYPE_CHECKING:
+    from .stages import CompilationStage, CompilationStageExecutionEnvironment
 
 __all__ = ("Plan",)
 
 
-class _FakeProgressBar:
+class _FakeProgressBar(AbstractContextManager):
     """Fake progress bar class that provides the same interface as `tqdm.tqdm()`
-    to be used in places where `tdqm` does not have to be present (e.g.,
-    Blender).
+    to be used in places where `tdqm` does not have to be present.
     """
-
-    def __enter__(self):
-        return self
 
     def __exit__(self, *args, **kwds):
         pass
@@ -33,35 +45,45 @@ class Plan:
     to execute. Each step must be an instance of CompilationStage_.
     """
 
+    _steps: List["CompilationStage"]
+    """The list of compilation steps to execute."""
+
+    _output_steps: List["CompilationStage"]
+    """A sub-list of the compilation steps that are marked as ones that produce
+    outputs.
+    """
+
+    _callbacks: DefaultDict[Tuple["CompilationStage", str], List[Callable[..., None]]]
+
     def __init__(self):
         """Constructor."""
         self._steps = []
         self._output_steps = []
         self._callbacks = defaultdict(list)
 
-    def add_step(self, step):
+    def add_step(self, step: "CompilationStage") -> "Continuation":
         """Adds the given step to the plan after any other step that has been
         added previously.
 
         Parameters:
-            step (CompilationStage): the step to add
+            step: the step to add
 
         Returns:
-            Continuation: a helper object that can be used to attach hook
-                functions to the execution of the step
+            a helper object that can be used to attach hook functions to the
+            execution of the step
         """
         self._steps.append(step)
         return Continuation(self, step)
 
     def execute(
         self,
-        environment,
+        environment: "CompilationStageExecutionEnvironment",
         *,
-        description: str = None,
+        description: Optional[str] = None,
         force: bool = False,
         progress: bool = False,
         verbose: bool = False,
-    ):
+    ) -> tuple:
         """Executes the steps of the plan.
 
         Parameters:
@@ -78,7 +100,7 @@ class Plan:
                 plan execution
 
         Returns:
-            a list containing one object for each step in the execution plan
+            a tuple containing one object for each step in the execution plan
             that was marked as an output step, in exactly the same order as
             the output steps were marked as such
 
@@ -124,9 +146,9 @@ class Plan:
                     if callbacks:
                         for callback in callbacks:
                             if hasattr(step, "output_object"):
-                                callback(step.output_object)
+                                callback(step.output_object)  # type: ignore
                             elif hasattr(step, "output"):
-                                callback(step.output)
+                                callback(step.output)  # type: ignore
                             else:
                                 callback()
 
@@ -144,7 +166,7 @@ class Plan:
             progress_bar.set_postfix_str("done.")
 
         # Collect the results of the output steps into a result list
-        result = [step.output_object for step in self._output_steps]
+        result = [step.output_object for step in self._output_steps]  # type: ignore
 
         # Unwrap timestamped objects from the result before returning them
         result = [getattr(item, "wrapped", item) for item in result]
@@ -152,7 +174,13 @@ class Plan:
         # Return a tuple to prevent mutation
         return tuple(result)
 
-    def insert_step(self, step, before=None, after=None):
+    def insert_step(
+        self,
+        step: "CompilationStage",
+        *,
+        before: Optional["CompilationStage"] = None,
+        after: Optional["CompilationStage"] = None,
+    ) -> "Continuation":
         """Inserts the given step before or after some other step that is
         already part of the compilation plan.
 
@@ -168,18 +196,18 @@ class Plan:
         """
         if (before is None) == (after is None):
             raise ValueError("exactly one of before=... and after=... must be None")
-        index = self._steps.index(before or after)
+        index = self._steps.index(before or after)  # type: ignore
         if before is None:
             index += 1
         self._steps.insert(index, step)
         return Continuation(self, step)
 
-    def iter_steps(self, cls=None):
+    def iter_steps(self, cls: Optional[type] = None) -> Iterable["CompilationStage"]:
         """Iterates over the steps of this compilation plan.
 
         Parameters:
-            cls (Optional[type]): when it is not ``None``, only the steps
-                that are instances of the given class are returned
+            cls: when it is not ``None``, only the steps that are instances of
+                the given class are returned
 
         Yields:
             CompilationStage: each compilation stage in this plan
@@ -189,7 +217,19 @@ class Plan:
         else:
             return (step for step in self._steps if isinstance(step, cls))
 
-    def when_step_is_done(self, step, func=None):
+    @overload
+    def when_step_is_done(
+        self, step: "CompilationStage"
+    ) -> Callable[[Callable[..., None]], Callable[..., None]]:
+        ...  # pragma: no cover
+
+    @overload
+    def when_step_is_done(
+        self, step: "CompilationStage", func: Callable[..., None]
+    ) -> None:
+        ...  # pragma: no cover
+
+    def when_step_is_done(self, step: "CompilationStage", func=None) -> Any:
         """Registers a function to be called when the given compilation
         step is done.
 
@@ -205,13 +245,13 @@ class Plan:
             return self._register_callback(step, "done", func)
         else:
 
-            def decorator(decorated):
+            def decorator(decorated: Callable[..., None]) -> Callable[..., None]:
                 self.when_step_is_done(step, decorated)
                 return decorated
 
             return decorator
 
-    def _get_message_for_step(self, step):
+    def _get_message_for_step(self, step: "CompilationStage") -> str:
         """Returns the message to be shown on the console when the given step
         is being executed.
         """
@@ -222,7 +262,7 @@ class Plan:
         else:
             return "Executing {0}...".format(class_name)
 
-    def mark_as_output(self, step):
+    def mark_as_output(self, step: "CompilationStage") -> None:
         """Marks the given compilation step as an output step. The results of
         the output steps will be returned by the ``execute()`` method of the
         plan.
@@ -232,8 +272,13 @@ class Plan:
 
         self._output_steps.append(step)
 
-    def _register_callback(self, step, callback_type, func):
+    def _register_callback(
+        self, step: "CompilationStage", callback_type: str, func: Callable[..., None]
+    ) -> None:
         self._callbacks[step, callback_type].append(func)
+
+
+C = TypeVar("C", bound="Continuation")
 
 
 class Continuation:
@@ -242,17 +287,17 @@ class Continuation:
     functions for the execution of a compilation step.
     """
 
-    def __init__(self, plan, step):
+    def __init__(self, plan: Plan, step: "CompilationStage"):
         """Constructor.
 
         Parameters:
-            plan (Plan): the compilation plan
-            step (CompilationStage): the compilation step
+            plan: the compilation plan
+            step: the compilation step
         """
         self.plan = plan
         self.step = step
 
-    def and_when_done(self, func):
+    def and_when_done(self: C, func: Callable[..., None]) -> C:
         """Specifies the given function to be called when the plan finishes
         the execution of the step. The function will be invoked with the
         value of the ``output`` property of the step if it has such a
@@ -267,9 +312,10 @@ class Continuation:
         self.plan.when_step_is_done(self.step, func)
         return self
 
-    def mark_as_output(self):
+    def mark_as_output(self: C) -> C:
         """Marks the compilation step as an output step so the plan knows that
         the output of the compilation step has to be exposed explicitly in the
         result object.
         """
         self.plan.mark_as_output(self.step)
+        return self

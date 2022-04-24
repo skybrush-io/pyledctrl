@@ -1,6 +1,20 @@
 """Utility objects and functions for the compiler."""
 
 from time import time
+from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
+
+
+T = TypeVar("T")
+
+
+@overload
+def get_timestamp_of(obj: Any) -> Optional[float]:
+    ...  # pragma: no cover
+
+
+@overload
+def get_timestamp_of(obj: Any, default_value: T = None) -> Union[float, T]:
+    ...  # pragma: no cover
 
 
 def get_timestamp_of(obj, default_value=None):
@@ -19,7 +33,7 @@ def get_timestamp_of(obj, default_value=None):
     return getattr(obj, "timestamp", default_value)
 
 
-def is_timestamped(obj):
+def is_timestamped(obj: Any) -> bool:
     """Returns whether a given object is timestamped.
 
     An object is timestamped if it has a ``timestamp`` property that returns
@@ -28,30 +42,38 @@ def is_timestamped(obj):
     return hasattr(obj, "timestamp")
 
 
-class TimestampWrapper:
+class TimestampWrapper(Generic[T]):
     """Wrapper object that wraps another object and adds a ``timestamp``
     property to it to make it timestamped.
     """
 
+    _wrapped: T
+    """The object wrapped by this wrapper."""
+
+    _timestamp: float
+    """The timestamp associated to the object."""
+
     @classmethod
-    def wrap(cls, wrapped, timestamp=None):
+    def wrap(cls, wrapped: T, timestamp: Union[float, Callable[[], float]] = time):
         """Creates a new timestamped wrapper for the given wrapped object.
 
         Parameters:
-            wrapped : the object to wrap
-            timestamp (Optional[float]): the timestamp added to the object;
-                ``None`` means to add the current time.
+            wrapped: the object to wrap
+            timestamp: the timestamp added to the object. When it is a callable,
+                it will be called to obtain the timestamp. The default value
+                calls ``time.time()`` to add the current time.
         """
-        if timestamp is None:
-            timestamp = time()
+        if callable(timestamp):
+            timestamp = timestamp()
+            assert isinstance(timestamp, (int, float))
         return cls(wrapped, timestamp)
 
-    def __init__(self, wrapped, timestamp):
+    def __init__(self, wrapped: T, timestamp: float):
         """Constructor.
 
         Parameters:
-            wrapped : the object to wrap
-            timestamp (float): the timestamp added to the object.
+            wrapped: the object to wrap
+            timestamp: the timestamp added to the object.
         """
         self._wrapped = wrapped
         self._timestamp = float(timestamp)
@@ -60,6 +82,6 @@ class TimestampWrapper:
         return getattr(self._wrapped, attr)
 
     @property
-    def wrapped(self):
+    def wrapped(self) -> T:
         """The object wrapped by this wrapper."""
         return self._wrapped
