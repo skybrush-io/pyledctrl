@@ -76,8 +76,6 @@ terminals and therefore are enclosed in quotes)::
     varuint = ? varint-encoded representation of an unsigned integer ?
 """
 
-from __future__ import division
-
 from decimal import Decimal, Inexact, getcontext
 from struct import Struct
 from warnings import warn

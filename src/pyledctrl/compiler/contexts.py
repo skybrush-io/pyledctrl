@@ -6,8 +6,6 @@ file is evaluated. This allows us to implement custom "commands" that the
 user can use in a LED control file.
 """
 
-from __future__ import absolute_import
-
 from contextlib import contextmanager
 from functools import wraps
 

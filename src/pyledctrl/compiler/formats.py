@@ -20,8 +20,6 @@ class InputFormat(Enum):
     LEDCTRL_SOURCE = "ledctrl_source"
     LEDCTRL_BINARY = "ledctrl_binary"
     LEDCTRL_JSON = "ledctrl_json"
-    SUNLITE_STUDIO_SCE = "sunlite_sce"
-    SUNLITE_STUDIO_SES = "sunlite_ses"
 
     @staticmethod
     def detect_from_filename(filename: str):
@@ -46,10 +44,6 @@ class InputFormat(Enum):
             return InputFormat.LEDCTRL_BINARY
         elif ext == ".json":
             return InputFormat.LEDCTRL_JSON
-        elif ext == ".sce":
-            return InputFormat.SUNLITE_STUDIO_SCE
-        elif ext == ".ses":
-            return InputFormat.SUNLITE_STUDIO_SES
         else:
             raise UnsupportedInputFormatError(filename=filename)
 

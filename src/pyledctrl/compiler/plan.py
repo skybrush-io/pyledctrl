@@ -1,7 +1,5 @@
 """Compilation plan being used in the bytecode compiler."""
 
-from __future__ import division
-
 from collections import defaultdict
 from functools import partial
 

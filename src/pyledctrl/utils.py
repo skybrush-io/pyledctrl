@@ -1,7 +1,5 @@
 """Utility functions for PyLedCtrl."""
 
-from __future__ import print_function
-
 import glob
 import os
 import shutil
@@ -11,34 +9,6 @@ import tempfile
 from itertools import tee
 
 from pyledctrl.config import DEFAULT_BAUD
-
-
-def changed_indexes(seq1, seq2):
-    """Compares two sequences and returns the indices where the two
-    sequences are different.
-
-    The two sequences are assumed to have the same length.
-
-    When a sequence is ``None``, all the indices of the other sequence are
-    returned.
-
-    When both sequences are ``None``, an empty list is returned.
-
-    Parameters:
-        seq1 (Optional[Seq[object]]): the first sequence
-        seq2 (Optional[Seq[object]]): the second sequence
-
-    Returns:
-        List[int]: a list containing the indices where the two sequences are
-            different
-    """
-    if seq1 is None:
-        return [] if seq2 is None else range(len(seq2))
-    if seq2 is None:
-        return range(len(seq1))
-
-    assert len(seq1) == len(seq2)
-    return [i for i in range(len(seq1)) if seq1[i] != seq2[i]]
 
 
 def consecutive_pairs(iterable):
