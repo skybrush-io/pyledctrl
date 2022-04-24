@@ -210,7 +210,7 @@ def replace_extension(filename: str, ext: str) -> str:
     return base + ext
 
 
-class _TemporaryDirectory(object):
+class _TemporaryDirectory:
     """Create and return a temporary directory.  This has the same
     behaviour as mkdtemp but can be used as a context manager.
     Backported from Python 3.x. For example:

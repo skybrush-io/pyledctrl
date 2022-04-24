@@ -41,7 +41,7 @@ def _flatten_bytes_helper(iterable):
                 yield sub_item
 
 
-class ExecutionContext(object):
+class ExecutionContext:
     """Base class for execution contexts.
 
     Execution contexts provide a dictionary mapping identifiers to functions

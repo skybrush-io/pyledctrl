@@ -5,7 +5,7 @@ from __future__ import print_function
 import sys
 
 
-class BytecodeUploader(object):
+class BytecodeUploader:
     """Bytecode uploader for PyLedCtrl."""
 
     def __init__(self, port):
@@ -108,7 +108,7 @@ class BytecodeUploader(object):
                 return Response.success(fd.match.group(1))
 
 
-class Response(object):
+class Response:
     """Represents a response from the Arduino."""
 
     @classmethod

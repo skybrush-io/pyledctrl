@@ -13,8 +13,8 @@ def get_timestamp_of(obj, default_value=None):
     the given default value otherwise.
 
     Parameters:
-        obj (object): the object whose timestamp is to be returned
-        default_value (object): the default timestamp to return if the object
+        obj : the object whose timestamp is to be returned
+        default_value : the default timestamp to return if the object
             is not timestamped or if it has no timestamp
 
     Returns:
@@ -33,7 +33,7 @@ def is_timestamped(obj):
     return hasattr(obj, "timestamp")
 
 
-class TimestampWrapper(object):
+class TimestampWrapper:
     """Wrapper object that wraps another object and adds a ``timestamp``
     property to it to make it timestamped.
     """
@@ -43,7 +43,7 @@ class TimestampWrapper(object):
         """Creates a new timestamped wrapper for the given wrapped object.
 
         Parameters:
-            wrapped (object): the object to wrap
+            wrapped : the object to wrap
             timestamp (Optional[float]): the timestamp added to the object;
                 ``None`` means to add the current time.
         """
@@ -55,7 +55,7 @@ class TimestampWrapper(object):
         """Constructor.
 
         Parameters:
-            wrapped (object): the object to wrap
+            wrapped : the object to wrap
             timestamp (float): the timestamp added to the object.
         """
         self._wrapped = wrapped
@@ -70,7 +70,7 @@ class TimestampWrapper(object):
         return self._wrapped
 
 
-class TimestampedLineCollector(object):
+class TimestampedLineCollector:
     """Helper object that allows us to collect lines to be printed into a
     ``.led`` output file and also keep track of a running timer such that
     each added line is timestamped with the state of the timer at the
@@ -213,7 +213,7 @@ class TimestampedLineCollector(object):
         self._marker_index = next_index
 
 
-class UnifiedTimeline(object):
+class UnifiedTimeline:
     """Unified timeline object that contains a time axis with time instant.
     and a list of associated channel values for each time instant. The time
     instants have the following properties:

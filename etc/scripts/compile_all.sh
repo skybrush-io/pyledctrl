@@ -1,5 +1,5 @@
 #!/bin/sh
-# 
+#
 # Compiles all the files found in data/simple/ and data/tests/
 
 SCRIPT_ROOT=`dirname $0`

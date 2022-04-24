@@ -13,7 +13,7 @@ def parse_color(string):
     try:
         string = string.lower().strip()
         return known_colors[string]
-    except:
+    except Exception:
         raise InvalidColorError(string)
 
 

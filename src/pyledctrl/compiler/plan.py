@@ -8,7 +8,7 @@ from functools import partial
 __all__ = ("Plan",)
 
 
-class _FakeProgressBar(object):
+class _FakeProgressBar:
     """Fake progress bar class that provides the same interface as `tqdm.tqdm()`
     to be used in places where `tdqm` does not have to be present (e.g.,
     Blender).
@@ -30,7 +30,7 @@ class _FakeProgressBar(object):
         pass
 
 
-class Plan(object):
+class Plan:
     """Represents a compilation plan that consists of a list of steps (stages)
     to execute. Each step must be an instance of CompilationStage_.
     """
@@ -222,7 +222,7 @@ class Plan(object):
         if step_id is not None:
             return "Executing {0} (id={1})...".format(class_name, step_id)
         else:
-            return "Executing {0}...".format(class_name, step_id)
+            return "Executing {0}...".format(class_name)
 
     def mark_as_output(self, step):
         """Marks the given compilation step as an output step. The results of
@@ -238,7 +238,7 @@ class Plan(object):
         self._callbacks[step, callback_type].append(func)
 
 
-class Continuation(object):
+class Continuation:
     """Helper object that is returned from the ``add_step()`` and
     ``insert_step()`` methods of Plan_ in order to help specifying hook
     functions for the execution of a compilation step.

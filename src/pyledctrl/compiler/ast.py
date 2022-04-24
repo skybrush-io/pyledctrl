@@ -104,7 +104,7 @@ def _to_varuint(value):
     return bytes(result)
 
 
-class CommandCode(object):
+class CommandCode:
     r"""Constants corresponding to the various raw bytecode commands in
     ``ledctrl``\ 's bytecode.
     """
@@ -132,7 +132,7 @@ class CommandCode(object):
     SET_PYRO_ALL = b"\x15"
 
 
-class EasingMode(object):
+class EasingMode:
     """Constants corresponding to the various easing modes in ``ledctrl``."""
 
     LINEAR = b"\x00"

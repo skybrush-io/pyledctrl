@@ -28,7 +28,7 @@ def are_statements_equivalent(first, second):
     return hasattr(first, "is_equivalent_to") and first.is_equivalent_to(second)
 
 
-class ASTOptimiser(object):
+class ASTOptimiser:
     """Base class for optimiser objects that take an AST and mutate it in
     order to reduce the size of the final bytecode.
     """
