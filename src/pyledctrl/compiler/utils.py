@@ -9,12 +9,12 @@ T = TypeVar("T")
 
 @overload
 def get_timestamp_of(obj: Any) -> Optional[float]:
-    ...  # pragma: no cover
+    ...
 
 
 @overload
 def get_timestamp_of(obj: Any, default_value: T = None) -> Union[float, T]:
-    ...  # pragma: no cover
+    ...
 
 
 def get_timestamp_of(obj, default_value=None):

@@ -1,0 +1,4 @@
+with loop(iterations=UnsignedByte(value=0)):
+    fade_to_color(255, 0, 0, duration=2)
+    fade_to_black(duration=2)
+end()

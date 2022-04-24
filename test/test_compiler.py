@@ -20,9 +20,15 @@ def load_test_data():
             OutputFormat.LEDCTRL_SOURCE,
         ):
             if to_skip:
-                result.append(pytest.param(data, format, marks=pytest.mark.xfail))
+                result.append(pytest.param(data, format, None, marks=pytest.mark.xfail))
             else:
-                result.append((data, format))
+                if format is OutputFormat.LEDCTRL_BINARY:
+                    expected = path.with_suffix(".bin").read_bytes()
+                elif format is OutputFormat.LEDCTRL_SOURCE:
+                    expected = path.with_suffix(".oled").read_bytes()
+                else:
+                    expected = None
+                result.append((data, format, expected))
 
     return result
 
@@ -30,8 +36,8 @@ def load_test_data():
 class TestCompilation:
     test_data = load_test_data()
 
-    @pytest.mark.parametrize("input,format", test_data)
-    def test_compilation(self, tmp_path: Path, input, format):
+    @pytest.mark.parametrize("input,format,expected", test_data)
+    def test_compilation(self, tmp_path: Path, input, format, expected):
         compiler = BytecodeCompiler(optimisation_level=2)
 
         (tmp_path / "input.led").write_bytes(input)
@@ -40,4 +46,7 @@ class TestCompilation:
         )
         result = (tmp_path / "out").read_bytes()
 
-        assert len(result) > 0
+        if expected is not None:
+            assert result == expected
+        else:
+            assert len(result) > 0
