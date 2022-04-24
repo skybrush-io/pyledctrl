@@ -3,9 +3,10 @@
 import csv
 import sys
 
+from pathlib import Path
+
 from .compiler import BytecodeCompiler
 from .executor import Executor, unroll as unroll_sequence
-from .utils import replace_extension
 
 try:
     import click
@@ -61,7 +62,7 @@ def compile(filename, output, optimisation, progress, verbose):
     Takes a single input filename as its only argument.
     """
     if output is None:
-        output = replace_extension(filename, ".bin")
+        output = Path(filename).with_suffix(".bin")
 
     compiler = BytecodeCompiler(
         optimisation_level=optimisation, progress=progress, verbose=verbose

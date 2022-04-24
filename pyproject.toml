@@ -33,6 +33,7 @@ source = ["src"]
 [tool.coverage.run]
 branch = true
 source = ["src"]
+omit = ["src/pyledctrl/app.py", "src/pyledctrl/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true

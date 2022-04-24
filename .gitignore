@@ -6,4 +6,5 @@ venv/
 .vscode/
 *.pyc
 *.egg-info
+.coverage*
 .python-version

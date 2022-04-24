@@ -1,6 +1,5 @@
 """Utility functions for PyLedCtrl."""
 
-import os
 import sys
 
 from itertools import tee
@@ -29,19 +28,19 @@ def consecutive_pairs(it: Iterable[T]) -> Iterable[Tuple[T, T]]:
 
 @overload
 def ensure_tuple(obj: Tup) -> Tup:
-    ...
+    ...  # pragma: no cover
 
 
 @overload
 def ensure_tuple(obj: T) -> Tuple[T]:
-    ...
+    ...  # pragma: no cover
 
 
 def ensure_tuple(obj):
     """Ensures that the given object is a tuple. If it is not a tuple,
     returns a tuple containing the object only.
     """
-    return (obj if isinstance(obj, tuple) else obj,)
+    return obj if isinstance(obj, tuple) else (obj,)
 
 
 def error(message: str, fatal: bool = False) -> None:
@@ -142,17 +141,3 @@ def parse_as_frame_count(value: str, *, fps: int) -> int:
     seconds = float(seconds) if seconds else 0
     residual = float(residual) if residual else 0
     return int((minutes * 60 + seconds) * fps + residual)
-
-
-def replace_extension(filename: str, ext: str) -> str:
-    """Replaces the extension of the given filename with another one.
-
-    Parameters:
-        filename: the filename to modify
-        ext: the desired extension of the file
-
-    Returns:
-        the new filename
-    """
-    base, _ = os.path.splitext(filename)
-    return base + ext
