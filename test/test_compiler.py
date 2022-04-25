@@ -8,7 +8,7 @@ import pytest
 
 
 def load_test_data():
-    data_dir = Path(__file__).parent / "data"
+    data_dir = Path(__file__).parent / "data" / "compiler"
 
     result = []
 
