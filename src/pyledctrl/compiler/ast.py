@@ -77,111 +77,117 @@ terminals and therefore are enclosed in quotes)::
 """
 
 from decimal import Decimal, Inexact, getcontext
+from io import BufferedReader
 from struct import Struct
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    FrozenSet,
+    IO,
+    Iterable,
+    Generator,
+    Generic,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from warnings import warn
 
-from pyledctrl.compiler.errors import BytecodeParserError, BytecodeParserEOFError
-from pyledctrl.utils import first, memoize
+from pyledctrl.utils import first, to_varuint
 
-
-@memoize
-def _to_varuint(value):
-    """Converts the given numeric value into its varuint representation."""
-    if value < 0:
-        raise ValueError("negative varuints are not supported")
-    elif value < 128:
-        result = [value]
-    else:
-        result = []
-        while value > 0:
-            if value < 128:
-                result.append(value)
-            else:
-                result.append((value & 0x7F) + 0x80)
-            value >>= 7
-    return bytes(result)
+from .colors import Color
+from .errors import BytecodeParserError, BytecodeParserEOFError
 
 
 class CommandCode:
-    r"""Constants corresponding to the various raw bytecode commands in
-    ``ledctrl``\ 's bytecode.
+    """Constants corresponding to the various raw bytecode commands in
+    ``ledctrl``'s bytecode.
     """
 
     END = b"\x00"
+    """End of bytecode."""
+
     NOP = b"\x01"
+    """Empty operation, do nothing."""
+
     SLEEP = b"\x02"
+    """Sleep for a given number of frames."""
+
     WAIT_UNTIL = b"\x03"
+    """Wait until the internal clock reaches the given number of frames."""
+
     SET_COLOR = b"\x04"
+    """Set the output RGB color to a given color, then wait for a given number
+    of frames.
+    """
+
     SET_GRAY = b"\x05"
+    """Set the output RGB color to a given shade of gray, then wait for a given
+    number of frames.
+    """
+
     SET_BLACK = b"\x06"
+    """Set the output RGB color to black, then wait for a given number of frames.
+    """
+
     SET_WHITE = b"\x07"
+    """Set the output RGB color to white, then wait for a given number of frames.
+    """
+
     FADE_TO_COLOR = b"\x08"
+    """Fade the current color to the given RGB color over a specified time
+    interval.
+    """
+
     FADE_TO_GRAY = b"\x09"
+    """Fade the current color to the given shade of gray over a specified time
+    interval.
+    """
+
     FADE_TO_BLACK = b"\x0A"
+    """Fade the current color to black over a specified time interval."""
+
     FADE_TO_WHITE = b"\x0B"
+    """Fade the current color to white over a specified time interval."""
+
     LOOP_BEGIN = b"\x0C"
+    """Marks the beginning of a loop, followed by an iteration count."""
+
     LOOP_END = b"\x0D"
+    """Marks the end of a loop."""
+
     RESET_TIMER = b"\x0E"
+    """Resets the internal timer to zero."""
+
     SET_COLOR_FROM_CHANNELS = b"\x10"
+    """Sets the current color from some input RC channels."""
+
     FADE_TO_COLOR_FROM_CHANNELS = b"\x11"
+    """Fades the current color to the current values of some input RC channels."""
+
     JUMP = b"\x12"
+    """Jump to a given address in the bytecode."""
+
     TRIGGERED_JUMP = b"\x13"
+    """Jump to a given address in the bytecode when a specified condition happens."""
+
     SET_PYRO = b"\x14"
+    """Sets the output value of a pyro/relay channel to a given value (same value
+    for all channels).
+    """
+
     SET_PYRO_ALL = b"\x15"
+    """Sets the output value of all pyro/relay channels explicitly to a given
+    value.
+    """
 
 
-class EasingMode:
-    """Constants corresponding to the various easing modes in ``ledctrl``."""
-
-    LINEAR = b"\x00"
-    IN_SINE = b"\x01"
-    OUT_SINE = b"\x02"
-    IN_OUT_SINE = b"\x03"
-    IN_QUAD = b"\x04"
-    OUT_QUAD = b"\x05"
-    IN_OUT_QUAD = b"\x06"
-    IN_CUBIC = b"\x07"
-    OUT_CUBIC = b"\x08"
-    IN_OUT_CUBIC = b"\x09"
-    IN_QUART = b"\x0A"
-    OUT_QUART = b"\x0B"
-    IN_OUT_QUART = b"\x0C"
-    IN_QUINT = b"\x0D"
-    OUT_QUINT = b"\x0E"
-    IN_OUT_QUINT = b"\x0F"
-    IN_EXPO = b"\x10"
-    OUT_EXPO = b"\x11"
-    IN_OUT_EXPO = b"\x12"
-    IN_CIRC = b"\x13"
-    OUT_CIRC = b"\x14"
-    IN_OUT_CIRC = b"\x15"
-    IN_BACK = b"\x16"
-    OUT_BACK = b"\x17"
-    IN_OUT_BACK = b"\x18"
-    IN_ELASTIC = b"\x19"
-    OUT_ELASTIC = b"\x1A"
-    IN_OUT_ELASTIC = b"\x1B"
-    IN_BOUNCE = b"\x1C"
-    OUT_BOUNCE = b"\x1D"
-    IN_OUT_BOUNCE = b"\x1E"
-
-    @classmethod
-    def get(cls, spec):
-        """Returns an easing mode constant from a string specification.
-
-        Args:
-            spec (None or string): a string constant corresponding to the name
-                of an easing mode, or ``None`` to denote linear easing. When
-                it is a string, it will be turned to uppercase and all the
-                dashes will be replaced with underscores before the string
-                is looked up in the ``EasingMode`` class.
-        """
-        if spec is None:
-            return cls.LINEAR
-        if isinstance(spec, int):
-            return spec
-        spec = spec.upper().replace("-", "_")
-        return getattr(cls, spec)
+T = TypeVar("T")
 
 
 class _NodeMeta(type):
@@ -204,7 +210,7 @@ class _NodeMeta(type):
     the incoming value in the appropriate literal type.
     """
 
-    def __new__(cls, name, parents, dct):
+    def __new__(cls, name: str, parents, dct):
         fields = dct.get("_fields")
         defaults = dct.get("_defaults")
         immutables = dct.get("_immutable")
@@ -214,7 +220,7 @@ class _NodeMeta(type):
         return super().__new__(cls, name, parents, dct)
 
     @classmethod
-    def _add_setters_for_literals(cls, defaults, dct, immutables, name):
+    def _add_setters_for_literals(cls, defaults, dct, immutables, name: str):
         if not defaults:
             return
         immutables = frozenset(immutables or [])
@@ -228,7 +234,7 @@ class _NodeMeta(type):
                 dct[field] = cls._add_setter_for_literal(field, default)
 
     @classmethod
-    def _add_getter_for_immutable_field(cls, field):
+    def _add_getter_for_immutable_field(cls, field: str) -> property:
         field_var = "_" + field
 
         def getter(self):
@@ -237,7 +243,7 @@ class _NodeMeta(type):
         return property(getter)
 
     @classmethod
-    def _add_setter_for_literal(cls, field, literal_type):
+    def _add_setter_for_literal(cls, field: str, literal_type: type) -> property:
         field_var = "_" + field
 
         def getter(self):
@@ -251,10 +257,15 @@ class _NodeMeta(type):
         return property(getter, setter)
 
     @classmethod
-    def _create_init_method(cls, parents, fields, defaults):
+    def _create_init_method(
+        cls,
+        parents,
+        fields: Optional[Sequence[str]],
+        defaults: Optional[Dict[str, Any]],
+    ) -> Callable[..., None]:
         if fields is None:
             # Class should be abstract
-            def __init__(self, *args, **kwds):
+            def __init__(self, *args, **kwds):  # type: ignore
                 raise NotImplementedError("this node type is abstract")
 
             return __init__
@@ -304,7 +315,9 @@ class _NodeMeta(type):
 class Node(object, metaclass=_NodeMeta):
     """Base class for nodes in the abstract syntax tree."""
 
-    def iter_child_nodes(self):
+    _fields: ClassVar[Sequence[str]]
+
+    def iter_child_nodes(self) -> Iterable["Node"]:
         """Returns an iterator that yields all field values that are subclasses
         of nodes. When a field maps to a list of nodes, yields all the nodes
         in the list.
@@ -317,14 +330,14 @@ class Node(object, metaclass=_NodeMeta):
                 for node in value:
                     yield node
 
-    def iter_fields(self):
+    def iter_fields(self) -> Iterable[Tuple[str, Any]]:
         """Returns an iterator that yields ``(field_name, field_value)`` pairs
         for each field of the node.
         """
         for name in self._fields:
             yield name, getattr(self, name)
 
-    def iter_field_values(self):
+    def iter_field_values(self) -> Iterable[Any]:
         """Returns an iterator that yields the values of each field of the node,
         in the order defined in the ``_fields`` property.
         """
@@ -332,7 +345,7 @@ class Node(object, metaclass=_NodeMeta):
             yield getattr(self, name)
 
     @property
-    def length_in_bytes(self):
+    def length_in_bytes(self) -> int:
         """Returns the length of the node when it is converted into bytecode.
         The default implementation calls ``to_bytecode`` and returns the length
         of the generated bytecode, but you should override it in subclasses
@@ -340,15 +353,15 @@ class Node(object, metaclass=_NodeMeta):
         """
         return len(self.to_bytecode())
 
-    def to_bytecode(self):
+    def to_bytecode(self) -> bytes:
         """Converts the node into bytecode.
 
         Returns:
-            bytes: the bytecode representation of the node
+            the bytecode representation of the node
         """
         raise NotImplementedError
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         """Converts the node into a dictionary representation that maps the
         names of the children of the node into the corresponding values.
         Works only for concrete nodes where the ``_fields`` class variable
@@ -356,15 +369,15 @@ class Node(object, metaclass=_NodeMeta):
         """
         return dict(self.iter_fields())
 
-    def to_led_source(self):
+    def to_led_source(self) -> str:
         """Converts the node back into the ``.led`` source format.
 
         Returns:
-            str: the ``.led`` source format representation of the node
+            the ``.led`` source format representation of the node
         """
         raise NotImplementedError
 
-    def transform_child_nodes(self):
+    def transform_child_nodes(self) -> Generator["Node", Optional["Node"], None]:
         """Returns a generator that yields all field values that are subclasses
         of nodes and allows the user to replace the nodes with transformed ones
         by sending the new node back into the generator. Sending ``None`` back
@@ -402,7 +415,7 @@ class Node(object, metaclass=_NodeMeta):
         for arg_name, value in zip(self._fields, state):
             setattr(self, arg_name, value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         kvpairs = [
             "{0}={1!r}".format(arg_name, getattr(self, arg_name))
             for arg_name in self._fields
@@ -440,12 +453,15 @@ class UnsignedByte(Byte):
     _fields = ("value",)
     _defaults = {"value": 0}
 
+    _value: int
+    _bytecode: bytes
+
     @classmethod
-    def from_bytecode(cls, data):
+    def from_bytecode(cls, data: IO[bytes]):
         """Reads an UnsignedByte from a binary file-like object.
 
         Parameters:
-            data (IOBase): the stream to read from
+            data: the stream to read from
 
         Returns:
             UnsignedByte: the constructed object
@@ -455,23 +471,23 @@ class UnsignedByte(Byte):
             raise BytecodeParserEOFError(cls)
         return cls(value=ord(value))
 
-    def __init__(self, value=0):
+    def __init__(self, value: int = 0):
         """Constructor.
 
         Parameters:
-            value (int): the value of the literal
+            value: the value of the literal
         """
         self._set_value(value)
-        self.bytecode = bytes([self.value])
+        self._bytecode = bytes([self.value])
 
-    def equals(self, other):
+    def equals(self, other: "UnsignedByte"):
         """Compares this byte with another byte to decide whether they
         are the same.
         """
         return self._value == other._value
 
     def to_bytecode(self):
-        return self.bytecode
+        return self._bytecode
 
     def to_led_source(self):
         return str(self.value)
@@ -480,9 +496,10 @@ class UnsignedByte(Byte):
     def value(self):
         return self._value
 
-    def _set_value(self, value):
+    def _set_value(self, value: Union[int, "UnsignedByte"]) -> None:
         if isinstance(value, UnsignedByte):
             value = value.value
+            assert isinstance(value, int)
         if value < 0 or value > 255:
             raise ValueError("value must be between 0 and 255 (inclusive)")
         self._value = value
@@ -495,15 +512,18 @@ class Varuint(Literal):
     _defaults = {"value": 0}
     _immutable = _fields
 
+    _value: int
+    _bytecode: bytes
+
     @classmethod
-    def from_bytecode(cls, data):
+    def from_bytecode(cls, data: IO[bytes]):
         """Reads a Varuint from a binary file-like object.
 
         Parameters:
-            data (IOBase): the stream to read from
+            data: the stream to read from
 
         Returns:
-            Varuint: the constructed object
+            the constructed object
         """
         value = 0
         shift = 0
@@ -523,10 +543,10 @@ class Varuint(Literal):
 
     def __init__(self, value=0):
         self._set_value(int(value))
-        self._bytecode = _to_varuint(value)
+        self._bytecode = to_varuint(value)
 
-    def equals(self, other):
-        """Compares this byte with another byte to decide whether they
+    def equals(self, other: "Varuint"):
+        """Compares this varuint with another varuint to decide whether they
         are the same.
         """
         return self._value == other._value
@@ -545,7 +565,7 @@ class Varuint(Literal):
     def value(self):
         return self._value
 
-    def _set_value(self, value):
+    def _set_value(self, value: int) -> None:
         if value < 0:
             raise ValueError("value must be non-negative")
         elif value >= 2 ** 28:
@@ -562,15 +582,21 @@ class ChannelMask(Byte):
     _defaults = {"enable": False, "channels": ()}
     _immutable = _fields
 
+    enable: bool
+    """Whether to enable or disable the channels in the mask."""
+
+    channels: FrozenSet[int]
+    """Indices of the channels to enable or disable."""
+
     @classmethod
-    def from_bytecode(cls, data):
-        """Parses a ChannelValues object from its bytecode representation.
+    def from_bytecode(cls, data: IO[bytes]):
+        """Parses a ChannelMask object from its bytecode representation.
 
         Parameters:
-            data (BufferedReader): the stream to read from
+            data: the stream to read from
 
         Returns:
-            StatementSequence: the constructed object
+            the constructed object
         """
         value = data.read(1)
         if not value:
@@ -584,24 +610,23 @@ class ChannelMask(Byte):
 
         return cls(enable=bool(value & 0x80), channels=tuple(channels))
 
-    def __init__(self, enable=False, channels=()):
+    def __init__(self, enable: bool = False, channels: Iterable[int] = ()):
         """Constructor.
 
         Parameters:
-            enable (bool): whether to enable or disable the channels in the mask
-            channels (Iterable[int]): collection of channel indices that are
-                present in the mask
+            enable: whether to enable or disable the channels in the mask
+            channels: collection of channel indices that are present in the mask
         """
         self._enable = bool(enable)
         self._set_channels(channels)
 
-    def equals(self, other):
+    def equals(self, other: "ChannelMask") -> bool:
         """Compares this byte with another byte to decide whether they
         are the same.
         """
         return self._enable == other._enable and self._channels == other._channels
 
-    def _to_byte(self):
+    def _to_byte(self) -> int:
         result = 0
         for bit in self._channels:
             result |= 1 << bit
@@ -616,7 +641,7 @@ class ChannelMask(Byte):
         else:
             return str(tuple(sorted(self._channels)))[1:-1]
 
-    def _set_channels(self, value):
+    def _set_channels(self, value: Iterable[int]) -> None:
         if any(ch < 0 or ch > 6 for ch in value):
             raise ValueError("channel indices must be between 0 and 6 (inclusive)")
         self._channels = frozenset(value)
@@ -624,20 +649,21 @@ class ChannelMask(Byte):
 
 class ChannelValues(Byte):
     """Literal that represents the channel value byte of a SET_PYRO_ALL
-    command."""
+    command.
+    """
 
     _fields = ("channels",)
     _defaults = {"channels": ()}
 
     @classmethod
-    def from_bytecode(cls, data):
+    def from_bytecode(cls, data: IO[bytes]):
         """Parses a ChannelValues object from its bytecode representation.
 
         Parameters:
-            data (BufferedReader): the stream to read from
+            data: the stream to read from
 
         Returns:
-            StatementSequence: the constructed object
+            the constructed object
         """
         value = data.read(1)
         if not value:
@@ -651,22 +677,23 @@ class ChannelValues(Byte):
 
         return cls(tuple(channels))
 
-    def __init__(self, channels=()):
+    def __init__(self, channels: Iterable[int] = ()):
         """Constructor.
 
         Parameters:
             channels (Iterable[int]): collection of channel indices that are
-                set to 1 after the execution of the SET_PYRO_ALL command.
+                set to 1 after the execution of the SET_PYRO_ALL command; the
+                rest are set to zero.
         """
         self._set_channels(channels)
 
-    def equals(self, other):
+    def equals(self, other: "ChannelValues") -> bool:
         """Compares this byte with another byte to decide whether they
         are the same.
         """
         return self._channels == other._channels
 
-    def _to_byte(self):
+    def _to_byte(self) -> int:
         result = 0
         for bit in self._channels:
             result |= 1 << bit
@@ -685,11 +712,7 @@ class ChannelValues(Byte):
     def channels(self):
         return self._channels
 
-    @property
-    def enable(self):
-        return self._enable
-
-    def _set_channels(self, value):
+    def _set_channels(self, value: Iterable[int]) -> None:
         if any(ch < 0 or ch > 6 for ch in value):
             raise ValueError("channel indices must be between 0 and 6 (inclusive)")
         self._channels = frozenset(value)
@@ -701,23 +724,28 @@ class RGBColor(Node):
     _fields = ("red", "green", "blue")
     _defaults = {"red": UnsignedByte, "green": UnsignedByte, "blue": UnsignedByte}
     _immutable = _fields
-    _instance_cache = {}
-    _struct = Struct("BBB")
 
-    def __init__(self, red, green, blue):
+    _instance_cache: ClassVar[Dict[Color, "RGBColor"]] = {}
+    _struct: ClassVar[Struct] = Struct("BBB")
+
+    red: UnsignedByte
+    green: UnsignedByte
+    blue: UnsignedByte
+
+    def __init__(self, red: int, green: int, blue: int):
         self._red = UnsignedByte(red)
         self._green = UnsignedByte(green)
         self._blue = UnsignedByte(blue)
 
     @classmethod
-    def cached(cls, red, green, blue):
+    def cached(cls, red: int, green: int, blue: int):
         key = red, green, blue
         result = cls._instance_cache.get(key)
         if result is None:
             cls._instance_cache[key] = result = cls(red, green, blue)
         return result
 
-    def equals(self, other):
+    def equals(self, other: "RGBColor"):
         """Compares this color with another RGBColor to decide whether they
         are the same.
         """
@@ -768,16 +796,17 @@ class Duration(Varuint):
     """Node that represents a duration."""
 
     _fields = Varuint._fields
-    FPS = Decimal(50)
-    _instance_cache = {}
+    _instance_cache: ClassVar[Dict[int, "Duration"]] = {}
 
-    def __init__(self, value=0):
+    FPS: ClassVar[Decimal] = Decimal(50)
+
+    def __init__(self, value: int = 0):
         # Don't remove this constructor -- it prevents NodeMeta from generating
         # one for Duration
         super().__init__(value)
 
     @classmethod
-    def from_frames(cls, frames):
+    def from_frames(cls, frames: int):
         result = cls._instance_cache.get(frames)
         if result is None:
             result = cls(value=frames)
@@ -785,7 +814,7 @@ class Duration(Varuint):
         return result
 
     @classmethod
-    def from_seconds(cls, seconds):
+    def from_seconds(cls, seconds: float):
         # Okay, this is tricky. First of all, multiplication between a
         # Decimal and a float is not supported, so we need to convert
         # float seconds into Decimal as well. However, check this:
@@ -802,15 +831,15 @@ class Duration(Varuint):
         if seconds is None:
             seconds = 0
 
-        seconds = Decimal(str(seconds))
-        frame_count = seconds * cls.FPS
+        seconds_as_str = Decimal(str(seconds))
+        frame_count = seconds_as_str * cls.FPS
         getcontext().clear_flags()
         frame_count_as_int = int(frame_count.to_integral_exact())
         if getcontext().flags[Inexact]:
             warn(
                 "Cannot convert {0} seconds into an integer number of frames "
                 "at {1} FPS; this could be a problem in the ledctrl output".format(
-                    str(seconds), cls.FPS
+                    seconds, cls.FPS
                 )
             )
 
@@ -825,7 +854,7 @@ class Duration(Varuint):
         return self.value / self.FPS
 
     def to_bytecode(self):
-        return _to_varuint(int(self.value))
+        return to_varuint(int(self.value))
 
     def to_led_source(self):
         return str(self.value_in_seconds)
@@ -837,15 +866,17 @@ class StatementSequence(Node):
     _fields = ["statements"]
     _defaults = {"statements": NodeList}
 
+    statements: NodeList
+
     @classmethod
-    def from_bytecode(cls, data):
+    def from_bytecode(cls, data: BufferedReader):
         """Parses a StatementSequence object from its bytecode representation.
 
         Parameters:
-            data (BufferedReader): the stream to read from
+            data: the stream to read from
 
         Returns:
-            StatementSequence: the constructed object
+            the constructed object
         """
         result = cls()
 
@@ -858,7 +889,7 @@ class StatementSequence(Node):
 
         return result
 
-    def append(self, node):
+    def append(self, node: Node) -> None:
         """Appends a node to the sequence."""
         self.statements.append(node)
 
@@ -877,7 +908,7 @@ class Statement(Node):
     """Node that represents a single statement (e.g., a bytecode command or
     a loop block)."""
 
-    def is_equivalent_to(self, other):
+    def is_equivalent_to(self, other: Node) -> bool:
         """Returns whether this statement is semantically equivalent to
         some other statement.
         """
@@ -885,7 +916,7 @@ class Statement(Node):
             self.__class__ is other.__class__ and self._is_equivalent_to_inner(other)
         )
 
-    def _is_equivalent_to_inner(self, other):
+    def _is_equivalent_to_inner(self, other: Node):
         """Compares two statements of *exactly* the same class to decide
         whether they are semantically equivalent.
 
@@ -902,6 +933,8 @@ class Comment(Statement):
 
     _fields = ("value",)
 
+    value: str
+
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
         return 0
@@ -916,7 +949,8 @@ class Comment(Statement):
 class Command(Statement):
     """Node that represents a single bytecode command."""
 
-    code = None
+    code: ClassVar[bytes]
+    """The code of this command; must be declared in subclasses."""
 
     @Node.length_in_bytes.getter
     def length_in_bytes(self):
@@ -953,7 +987,9 @@ class SleepCommand(Command):
 
     code = CommandCode.SLEEP
     _fields = ("duration",)
-    _defaults = {"duration": Varuint}
+    _defaults = {"duration": Duration}
+
+    duration: Duration
 
     def to_led_source(self):
         return "sleep(duration={0})".format(self.duration.to_led_source())
@@ -966,6 +1002,11 @@ class WaitUntilCommand(Command):
     _fields = ("timestamp",)
     _defaults = {"timestamp": Varuint}
 
+    timestamp: Varuint
+
+    def to_led_source(self):
+        return "wait_until(timestamp={0})".format(self.timestamp.to_led_source())
+
 
 class SetColorCommand(Command):
     """Node that represents a ``SET_COLOR`` command in the bytecode."""
@@ -975,13 +1016,16 @@ class SetColorCommand(Command):
     _defaults = {"color": RGBColor, "duration": Duration}
     _immutable = _fields
 
-    def __init__(self, color, duration):
+    color: RGBColor
+    duration: Duration
+
+    def __init__(self, color: RGBColor, duration: Union[int, Duration]):
         assert isinstance(color, RGBColor)
         assert isinstance(duration, Duration)
         self._color = color
         self._duration = duration
 
-    def _is_equivalent_to_inner(self, other):
+    def _is_equivalent_to_inner(self, other: "SetColorCommand"):
         return self._color.equals(other._color) and self._duration.equals(
             other._duration
         )
@@ -997,12 +1041,13 @@ class SetGrayCommand(Command):
 
     code = CommandCode.SET_GRAY
     _fields = ("value", "duration")
-    _defaults = {"value": UnsignedByte, "duration": Varuint}
+    _defaults = {"value": UnsignedByte, "duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._value.equals(other._value) and self._duration.equals(
-            other._duration
-        )
+    value: UnsignedByte
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "SetGrayCommand"):
+        return self.value.equals(other.value) and self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "set_gray({0}, duration={1})".format(
@@ -1015,10 +1060,12 @@ class SetBlackCommand(Command):
 
     code = CommandCode.SET_BLACK
     _fields = ("duration",)
-    _defaults = {"duration": Varuint}
+    _defaults = {"duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._duration.equals(other._duration)
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "SetBlackCommand"):
+        return self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "set_black(duration={0})".format(self.duration.to_led_source())
@@ -1029,10 +1076,12 @@ class SetWhiteCommand(Command):
 
     code = CommandCode.SET_WHITE
     _fields = ("duration",)
-    _defaults = {"duration": Varuint}
+    _defaults = {"duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._duration.equals(other._duration)
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "SetWhiteCommand"):
+        return self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "set_white(duration={0})".format(self.duration.to_led_source())
@@ -1046,13 +1095,16 @@ class FadeToColorCommand(Command):
     _defaults = {"color": RGBColor, "duration": Duration}
     _immutable = _fields
 
+    color: RGBColor
+    duration: Duration
+
     def __init__(self, color, duration):
         assert isinstance(color, RGBColor)
         assert isinstance(duration, Duration)
         self._color = color
         self._duration = duration
 
-    def _is_equivalent_to_inner(self, other):
+    def _is_equivalent_to_inner(self, other: "FadeToColorCommand"):
         return self._color.equals(other._color) and self._duration.equals(
             other._duration
         )
@@ -1068,12 +1120,13 @@ class FadeToGrayCommand(Command):
 
     code = CommandCode.FADE_TO_GRAY
     _fields = ("value", "duration")
-    _defaults = {"value": UnsignedByte, "duration": Varuint}
+    _defaults = {"value": UnsignedByte, "duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._value.equals(other._value) and self._duration.equals(
-            other._duration
-        )
+    value: UnsignedByte
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "FadeToGrayCommand"):
+        return self.value.equals(other.value) and self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "fade_to_gray({0}, duration={1})".format(
@@ -1086,10 +1139,12 @@ class FadeToBlackCommand(Command):
 
     code = CommandCode.FADE_TO_BLACK
     _fields = ("duration",)
-    _defaults = {"duration": Varuint}
+    _defaults = {"duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._duration.equals(other._duration)
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "FadeToBlackCommand"):
+        return self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "fade_to_black(duration={0})".format(self.duration.to_led_source())
@@ -1100,10 +1155,12 @@ class FadeToWhiteCommand(Command):
 
     code = CommandCode.FADE_TO_WHITE
     _fields = ("duration",)
-    _defaults = {"duration": Varuint}
+    _defaults = {"duration": Duration}
 
-    def _is_equivalent_to_inner(self, other):
-        return self._duration.equals(other._duration)
+    duration: Duration
+
+    def _is_equivalent_to_inner(self, other: "FadeToWhiteCommand"):
+        return self.duration.equals(other.duration)
 
     def to_led_source(self):
         return "fade_to_white(duration={0})".format(self.duration.to_led_source())
@@ -1126,8 +1183,13 @@ class SetColorFromChannelsCommand(Command):
         "red_channel": UnsignedByte,
         "green_channel": UnsignedByte,
         "blue_channel": UnsignedByte,
-        "duration": Varuint,
+        "duration": Duration,
     }
+
+    red_channel: UnsignedByte
+    green_channel: UnsignedByte
+    blue_channel: UnsignedByte
+    duration: Duration
 
 
 class FadeToColorFromChannelsCommand(Command):
@@ -1140,8 +1202,13 @@ class FadeToColorFromChannelsCommand(Command):
         "red_channel": UnsignedByte,
         "green_channel": UnsignedByte,
         "blue_channel": UnsignedByte,
-        "duration": Varuint,
+        "duration": Duration,
     }
+
+    red_channel: UnsignedByte
+    green_channel: UnsignedByte
+    blue_channel: UnsignedByte
+    duration: Duration
 
 
 class JumpCommand(Command):
@@ -1150,6 +1217,8 @@ class JumpCommand(Command):
     code = CommandCode.JUMP
     _fields = ("address",)
     _defaults = {"address": Varuint}
+
+    address: Varuint
 
 
 class SetPyroCommand(Command):
@@ -1160,16 +1229,18 @@ class SetPyroCommand(Command):
     _defaults = {"mask": ChannelMask}
     _immutable = _fields
 
-    def __init__(self, mask):
+    mask: ChannelMask
+
+    def __init__(self, mask: ChannelMask):
         assert isinstance(mask, ChannelMask)
         self._mask = mask
 
-    def _is_equivalent_to_inner(self, other):
+    def _is_equivalent_to_inner(self, other: "SetPyroCommand"):
         return self._mask.equals(other._mask)
 
     def to_led_source(self):
-        bits = self._mask.to_led_source()
-        if self._mask.enable:
+        bits = self.mask.to_led_source()
+        if self.mask.enable:
             return "pyro_enable({0})".format(bits)
         else:
             return "pyro_disable({0})".format(bits)
@@ -1183,11 +1254,13 @@ class SetPyroAllCommand(Command):
     _defaults = {"values": ChannelValues}
     _immutable = _fields
 
-    def __init__(self, values):
+    values: ChannelValues
+
+    def __init__(self, values: ChannelValues):
         assert isinstance(values, ChannelValues)
         self._values = values
 
-    def _is_equivalent_to_inner(self, other):
+    def _is_equivalent_to_inner(self, other: "SetPyroAllCommand"):
         return self._values.equals(other._values)
 
     def to_led_source(self):
@@ -1204,12 +1277,15 @@ class LoopBlock(Statement):
     _fields = ("iterations", "body")
     _defaults = {"iterations": UnsignedByte, "body": StatementSequence}
 
+    iterations: UnsignedByte
+    body: StatementSequence
+
     @classmethod
-    def from_bytecode(cls, data):
+    def from_bytecode(cls, data: BufferedReader):
         """Reads a LoopBlock from a binary file-like object.
 
         Parameters:
-            data (IOBase): the stream to read from
+            data: the stream to read from
 
         Returns:
             LoopBlock: the constructed object
@@ -1270,17 +1346,20 @@ class LoopBlock(Statement):
         return "with loop(iterations={0}):\n    {1}".format(self.iterations, body)
 
 
-class NodeVisitor:
+class NodeVisitor(Generic[T]):
     """Base class for node visitors that walk the abstract syntax tree in a
     top-down manner and call a visitor function for every node found.
 
     This class is meant to be subclassed; subclasses should add or override
-    visitor methods."""
+    visitor methods.
+    """
+
+    _dispatch_table: Dict[Type[Node], Callable[[Node], T]]
 
     def __init__(self):
         self._dispatch_table = {}
 
-    def generic_visit(self, node):
+    def generic_visit(self, node: Node) -> None:
         """This visitor method is called for nodes for which no specific
         visitor method of the form ``self.visit_{classname}`` exists in this
         class. The default implementation of this method simply calls
@@ -1294,25 +1373,25 @@ class NodeVisitor:
             for child_node in node.iter_child_nodes():
                 self._visit(child_node)
 
-    def visit(self, node):
+    def visit(self, node: Node) -> T:
         """Visits the given node in the abstract syntax tree. The default
         implementation calls ``self.visit_{classname}`` where ``{classname}``
         is the name of the node class, or ``self.generic_visit()`` if a
         node-specific visitor method does not exist.
 
         Returns:
-            object: whatever the visitor method returns.
+            whatever the visitor method returns.
         """
         return self._visit(node)
 
-    def _find_visitor_method(self, node):
+    def _find_visitor_method(self, node: Node) -> Callable[[Node], T]:
         """Finds an appropriate visitor method within this instance for the
         given node. By default, this function will look for a method named
         ``visit_{classname}`` in ``self`` and fall back to ``generic_visit``
         if such a method does not exist.
 
         Parameters:
-            node (Node): the node to visit
+            node: the node to visit
 
         Returns:
             callable: an appropriate visitor method for the node
@@ -1320,7 +1399,7 @@ class NodeVisitor:
         method_name = "visit_{0}".format(node.__class__.__name__)
         return getattr(self, method_name, None) or self.generic_visit
 
-    def _get_visitor_method(self, node):
+    def _get_visitor_method(self, node: Node) -> Callable[[Node], T]:
         """Returns the visitor method corresponding to the given node."""
         cls = node.__class__
         func = self._dispatch_table.get(cls)
@@ -1328,22 +1407,25 @@ class NodeVisitor:
             func = self._dispatch_table[cls] = self._find_visitor_method(node)
         return func
 
-    def _visit(self, node):
+    def _visit(self, node: Node) -> T:
         return self._get_visitor_method(node)(node)
 
 
-class NodeTransformer(NodeVisitor):
+class NodeTransformer(NodeVisitor[Optional[Node]]):
     """A ``NodeVisitor`` subclass that assumes that the visitor methods return
     an AST node or ``None``. When ``None`` is returned, the visited node is
     removed from the tree. When an AST node is returned, the visited node is
     replaced by the returned AST node (which may of course be the same as the
-    original visited node)."""
+    original visited node).
+    """
+
+    changed: bool
 
     def __init__(self):
         super().__init__()
         self.changed = False
 
-    def generic_visit(self, node):
+    def generic_visit(self, node: Node) -> Optional[Node]:
         """This visitor method is called for nodes for which no specific
         visitor method of the form ``self.visit_{classname}`` exists in this
         class. The default implementation of this method simply calls
@@ -1364,7 +1446,7 @@ class NodeTransformer(NodeVisitor):
             except StopIteration:
                 return node
 
-    def visit(self, node):
+    def visit(self, node: Node) -> Optional[Node]:
         self.changed = False
         return super().visit(node)
 
@@ -1378,11 +1460,11 @@ iter_child_nodes = Node.iter_child_nodes
 # Helper functions for parsing
 
 
-def _parse_statement_from_bytecode(data):
+def _parse_statement_from_bytecode(data: BufferedReader) -> Optional[Statement]:
     """Parses a Statement object from its bytecode representation.
 
     Parameters:
-        data (BufferedReader): the stream to read the statement from
+        data: the stream to read the statement from
 
     Returns:
         Optional[Statement]: the statement that was constructed, or `None` if
@@ -1400,10 +1482,9 @@ def _parse_statement_from_bytecode(data):
             break
     else:
         # No such command; maybe it's the start or end of a loop block?
-        if code == b"\x0c":
-            # CommandCode.LOOP_START
+        if code == CommandCode.LOOP_BEGIN:
             subcls = LoopBlock
-        elif code == b"\x0d":
+        elif code == CommandCode.LOOP_END:
             # CommandCode.LOOP_END
             return None
         else:
@@ -1415,7 +1496,7 @@ def _parse_statement_from_bytecode(data):
     return _parse_node_from_bytecode_by_class(subcls, data)
 
 
-def _parse_node_from_bytecode_by_class(cls, data):
+def _parse_node_from_bytecode_by_class(cls: Type[Node], data: IO[bytes]):
     """Parses a Node subclass from its bytecode representation, assuming that
     we know what node class we expect to see next.
 
@@ -1429,7 +1510,7 @@ def _parse_node_from_bytecode_by_class(cls, data):
     """
     if hasattr(cls, "from_bytecode"):
         # Node provides its own from_bytecode method so let it do the parsing
-        return cls.from_bytecode(data)
+        return cls.from_bytecode(data)  # type: ignore
 
     # Default implementation: we assume that we have a command code and a list
     # of fields; the fields are defined in the `_fields` property of the node
@@ -1438,23 +1519,25 @@ def _parse_node_from_bytecode_by_class(cls, data):
     # Consume the code marker, if any
     if hasattr(cls, "code"):
         code = data.read(1)
+        cls_code: bytes = cls.code  # type: ignore
         if not code:
             raise BytecodeParserEOFError(cls)
-        if code != cls.code:
+        if code != cls_code:
             raise BytecodeParserError(
-                "{0} nodes must start with {1}".format(cls.__name__, ord(cls.code))
+                "{0} nodes must start with {1}".format(cls.__name__, ord(cls_code))
             )
 
     # Consume all the fields of the node
     field_values = {}
     for field in cls._fields:
-        if field not in cls._defaults:
+        defaults: Dict[str, Any] = cls._defaults  # type: ignore
+        if field not in defaults:
             raise BytecodeParserError(
                 "cannot parse {0}, default value for {1!r} "
                 "is not specified".format(cls.__name__, field)
             )
 
-        default_value = cls._defaults[field]
+        default_value = defaults[field]
         if callable(default_value) and issubclass(default_value, Node):
             field_value = _parse_node_from_bytecode_by_class(default_value, data)
         else:

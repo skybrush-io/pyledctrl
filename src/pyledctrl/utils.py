@@ -3,7 +3,7 @@
 import sys
 
 from itertools import tee
-from typing import cast, Callable, Iterable, Tuple, TypeVar, overload
+from typing import cast, Callable, Iterable, List, Tuple, TypeVar, overload
 
 
 T = TypeVar("T")
@@ -141,3 +141,30 @@ def parse_as_frame_count(value: str, *, fps: int) -> int:
     seconds = float(seconds) if seconds else 0
     residual = float(residual) if residual else 0
     return int((minutes * 60 + seconds) * fps + residual)
+
+
+@memoize
+def to_varuint(value: int) -> bytes:
+    """Converts the given numeric value into its varuint representation.
+
+    Parameters:
+        value: the input value
+
+    Returns:
+        the variable-length uint representation of the input value
+    """
+    if value < 0:
+        raise ValueError("negative varuints are not supported")
+    elif value < 128:
+        return bytes([value])
+    else:
+        result: List[int] = []
+        while True:
+            if value < 128:
+                result.append(value)
+                break
+
+            result.append((value & 0x7F) + 0x80)
+            value >>= 7
+
+        return bytes(result)

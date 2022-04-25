@@ -7,6 +7,7 @@ from pyledctrl.utils import (
     format_frame_count,
     last,
     parse_as_frame_count,
+    to_varuint,
 )
 
 
@@ -55,3 +56,24 @@ def test_format_frame_count(input, output):
 @mark.parametrize("output,input", FRAME_COUNT_TESTS)
 def test_parse_frame_count(input, output):
     assert parse_as_frame_count(input, fps=24) == output
+
+
+@mark.parametrize(
+    "input,output",
+    [
+        (0, b"\x00"),
+        (17, b"\x11"),
+        (127, b"\x7f"),
+        (128, b"\x80\x01"),
+        (143, b"\x8f\x01"),
+        (4242, b"\x92\x21"),
+        (4125467431, bytes([167, 198, 150, 175, 15])),
+    ],
+)
+def test_to_varuint(input, output):
+    assert to_varuint(input) == output
+
+
+def test_to_varuint_negative():
+    with raises(ValueError, match="negative varuints"):
+        assert to_varuint(-42)
