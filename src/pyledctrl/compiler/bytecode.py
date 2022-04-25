@@ -3,20 +3,7 @@ abstract syntax tree fragments."""
 
 from pyledctrl.compiler import ast
 from pyledctrl.compiler.colors import parse_color
-from pyledctrl.compiler.errors import (
-    MarkerNotResolvableError,
-    FeatureNotImplementedError,
-)
-
-
-def _check_easing_is_supported(easing):
-    """Checks whether the given easing mode is supported.
-
-    Raises:
-        FeatureNotImplementedError: if the easing mode is not supported
-    """
-    if easing is not ast.EasingMode.LINEAR:
-        raise FeatureNotImplementedError("only linear easing is supported")
+from pyledctrl.compiler.errors import MarkerNotResolvableError
 
 
 class Marker:
@@ -96,35 +83,27 @@ def end():
     return ast.EndCommand()
 
 
-def fade_to_black(duration=None, easing=None):
+def fade_to_black(duration=None):
     duration = ast.Duration.from_seconds(duration)
-    easing = ast.EasingMode.get(easing)
-    _check_easing_is_supported(easing)
     return ast.FadeToBlackCommand(duration=duration)
 
 
-def fade_to_color(red, green=None, blue=None, duration=None, easing=None):
+def fade_to_color(red, green=None, blue=None, duration=None):
     if green is None and blue is None:
         red, green, blue = parse_color(red)
     red, green, blue = int(round(red)), int(round(green)), int(round(blue))
     color = ast.RGBColor.cached(red, green, blue)
     duration = ast.Duration.from_seconds(duration)
-    easing = ast.EasingMode.get(easing)
-    _check_easing_is_supported(easing)
     return ast.FadeToColorCommand(color=color, duration=duration)
 
 
-def fade_to_gray(value, duration=None, easing=None):
+def fade_to_gray(value, duration=None):
     duration = ast.Duration.from_seconds(duration)
-    easing = ast.EasingMode.get(easing)
-    _check_easing_is_supported(easing)
     return ast.FadeToGrayCommand(value=value, duration=duration)
 
 
-def fade_to_white(duration=None, easing=None):
+def fade_to_white(duration=None):
     duration = ast.Duration.from_seconds(duration)
-    easing = ast.EasingMode.get(easing)
-    _check_easing_is_supported(easing)
     return ast.FadeToWhiteCommand(duration=duration)
 
 
@@ -182,3 +161,7 @@ def set_white(duration=None):
 
 def sleep(duration):
     return ast.SleepCommand(duration=ast.Duration.from_seconds(duration))
+
+
+def wait_until(timestamp):
+    return ast.WaitUntilCommand(timestamp=ast.Duration.from_seconds(timestamp))
