@@ -3,6 +3,7 @@ from pathlib import Path
 from pyledctrl.compiler import BytecodeCompiler
 from pyledctrl.compiler.formats import OutputFormat
 
+import json
 import pytest
 
 
@@ -26,6 +27,8 @@ def load_test_data():
                     expected = path.with_suffix(".bin").read_bytes()
                 elif format is OutputFormat.LEDCTRL_SOURCE:
                     expected = path.with_suffix(".oled").read_bytes()
+                elif format is OutputFormat.LEDCTRL_JSON:
+                    expected = json.loads(path.with_suffix(".json").read_text())
                 else:
                     expected = None
                 result.append((data, format, expected))
@@ -44,7 +47,12 @@ class TestCompilation:
         compiler.compile(
             tmp_path / "input.led", str(tmp_path / "out"), output_format=format
         )
-        result = (tmp_path / "out").read_bytes()
+
+        if format is OutputFormat.LEDCTRL_JSON:
+            with (tmp_path / "out").open() as fp:
+                result = json.load(fp)
+        else:
+            result = (tmp_path / "out").read_bytes()
 
         if expected is not None:
             assert result == expected
