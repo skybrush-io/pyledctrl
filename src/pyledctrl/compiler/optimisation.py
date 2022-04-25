@@ -19,6 +19,7 @@ from .ast import (
     FadeToColorCommand,
     SleepCommand,
     LoopBlock,
+    Statement,
     StatementSequence,
 )
 from .utils import TimestampWrapper
@@ -238,7 +239,7 @@ class CommandMerger(ASTOptimiser):
 
             color = original_command.color
             duration, length = 0, 1
-            for statement in body[index + 1, :]:
+            for statement in body[index + 1 :]:
                 if isinstance(statement, SetColorCommand) and statement.color.equals(
                     color
                 ):
@@ -327,12 +328,14 @@ class LoopDetector(ASTOptimiser):
         blocks.
         """
 
+        max_loop_len: int
+
         def __init__(self):
             super().__init__()
             self.max_loop_len = 8
 
         def _identify_loop_iteration_count(
-            self, statements, start_index, loop_body_length
+            self, statements: List[Statement], start_index: int, loop_body_length: int
         ):
             """Identifies the maximum iteration count of a potential loop
             that starts at the given index and has the given assumed body
@@ -350,7 +353,7 @@ class LoopDetector(ASTOptimiser):
             # more than 255 anyway
             return min((second - start_index) // loop_body_length, 255)
 
-        def visit_StatementSequence(self, node):
+        def visit_StatementSequence(self, node: StatementSequence) -> None:
             body = node.statements
             index = 0
             num_statements = len(body)
@@ -375,7 +378,7 @@ class LoopDetector(ASTOptimiser):
                         # would be.
                         body_length = end - index
                         iterations = self._identify_loop_iteration_count(
-                            body, index, body_length
+                            body, index, body_length  # type: ignore
                         )
                         if iterations > 1:
                             potential_loops.append((end, iterations))
@@ -402,13 +405,13 @@ class LoopDetector(ASTOptimiser):
                     # Just jump to the next statement
                     index += 1
 
-    def optimise_ast(self, ast):
+    def optimise_ast(self, ast: Node) -> bool:
         transformer = self.Transformer()
         transformer.visit(ast)
         return transformer.changed
 
 
-def create_optimiser_for_level(level=2):
+def create_optimiser_for_level(level: int = 2) -> ASTOptimiser:
     """Creates an AST optimiser for the given optimisation level.
 
     Currently we have the following optimisation levels:
@@ -421,10 +424,10 @@ def create_optimiser_for_level(level=2):
           bytecode smaller (default)
 
     Parameters:
-        level (int): the optimisation level
+        level: the optimisation level
 
     Returns:
-        ASTOptimiser: the AST optimiser to use for the given optimisation level
+        the AST optimiser to use for the given optimisation level
     """
     if level <= 0:
         return NullASTOptimiser()
