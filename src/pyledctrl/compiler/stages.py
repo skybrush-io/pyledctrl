@@ -2,14 +2,22 @@
 
 import os
 
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
+from typing import Generic, List, Optional, TypeVar, Union
 
+from pyledctrl.compiler.optimisation import ASTOptimiser
+
+from .ast import Node
 from .contexts import ExecutionContext
 from .errors import CompilerError
 from .utils import get_timestamp_of
 
 from pyledctrl.logger import log
 from pyledctrl.parsers.bytecode import BytecodeParser
+
+
+S = TypeVar("S")
+T = TypeVar("T")
 
 
 class CompilationStageExecutionEnvironment:
@@ -31,7 +39,7 @@ class CompilationStageExecutionEnvironment:
     warn = log.warn
 
 
-class CompilationStage(metaclass=ABCMeta):
+class CompilationStage(ABC):
     """Compilation stage that can be executed during a course of compilation.
 
     Stages typically produce a particular kind of output file from one or more
@@ -44,18 +52,17 @@ class CompilationStage(metaclass=ABCMeta):
     label = "compiling..."
 
     @abstractmethod
-    def run(self, environment):
+    def run(self, environment: CompilationStageExecutionEnvironment):
         """Executes the compilation phase.
 
         Parameters:
-            environment (CompilationStageExecutionEnvironment): the execution
-                environment of the compilation stage, providing useful
-                functions for printing warnings etc
+            environment: the execution environment of the compilation stage,
+                providing useful functions for printing warnings etc
         """
         raise NotImplementedError
 
     @abstractmethod
-    def should_run(self):
+    def should_run(self) -> bool:
         """Returns whether the compilation phase should be executed. Returning
         ``False`` typically means that the target of the compilation phase is
         up-to-date so there is no need to re-run the compilation phase.
@@ -66,27 +73,27 @@ class CompilationStage(metaclass=ABCMeta):
 class DummyStage(CompilationStage):
     """Dummy stage that does nothing on its own."""
 
-    def run(self, environment):
+    def run(self, environment: CompilationStageExecutionEnvironment):
         """Inherited."""
         pass
 
-    def should_run(self):
+    def should_run(self) -> bool:
         """Inherited."""
         return True
 
 
-class FileSourceMixin(metaclass=ABCMeta):
+class FileSourceMixin(ABC):
     """Mixin class for compilation stages that assume that the source of
     the compilation stage is a set of files.
     """
 
     @abstractproperty
-    def input_files(self):
+    def input_files(self) -> List[str]:
         """The names of the input files of this compilation stage."""
         raise NotImplementedError
 
     @property
-    def oldest_input_file_timestamp(self):
+    def oldest_input_file_timestamp(self) -> float:
         """Returns the timestamp of the oldest input file or positive
         infinity if there are no input files. Raises an error if at least one
         input file is missing (i.e. does not exist).
@@ -99,23 +106,23 @@ class FileSourceMixin(metaclass=ABCMeta):
         return max(os.path.getmtime(filename) for filename in input_files)
 
 
-class FileTargetMixin(metaclass=ABCMeta):
+class FileTargetMixin(ABC):
     """Mixin class for compilation stages that assume that the target of
     the compilation stage is a set of files.
     """
 
     @abstractproperty
-    def output_files(self):
+    def output_files(self) -> List[str]:
         """The names of the output files of this compilation stage."""
         raise NotImplementedError
 
     @property
-    def youngest_output_file_timestamp(self):
+    def youngest_output_file_timestamp(self) -> float:
         """Returns the timestamp of the youngest output file, positive
         infinity if there are no output files, or negative infinity if at
         least one output file is missing (i.e. does not exist).
         """
-        output_files = self.output
+        output_files = self.output_files
         if not output_files:
             return float("-inf")
         if any(not os.path.exists(filename) for filename in output_files):
@@ -123,43 +130,43 @@ class FileTargetMixin(metaclass=ABCMeta):
         return min(os.path.getmtime(filename) for filename in output_files)
 
 
-class ObjectSourceMixin(metaclass=ABCMeta):
+class ObjectSourceMixin(ABC, Generic[S]):
     """Mixin class for compilation stages that assume that the source of
     the compilation stage is an in-memory object.
     """
 
     @abstractproperty
-    def input(self):
+    def input(self) -> Union[S, "ObjectTargetMixin[S]"]:
         """Returns the input object or the input stage on which this stage
         depends.
         """
         raise NotImplementedError
 
     @property
-    def input_object(self):
+    def input_object(self) -> S:
         """Returns the input object on which this stage depends. If the stage
         depends on the output of another stage, this property will return the
         output object of the other stage.
         """
         inp = self.input
         if isinstance(inp, ObjectTargetMixin):
-            return inp.output_object
+            return inp.output_object  # type: ignore
         else:
             return inp
 
 
-class ObjectTargetMixin(metaclass=ABCMeta):
+class ObjectTargetMixin(ABC, Generic[T]):
     """Mixin class for compilation stages that assume that the target of
     the compilation stage is an in-memory object.
     """
 
     @abstractproperty
-    def output(self):
+    def output(self) -> Union[T, "ObjectTargetMixin[T]"]:
         """THe output object of the compilation stage."""
         raise NotImplementedError
 
     @property
-    def output_object(self):
+    def output_object(self) -> T:
         """Returns the output object of this stage. If the output object
         happens to be the same as the input object, and the input
         depends on the output of another stage, this property will return the
@@ -167,25 +174,25 @@ class ObjectTargetMixin(metaclass=ABCMeta):
         """
         output = self.output
         if isinstance(output, ObjectTargetMixin):
-            return output.output_object
+            return output.output_object  # type: ignore
         else:
             return output
 
 
 class FileToObjectCompilationStage(
-    CompilationStage, FileSourceMixin, ObjectTargetMixin
+    CompilationStage, FileSourceMixin, ObjectTargetMixin[T]
 ):
     """Abstract compilation phase that turns a set of input files into an
     in-memory object. This phase is executed unconditionally.
     """
 
-    def should_run(self):
+    def should_run(self) -> bool:
         """Whether this compilation step should be executed."""
         return True
 
 
 class ObjectToFileCompilationStage(
-    CompilationStage, ObjectSourceMixin, FileTargetMixin
+    CompilationStage, ObjectSourceMixin[S], FileTargetMixin
 ):
     """Abstract compilation phase that turns an in-memory object into a set of
     output files. This phase is executed unconditionally if the in-memory
@@ -194,7 +201,7 @@ class ObjectToFileCompilationStage(
     than the timestamps of any of the output objects.
     """
 
-    def should_run(self):
+    def should_run(self) -> bool:
         """Whether this compilation step should be executed.
 
         The compilation step is executed if the timestamp of the input
@@ -207,13 +214,13 @@ class ObjectToFileCompilationStage(
 
 
 class ObjectToObjectCompilationStage(
-    CompilationStage, ObjectSourceMixin, ObjectTargetMixin
+    CompilationStage, ObjectSourceMixin[S], ObjectTargetMixin[T]
 ):
     """Abstract compilation phase that transforms an in-memory object into
     another in-memory object. This phase is executed unconditionally.
     """
 
-    def should_run(self):
+    def should_run(self) -> bool:
         """Whether this compilation step should be executed."""
         return True
 
@@ -224,7 +231,7 @@ class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMi
     older than all the output files.
     """
 
-    def should_run(self):
+    def should_run(self) -> bool:
         """Whether this compilation step should be executed.
 
         The compilation step is executed if the timestamp of the oldest
@@ -236,12 +243,15 @@ class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMi
         return oldest_input >= youngest_output
 
 
-class RawBytesToASTObjectCompilationStage(ObjectToObjectCompilationStage):
+class RawBytesToASTObjectCompilationStage(ObjectToObjectCompilationStage[bytes, Node]):
     """Abstract compilation stage that turns raw bytes containing the input
     in some input format into an in-memory abstract syntax tree.
     """
 
     label = "reading..."
+
+    _input: bytes
+    _output: Optional[Node]
 
     def __init__(self, input: bytes):
         """Constructor.
@@ -254,20 +264,24 @@ class RawBytesToASTObjectCompilationStage(ObjectToObjectCompilationStage):
         self._output = None
 
     @property
-    def input(self):
+    def input(self) -> bytes:
         """Inherited."""
         return self._input
 
     @property
-    def output(self):
+    def output(self) -> Node:
         """Inherited."""
+        if self._output is None:
+            raise RuntimeError("stage was not executed yet")
         return self._output
 
-    def run(self, environment):
+    def run(self, environment: CompilationStageExecutionEnvironment) -> None:
         self._output = self._create_output(self.input_object, environment)
 
     @abstractmethod
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: bytes, environment: CompilationStageExecutionEnvironment
+    ) -> Node:
         raise NotImplementedError
 
 
@@ -276,7 +290,9 @@ class LEDSourceCodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationSta
     an abstract syntax tree representation of the LED controller program in memory.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: bytes, environment: CompilationStageExecutionEnvironment
+    ) -> Node:
         context = ExecutionContext()
         code = compile(input, "<<bytecode>>", "exec")
         context.evaluate(code, add_end_command=True)
@@ -288,7 +304,9 @@ class BytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStage):
     syntax tree representation of the LED controller program in memory.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: bytes, environment: CompilationStageExecutionEnvironment
+    ) -> Node:
         """Inherited."""
         return BytecodeParser().parse(input)
 
@@ -299,7 +317,9 @@ class JSONBytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStag
     memory.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: bytes, environment: CompilationStageExecutionEnvironment
+    ) -> Node:
         """Inherited."""
         from base64 import b64decode
         from json import loads
@@ -326,41 +346,47 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
 
     label = "optimizing..."
 
-    def __init__(self, ast, optimiser):
+    _ast: Node
+    optimiser: ASTOptimiser
+
+    def __init__(self, ast: Node, optimiser: ASTOptimiser):
         """Constructor.
 
         Parameters:
-            ast (Node): the root of the abstract syntax tree that the
-                compiler will optimise.
-            optimiser (ASTOptimiser): the optimiser to use
+            ast: the root of the abstract syntax tree that the compiler will
+                optimise.
+            optimiser: the optimiser to use
         """
-        super(ObjectToObjectCompilationStage, self).__init__()
+        super().__init__()
         self._ast = ast
         self.optimiser = optimiser
 
     @property
-    def input(self):
+    def input(self) -> Node:
         """Inherited."""
         return self._ast
 
     @property
-    def output(self):
+    def output(self) -> Node:
         """Inherited."""
         return self._ast
 
-    def run(self, environment):
+    def run(self, environment: CompilationStageExecutionEnvironment) -> None:
         """Inherited."""
         self.optimiser.optimise(self.input_object)
 
 
-class ASTObjectToRawBytesCompilationStage(ObjectToObjectCompilationStage):
+class ASTObjectToRawBytesCompilationStage(ObjectToObjectCompilationStage[Node, bytes]):
     """Abstract compilation stage that turns an in-memory abstract syntax tree
     into some output format as raw bytes.
     """
 
     label = "writing..."
 
-    def __init__(self, input):
+    _input: Union[Node, ObjectTargetMixin[Node]]
+    _output: Optional[bytes]
+
+    def __init__(self, input: Union[Node, ObjectTargetMixin[Node]]):
         """Constructor.
 
         Parameters:
@@ -376,8 +402,10 @@ class ASTObjectToRawBytesCompilationStage(ObjectToObjectCompilationStage):
         return self._input
 
     @property
-    def output(self):
+    def output(self) -> bytes:
         """Inherited."""
+        if self._output is None:
+            raise RuntimeError("stage was not executed yet")
         return self._output
 
     def run(self, environment):
@@ -394,7 +422,9 @@ class ASTObjectToBytecodeCompilationStage(ASTObjectToRawBytesCompilationStage):
     file or stream.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: Node, environment: CompilationStageExecutionEnvironment
+    ):
         """Inherited."""
         return input.to_bytecode()
 
@@ -405,14 +435,18 @@ class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToRawBytesCompilationStag
     format.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: Node, environment: CompilationStageExecutionEnvironment
+    ):
         """Inherited."""
         from base64 import b64encode
         from json import dumps
 
         bytecode = input.to_bytecode()
         return dumps(
-            {"version": 1, "data": b64encode(bytecode).decode("ascii")}, indent=2
+            {"version": 1, "data": b64encode(bytecode).decode("ascii")},
+            indent=2,
+            sort_keys=True,
         ).encode("ascii")
 
 
@@ -421,7 +455,9 @@ class ASTObjectToLEDSourceCodeCompilationStage(ASTObjectToRawBytesCompilationSta
     (functionally equivalent) ``.led`` file.
     """
 
-    def _create_output(self, input, environment):
+    def _create_output(
+        self, input: Node, environment: CompilationStageExecutionEnvironment
+    ):
         """Inherited."""
         output = input.to_led_source().encode("utf-8")
         if output:
