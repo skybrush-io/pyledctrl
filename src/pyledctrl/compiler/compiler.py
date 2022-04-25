@@ -5,7 +5,7 @@ from input files in various formats.
 import os
 
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Type
 
 from .errors import CompilerError, UnsupportedInputFormatError
 from .formats import InputFormat, InputFormatLike, OutputFormat, OutputFormatLike
@@ -15,11 +15,13 @@ from .stages import (
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDSourceCodeCompilationStage,
+    ASTObjectToRawBytesCompilationStage,
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
     JSONBytecodeToASTObjectCompilationStage,
     LEDSourceCodeToASTObjectCompilationStage,
+    RawBytesToASTObjectCompilationStage,
 )
 
 
@@ -27,6 +29,18 @@ class BytecodeCompiler:
     """Bytecode compiler that produces raw bytecode from input files in
     various formats.
     """
+
+    _input_format_to_ast_stage_factory: Dict[
+        InputFormat, Type[RawBytesToASTObjectCompilationStage]
+    ]
+    _output_format_to_output_stage_factory: Dict[
+        OutputFormat, Type[ASTObjectToRawBytesCompilationStage]
+    ]
+    _optimisation_level: int
+
+    environment: CompilationStageExecutionEnvironment
+    progress: bool
+    verbose: bool
 
     def __init__(
         self,
@@ -123,6 +137,9 @@ class BytecodeCompiler:
             input = dumps(input).encode("utf-8")
             input_format = InputFormat.LEDCTRL_JSON
 
+        else:
+            description = "<<unknown>>"
+
         if input_format is None:
             raise CompilerError("input format must be specified")
 
@@ -150,7 +167,7 @@ class BytecodeCompiler:
         return self.output
 
     @property
-    def optimisation_level(self):
+    def optimisation_level(self) -> int:
         """The optimisation level that the compiler will use.
 
         Currently we have the following optimisation levels:
@@ -165,7 +182,7 @@ class BytecodeCompiler:
         return self._optimisation_level
 
     @optimisation_level.setter
-    def optimisation_level(self, value):
+    def optimisation_level(self, value: int):
         self._optimisation_level = max(0, int(value))
 
     def _collect_stages(
@@ -174,7 +191,7 @@ class BytecodeCompiler:
         input_data: bytes,
         input_format: InputFormat,
         output_format: OutputFormat,
-    ):
+    ) -> None:
         """Collects the compilation stages that will turn the given input
         file into the given output file.
 
@@ -193,7 +210,7 @@ class BytecodeCompiler:
         # input file
         create_ast_stage = self._input_format_to_ast_stage_factory.get(input_format)
         if create_ast_stage is None:
-            raise UnsupportedInputFormatError(format=input_format)
+            raise UnsupportedInputFormatError(format=input_format.value)
 
         ast_stage = create_ast_stage(input_data)
         plan.add_step(ast_stage)

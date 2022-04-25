@@ -1,8 +1,11 @@
 """AST optimization routines for the ledctrl compiler."""
 
-from itertools import islice
+from abc import ABC, abstractmethod
 from operator import attrgetter
-from pyledctrl.compiler.ast import (
+from typing import Any, List, Optional, Tuple
+
+from .ast import (
+    Command,
     Duration,
     Node,
     NodeTransformer,
@@ -18,7 +21,7 @@ from pyledctrl.compiler.ast import (
     LoopBlock,
     StatementSequence,
 )
-from pyledctrl.compiler.utils import TimestampWrapper
+from .utils import TimestampWrapper
 
 
 def are_statements_equivalent(first, second):
@@ -28,12 +31,13 @@ def are_statements_equivalent(first, second):
     return hasattr(first, "is_equivalent_to") and first.is_equivalent_to(second)
 
 
-class ASTOptimiser:
+class ASTOptimiser(ABC):
     """Base class for optimiser objects that take an AST and mutate it in
     order to reduce the size of the final bytecode.
     """
 
-    def optimise_ast(self, ast):
+    @abstractmethod
+    def optimise_ast(self, ast: Node) -> bool:
         """Attempts to optimise the given AST in-place.
 
         Returns:
@@ -41,7 +45,7 @@ class ASTOptimiser:
         """
         raise NotImplementedError
 
-    def optimise(self, obj):
+    def optimise(self, obj: Any) -> bool:
         """Attempts to optimise the given object.
 
         When the object is an abstract syntax tree, the call will be forwarded
@@ -53,13 +57,13 @@ class ASTOptimiser:
         elif isinstance(obj, TimestampWrapper):
             return self.optimise(obj.wrapped)
         else:
-            raise TypeError("optimisation not supported for {0!r}".format(obj))
+            raise TypeError(f"optimisation not supported for {obj!r}")
 
 
 class NullASTOptimiser(ASTOptimiser):
     """Null optimiser that does not transform the AST at all."""
 
-    def optimise_ast(self, obj):
+    def optimise_ast(self, ast: Node) -> bool:
         """Dummy implementation that does nothing."""
         return False
 
@@ -68,6 +72,8 @@ class CompositeASTOptimiser(ASTOptimiser):
     """Composite AST optimiser that uses multiple "child optimisers" and
     returns if none of the child optimisers can modify the AST any more.
     """
+
+    _optimisers: List[ASTOptimiser]
 
     def __init__(self):
         """Constructor."""
@@ -79,7 +85,7 @@ class CompositeASTOptimiser(ASTOptimiser):
         """
         self._optimisers.append(optimiser)
 
-    def optimise_ast(self, ast):
+    def optimise_ast(self, ast: Node) -> bool:
         modified_at_least_once = False
         any_modified = True
         while any_modified:
@@ -120,7 +126,7 @@ class ColorCommandShortener(ASTOptimiser):
         optimiser will perform.
         """
 
-        def visit_SetColorCommand(self, node):
+        def visit_SetColorCommand(self, node: SetColorCommand) -> Node:
             if node.color.is_white:
                 return SetWhiteCommand(duration=node.duration)
             elif node.color.is_black:
@@ -130,7 +136,7 @@ class ColorCommandShortener(ASTOptimiser):
             else:
                 return node
 
-        def visit_SetGrayCommand(self, node):
+        def visit_SetGrayCommand(self, node: SetGrayCommand) -> Node:
             if node.value == 255:
                 return SetWhiteCommand(duration=node.duration)
             elif node.value == 0:
@@ -138,7 +144,7 @@ class ColorCommandShortener(ASTOptimiser):
             else:
                 return node
 
-        def visit_FadeToColorCommand(self, node):
+        def visit_FadeToColorCommand(self, node: FadeToColorCommand) -> Node:
             if node.color.is_white:
                 return FadeToWhiteCommand(duration=node.duration)
             elif node.color.is_black:
@@ -148,7 +154,7 @@ class ColorCommandShortener(ASTOptimiser):
             else:
                 return node
 
-        def visit_FadeToGrayCommand(self, node):
+        def visit_FadeToGrayCommand(self, node: FadeToGrayCommand) -> Node:
             if node.value == 255:
                 return FadeToWhiteCommand(duration=node.duration)
             elif node.value == 0:
@@ -156,7 +162,7 @@ class ColorCommandShortener(ASTOptimiser):
             else:
                 return node
 
-    def optimise_ast(self, ast):
+    def optimise_ast(self, ast: Node) -> bool:
         transformer = self.Transformer()
         transformer.visit(ast)
         return transformer.changed
@@ -192,12 +198,16 @@ class CommandMerger(ASTOptimiser):
         CommandMerger_ appropriately.
         """
 
-        def _handle_set_color_command(self, body, index):
-            original_command = body[index]
+        def _handle_set_color_command(
+            self, body, index: int
+        ) -> Tuple[Optional[int], Optional[List[SetColorCommand]]]:
+            original_command: SetColorCommand = body[index]
+
             assert isinstance(original_command, SetColorCommand)
+
             color = original_command.color
             duration, length = 0, 0
-            for statement in islice(body, index, None):
+            for statement in body[index:]:
                 if isinstance(statement, SetColorCommand) and statement.color.equals(
                     color
                 ):
@@ -219,12 +229,16 @@ class CommandMerger(ASTOptimiser):
             else:
                 return None, None
 
-        def _handle_fade_to_color_command(self, body, index):
-            original_command = body[index]
+        def _handle_fade_to_color_command(
+            self, body, index: int
+        ) -> Tuple[Optional[int], Optional[List[Command]]]:
+            original_command: FadeToColorCommand = body[index]
+
             assert isinstance(original_command, FadeToColorCommand)
+
             color = original_command.color
             duration, length = 0, 1
-            for statement in islice(body, index + 1, None):
+            for statement in body[index + 1, :]:
                 if isinstance(statement, SetColorCommand) and statement.color.equals(
                     color
                 ):
@@ -246,11 +260,15 @@ class CommandMerger(ASTOptimiser):
             else:
                 return None, None
 
-        def _handle_sleep_command(self, body, index):
-            original_command = body[index]
+        def _handle_sleep_command(
+            self, body, index: int
+        ) -> Tuple[Optional[int], Optional[List[SleepCommand]]]:
+            original_command: SleepCommand = body[index]
+
             assert isinstance(original_command, SleepCommand)
+
             duration, length = 0, 0
-            for statement in islice(body, index, None):
+            for statement in body[index:]:
                 if isinstance(statement, SleepCommand):
                     duration += statement.duration.value
                 else:
@@ -264,7 +282,7 @@ class CommandMerger(ASTOptimiser):
             else:
                 return None, None
 
-        def visit_StatementSequence(self, node):
+        def visit_StatementSequence(self, node: StatementSequence) -> None:
             body = node.statements
             index = 0
             num_statements = len(body)
@@ -283,15 +301,16 @@ class CommandMerger(ASTOptimiser):
                         body, index
                     )
                 else:
-                    replacement = None
+                    length_to_replace, replacement = None, None
                 if replacement is not None:
+                    assert length_to_replace is not None
                     body[index : (index + length_to_replace)] = replacement
                     index += len(replacement)
                     num_statements = len(body)
                 else:
                     index += 1
 
-    def optimise_ast(self, ast):
+    def optimise_ast(self, ast: Node) -> bool:
         transformer = self.Transformer()
         transformer.visit(ast)
         return transformer.changed

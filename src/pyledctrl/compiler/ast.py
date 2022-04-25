@@ -90,6 +90,7 @@ from typing import (
     Generator,
     Generic,
     Optional,
+    List,
     Sequence,
     Tuple,
     Type,
@@ -423,7 +424,7 @@ class Node(object, metaclass=_NodeMeta):
         return "{0.__class__.__name__}({1})".format(self, ", ".join(kvpairs))
 
 
-class NodeList(list):
+class NodeList(List[Node]):
     """Subclass of list that adds no extra functionality but allows us to
     detect objects that are meant to hold lists of AST nodes.
     """

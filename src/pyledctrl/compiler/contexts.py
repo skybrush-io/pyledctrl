@@ -8,14 +8,15 @@ user can use in a LED control file.
 
 from contextlib import contextmanager
 from functools import wraps
+from typing import Any, Dict, List, Type
 
 from pyledctrl.utils import ensure_tuple
 
 from . import bytecode
 from .ast import EndCommand, LoopBlock, Node, StatementSequence
-from .bytecode import LabelMarker, Marker
 from .errors import DuplicateLabelError, MarkerNotResolvableError
 from .jumps import JumpMarkerCollector, JumpMarkerResolver
+from .markers import LabelMarker, Marker
 
 
 def _flatten_bytes(iterable):
@@ -48,12 +49,15 @@ class ExecutionContext:
     that the user can use in a LED control file.
     """
 
+    _ast: StatementSequence
+    _ast_stack: List[StatementSequence]
+
     def __init__(self):
         """Constuctor."""
         self.reset()
 
     @property
-    def ast(self):
+    def ast(self) -> StatementSequence:
         """Returns the abstract syntax tree that was parsed after evaluating
         the source code.
         """
@@ -64,12 +68,13 @@ class ExecutionContext:
         """Returns the compiled bytecode."""
         return self._ast.to_bytecode()
 
-    def evaluate(self, code, add_end_command=False):
+    def evaluate(self, code: str, add_end_command: bool = False) -> None:
         """Evaluates the given Python code object in this execution context.
 
-        :param code: the code to evaluate
-        :param add_end_command: whether to add a terminating ``END`` command
-            automatically to the end of the bytecode
+        Parameters:
+            code: the code to evaluate
+            add_end_command: whether to add a terminating ``END`` command
+                automatically to the end of the bytecode
         """
         global_vars = self.get_globals()
         exec(code, global_vars, {})
@@ -85,7 +90,7 @@ class ExecutionContext:
                 global_vars["end"]()
         self._postprocess_syntax_tree()
 
-    def get_globals(self):
+    def get_globals(self) -> Dict[str, Any]:
         """Returns a dictionary containing the global variables to be made
         available in the executed file.
         """
@@ -93,16 +98,16 @@ class ExecutionContext:
             self._globals = self._construct_globals()
         return self._globals
 
-    def reset(self):
+    def reset(self) -> None:
         """Resets the execution context to a pristine state."""
         self._ast = StatementSequence()
         self._ast_stack = [self._ast]
         self._labels = {}
         self._globals = None
 
-    def _construct_globals(self):
+    def _construct_globals(self) -> Dict[str, Any]:
         wrapper_for = self._create_bytecode_func_wrapper
-        result = {
+        result: Dict[str, Any] = {
             "comment": wrapper_for(bytecode.comment),
             "end": wrapper_for(bytecode.end),
             "fade_to_black": wrapper_for(bytecode.fade_to_black),
@@ -142,7 +147,7 @@ class ExecutionContext:
         def wrapped(*args, **kwds):
             node = func(*args, **kwds)
             if isinstance(node, (Node, Marker)):
-                self._ast_stack[-1].append(node)
+                self._ast_stack[-1].append(node)  # type: ignore
             else:
                 raise ValueError(
                     "unknown value returned from bytecode "
@@ -193,19 +198,21 @@ class ExecutionContext:
             self._resolve_markers()
         """
 
-    def _resolve_markers(self, cls=Marker, graceful=False):
+    @staticmethod
+    def _resolve_markers(
+        bytecode: bytearray, cls: Type[Marker] = Marker, graceful: bool = False
+    ):
         """Tries to resolve all markers of the given class within the abstract
         syntax tree by replacing them with the result of calling their
         ``to_ast_node()`` method.
 
         Args:
-            cls (type): the marker class to replace
-            graceful (bool): whether to ignore MarkerNotResolvableError
-                errors raised by the markers
+            cls: the marker class to replace
+            graceful: whether to ignore MarkerNotResolvableError errors raised by the markers
         """
-        index, length = 0, len(self._bytecode)
+        index, length = 0, len(bytecode)
         while index < length:
-            marker = self._bytecode[index]
+            marker = bytecode[index]
             if isinstance(marker, cls):
                 if graceful:
                     try:
@@ -216,6 +223,6 @@ class ExecutionContext:
                     replacement = marker.to_ast_node()
                 if replacement is not None:
                     replacement = _flatten_bytes(ensure_tuple(replacement))
-                    self._bytecode[index : (index + 1)] = replacement
+                    bytecode[index : (index + 1)] = replacement
                     length += len(replacement) - 1
             index += 1

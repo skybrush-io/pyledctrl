@@ -3,76 +3,8 @@ abstract syntax tree fragments."""
 
 from pyledctrl.compiler import ast
 from pyledctrl.compiler.colors import parse_color
-from pyledctrl.compiler.errors import MarkerNotResolvableError
 
-
-class Marker:
-    """Superclass for marker objects placed in the bytecode stream that are
-    resolved to actual bytecode in a later compilation stage."""
-
-    def to_ast_node(self):
-        """Returns the abstract syntax tree node that should replace the marker
-        in the abstract syntax tree.
-
-        Returns:
-            ast.Node or None: the absrtact syntax tree node that should replace
-                the marker or None if the marker should be removed from the
-                abstract syntax tree
-
-        Raises:
-            MarkerNotResolvableError: if the marker does not "know" all the
-                information that is needed to produce a corresponding abstract
-                syntax tree node.
-        """
-        return None
-
-
-class LabelMarker(Marker):
-    """Marker object for a label that jump instructions can refer to."""
-
-    def __init__(self, name):
-        self.name = name
-
-    def __repr__(self):
-        return "{0.__class__.__name__}(name={0.name!r})".format(self)
-
-
-class JumpMarker(Marker):
-    """Marker object for a jump instruction."""
-
-    def __init__(self, destination):
-        self.destination = destination
-        self.destination_marker = None
-        self.address = None
-
-    def _resolve_to_address(self, address):
-        assert self.address is None
-        self.address = address
-
-    def _resolve_to_marker(self, marker):
-        assert self.destination_marker is None
-        self.destination_marker = marker
-
-    def resolve_to(self, address_or_marker):
-        if isinstance(address_or_marker, int):
-            self._resolve_to_address(address_or_marker)
-        else:
-            self._resolve_to_marker(address_or_marker)
-
-    def to_ast_node(self):
-        if self.address is None:
-            raise MarkerNotResolvableError(self)
-        else:
-            return ast.JumpCommand(address=self.address)
-
-    def __repr__(self):
-        return "{0.__class__.__name__}(destination={0.destination!r})".format(self)
-
-
-class UnconditionalJumpMarker(JumpMarker):
-    """Marker object for an unconditional jump instruction."""
-
-    pass
+from .markers import LabelMarker, UnconditionalJumpMarker
 
 
 def comment(value):
