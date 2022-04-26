@@ -1,4 +1,4 @@
-from pyledctrl.app import main
+from pyledctrl.cli.app import main
 
 
 if __name__ == "__main__":

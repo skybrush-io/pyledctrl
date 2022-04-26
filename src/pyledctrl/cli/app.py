@@ -1,12 +1,12 @@
 """Main application class for PyLedCtrl"""
 
-import csv
 import sys
 
 from pathlib import Path
 
-from .compiler import BytecodeCompiler
-from .executor import Executor, unroll as unroll_sequence
+from pyledctrl.compiler import BytecodeCompiler
+
+from .utils import execute_and_write_tabular
 
 try:
     import click
@@ -97,32 +97,7 @@ def dump(filename, output, unroll):
 
     The last column is omitted if `--unroll` is specified.
     """
-    writer = csv.writer(output, dialect="excel-tab")
-
-    def state_to_row(state):
-        """Converts an ExecutorState_ object to the row that we want to
-        write into the output file.
-        """
-        row = [
-            "%g" % state.timestamp,
-            state.color.red,
-            state.color.green,
-            state.color.blue,
-        ]
-        if not unroll:
-            row.append(state.is_fade)
-        return row
-
-    compiler = BytecodeCompiler()
-    syntax_trees = compiler.compile(filename, output_format="ast")
-
-    for syntax_tree in syntax_trees:
-        sequence = Executor().execute(syntax_tree)
-        if unroll:
-            sequence = unroll_sequence(sequence)
-
-        for state in sequence:
-            writer.writerow(state_to_row(state))
+    return execute_and_write_tabular(filename, output, unroll)
 
 
 def main():

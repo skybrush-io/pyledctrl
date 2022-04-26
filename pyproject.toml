@@ -22,7 +22,7 @@ pytest-cov = "^3.0.0"
 cli = ["click", "tqdm"]
 
 [tool.poetry.scripts]
-ledctrl = "pyledctrl.app:main"
+ledctrl = "pyledctrl.cli.app:main"
 
 [[tool.poetry.source]]
 name = "fury"
@@ -35,7 +35,7 @@ source = ["src"]
 [tool.coverage.run]
 branch = true
 source = ["src"]
-omit = ["src/pyledctrl/app.py", "src/pyledctrl/__main__.py"]
+omit = ["src/pyledctrl/cli/app.py", "src/pyledctrl/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true

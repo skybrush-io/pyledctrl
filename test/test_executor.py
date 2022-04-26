@@ -1,6 +1,7 @@
+from io import StringIO
 from pathlib import Path
 
-from pyledctrl.app import dump
+from pyledctrl.cli.utils import execute_and_write_tabular
 
 import gzip
 import pytest
@@ -34,13 +35,10 @@ class TestExecutor:
     @pytest.mark.parametrize("input,format,expected", test_data)
     def test_executor(self, tmp_path: Path, input, format, expected):
         (tmp_path / "input.bin").write_bytes(input)
-        args = ["-o", str(tmp_path / "output.tab"), str(tmp_path / "input.bin")]
-        if format:
-            args.insert(0, "--unroll")
 
-        dump(args, standalone_mode=False)
-
-        result = (tmp_path / "output.tab").read_text().replace("\r", "")
+        output = StringIO()
+        execute_and_write_tabular(str(tmp_path / "input.bin"), output, unroll=format)
+        result = output.getvalue().replace("\r", "")
 
         if expected is not None:
             assert result == expected
