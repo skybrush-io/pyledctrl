@@ -11,18 +11,16 @@ from typing import (
     List,
     Optional,
     Tuple,
-    TYPE_CHECKING,
     TypeVar,
     overload,
 )
 
-if TYPE_CHECKING:
-    from .stages import CompilationStage, CompilationStageExecutionEnvironment
+from .stages import CompilationStage, CompilationStageExecutionEnvironment
 
 __all__ = ("Plan",)
 
 
-class _FakeProgressBar(AbstractContextManager):
+class _FakeProgressBar(AbstractContextManager):  # pragma: no cover
     """Fake progress bar class that provides the same interface as `tqdm.tqdm()`
     to be used in places where `tdqm` does not have to be present.
     """
@@ -45,15 +43,15 @@ class Plan:
     to execute. Each step must be an instance of CompilationStage_.
     """
 
-    _steps: List["CompilationStage"]
+    _steps: List[CompilationStage]
     """The list of compilation steps to execute."""
 
-    _output_steps: List["CompilationStage"]
+    _output_steps: List[CompilationStage]
     """A sub-list of the compilation steps that are marked as ones that produce
     outputs.
     """
 
-    _callbacks: DefaultDict[Tuple["CompilationStage", str], List[Callable[..., None]]]
+    _callbacks: DefaultDict[Tuple[CompilationStage, str], List[Callable[..., None]]]
 
     def __init__(self):
         """Constructor."""
@@ -61,7 +59,7 @@ class Plan:
         self._output_steps = []
         self._callbacks = defaultdict(list)
 
-    def add_step(self, step: "CompilationStage") -> "Continuation":
+    def add_step(self, step: CompilationStage) -> "Continuation":
         """Adds the given step to the plan after any other step that has been
         added previously.
 
@@ -77,7 +75,7 @@ class Plan:
 
     def execute(
         self,
-        environment: "CompilationStageExecutionEnvironment",
+        environment: Optional[CompilationStageExecutionEnvironment] = None,
         *,
         description: Optional[str] = None,
         force: bool = False,
@@ -107,6 +105,8 @@ class Plan:
         Raises:
             CompilerError: in case of a compilation error
         """
+        environment = environment or CompilationStageExecutionEnvironment()
+
         bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}{postfix}"
 
         step_index, num_steps = 0, len(self._steps)
@@ -121,7 +121,7 @@ class Plan:
             from tqdm import tqdm
 
             progress_bar_factory = partial(tqdm, **tqdm_kwds)
-        except ImportError:
+        except ImportError:  # pragma: no cover
             progress_bar_factory = _FakeProgressBar
 
         with progress_bar_factory() as progress_bar:
@@ -176,10 +176,10 @@ class Plan:
 
     def insert_step(
         self,
-        step: "CompilationStage",
+        step: CompilationStage,
         *,
-        before: Optional["CompilationStage"] = None,
-        after: Optional["CompilationStage"] = None,
+        before: Optional[CompilationStage] = None,
+        after: Optional[CompilationStage] = None,
     ) -> "Continuation":
         """Inserts the given step before or after some other step that is
         already part of the compilation plan.
@@ -202,7 +202,7 @@ class Plan:
         self._steps.insert(index, step)
         return Continuation(self, step)
 
-    def iter_steps(self, cls: Optional[type] = None) -> Iterable["CompilationStage"]:
+    def iter_steps(self, cls: Optional[type] = None) -> Iterable[CompilationStage]:
         """Iterates over the steps of this compilation plan.
 
         Parameters:
@@ -219,17 +219,17 @@ class Plan:
 
     @overload
     def when_step_is_done(
-        self, step: "CompilationStage"
+        self, step: CompilationStage, *args: Any
     ) -> Callable[[Callable[..., None]], Callable[..., None]]:
         ...
 
     @overload
     def when_step_is_done(
-        self, step: "CompilationStage", func: Callable[..., None]
+        self, step: CompilationStage, func: Callable[..., None], *args: Any
     ) -> None:
         ...
 
-    def when_step_is_done(self, step: "CompilationStage", func=None) -> Any:
+    def when_step_is_done(self, step: CompilationStage, func=None, *args: Any) -> Any:
         """Registers a function to be called when the given compilation
         step is done.
 
@@ -242,16 +242,20 @@ class Plan:
                 function that registers the decorated function as a callback.
         """
         if func is not None:
-            return self._register_callback(step, "done", func)
+            return self._register_callback(
+                step, "done", partial(func, *args) if args else func
+            )
         else:
 
-            def decorator(decorated: Callable[..., None]) -> Callable[..., None]:
-                self.when_step_is_done(step, decorated)
+            def decorator(
+                decorated: Callable[..., None], *args: Any
+            ) -> Callable[..., None]:
+                self.when_step_is_done(step, decorated, *args)
                 return decorated
 
             return decorator
 
-    def _get_message_for_step(self, step: "CompilationStage") -> str:
+    def _get_message_for_step(self, step: CompilationStage) -> str:
         """Returns the message to be shown on the console when the given step
         is being executed.
         """
@@ -262,7 +266,7 @@ class Plan:
         else:
             return "Executing {0}...".format(class_name)
 
-    def mark_as_output(self, step: "CompilationStage") -> None:
+    def mark_as_output(self, step: CompilationStage) -> None:
         """Marks the given compilation step as an output step. The results of
         the output steps will be returned by the ``execute()`` method of the
         plan.
@@ -273,7 +277,7 @@ class Plan:
         self._output_steps.append(step)
 
     def _register_callback(
-        self, step: "CompilationStage", callback_type: str, func: Callable[..., None]
+        self, step: CompilationStage, callback_type: str, func: Callable[..., None]
     ) -> None:
         self._callbacks[step, callback_type].append(func)
 
@@ -287,7 +291,7 @@ class Continuation:
     functions for the execution of a compilation step.
     """
 
-    def __init__(self, plan: Plan, step: "CompilationStage"):
+    def __init__(self, plan: Plan, step: CompilationStage):
         """Constructor.
 
         Parameters:
@@ -297,7 +301,7 @@ class Continuation:
         self.plan = plan
         self.step = step
 
-    def and_when_done(self: C, func: Callable[..., None]) -> C:
+    def and_when_done(self: C, func: Callable[..., None], *args: Any) -> C:
         """Specifies the given function to be called when the plan finishes
         the execution of the step. The function will be invoked with the
         value of the ``output`` property of the step if it has such a
@@ -309,7 +313,7 @@ class Continuation:
         Returns:
             the continuation object itself for easy chaining
         """
-        self.plan.when_step_is_done(self.step, func)
+        self.plan.when_step_is_done(self.step, func, *args)
         return self
 
     def mark_as_output(self: C) -> C:

@@ -1,10 +1,13 @@
+import json
+import pytest
+
+from functools import partial
 from pathlib import Path
 
 from pyledctrl.compiler import BytecodeCompiler
 from pyledctrl.compiler.formats import OutputFormat
-
-import json
-import pytest
+from pyledctrl.compiler.plan import Plan
+from pyledctrl.compiler.stages import ConstantOutputStage, DummyStage
 
 
 def load_test_data():
@@ -58,3 +61,47 @@ class TestCompilation:
             assert result == expected
         else:
             assert len(result) > 0
+
+
+def test_callbacks_in_steps():
+    value_holder = []
+
+    def set_done(holder, default_output="OK", output=None):
+        holder.append(output or default_output)
+
+    plan = Plan()
+    plan.add_step(DummyStage()).and_when_done(set_done, value_holder)
+
+    plan.execute()
+    assert value_holder == ["OK"]
+
+    new_stage = DummyStage()
+    plan.add_step(new_stage)
+    decorator = plan.when_step_is_done(new_stage)
+    decorator(partial(set_done, value_holder, "OK 2"))
+
+    value_holder.clear()
+    plan.execute()
+    assert value_holder == ["OK", "OK 2"]
+
+    output_stage = ConstantOutputStage(42)
+    plan.add_step(output_stage).mark_as_output()
+    plan.when_step_is_done(output_stage, partial(set_done, value_holder, "OK 3"))
+
+    value_holder.clear()
+    plan.execute()
+    assert value_holder == ["OK", "OK 2", 42]
+
+
+def test_iter_steps_in_plan():
+    plan = Plan()
+
+    stage1 = DummyStage()
+    stage2 = DummyStage()
+    stage3 = ConstantOutputStage(42)
+
+    plan.add_step(stage2)
+    plan.insert_step(stage1, before=stage2)
+    plan.insert_step(stage3, after=stage2)
+
+    assert list(plan.iter_steps()) == [stage1, stage2, stage3]

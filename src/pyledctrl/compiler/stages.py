@@ -26,14 +26,8 @@ class CompilationStageExecutionEnvironment:
     compiler itself.
     """
 
-    def __init__(self, compiler):
-        """Constructor.
-
-        Parameters:
-            compiler (BytecodeCompiler): the compiler that owns this
-                environment
-        """
-        self._compiler = compiler
+    def __init__(self):
+        """Constructor."""
 
     log = log
     warn = log.warn
@@ -177,6 +171,29 @@ class ObjectTargetMixin(ABC, Generic[T]):
             return output.output_object  # type: ignore
         else:
             return output
+
+
+class ConstantOutputStage(DummyStage, ObjectTargetMixin[T]):
+    """Dummy output stage that always returns the same object as its output."""
+
+    _output: T
+
+    def __init__(self, output: T):
+        super().__init__()
+        self._output = output
+
+    @property
+    def output(self) -> T:
+        """THe output object of the compilation stage."""
+        return self._output
+
+    def run(self, environment: CompilationStageExecutionEnvironment):
+        """Inherited."""
+        pass
+
+    def should_run(self) -> bool:
+        """Inherited."""
+        return True
 
 
 class FileToObjectCompilationStage(

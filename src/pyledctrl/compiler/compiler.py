@@ -76,7 +76,7 @@ class BytecodeCompiler:
         self.progress = progress
         self.verbose = verbose
 
-        self.environment = CompilationStageExecutionEnvironment(self)
+        self.environment = CompilationStageExecutionEnvironment()
         self.output = None
 
     def compile(
