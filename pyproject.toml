@@ -3,6 +3,7 @@ name = "pyledctrl"
 version = "3.2.1"
 description = "Compiler to convert LED light show scripts to bytecode format"
 authors = ["Tamas Nepusz <tamas@collmot.com>"]
+license = "GPL-3.0-or-later"
 packages = [
     { include = "pyledctrl", from = "src" }
 ]
