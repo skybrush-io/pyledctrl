@@ -21,8 +21,8 @@ def load_test_data():
         expected = path.with_suffix(".tab").read_text()
         result.append((data, False, expected))
 
-        with gzip.open(path.with_suffix(".tab.gz")) as fp:
-            expected = fp.read().decode("utf-8").replace("\r", "")
+        with gzip.open(path.with_suffix(".tab.gz"), mode="rt", encoding="utf-8") as fp:
+            expected = fp.read()
         result.append((data, True, expected))
 
     return result
