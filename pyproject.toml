@@ -25,8 +25,9 @@ cli = ["click", "tqdm"]
 ledctrl = "pyledctrl.app:main"
 
 [[tool.poetry.source]]
-name = "collmot"
-url = "https://pypi.collmot.com/simple/"
+name = "fury"
+url = "https://pypi.fury.io/skybrush/"
+secondary = true
 
 [tool.coverage.paths]
 source = ["src"]
