@@ -569,7 +569,7 @@ class Varuint(Literal):
     def _set_value(self, value: int) -> None:
         if value < 0:
             raise ValueError("value must be non-negative")
-        elif value >= 2 ** 28:
+        elif value >= 2**28:
             raise ValueError(
                 "varuints greater than 2**28 are not supported by the bytecode"
             )
