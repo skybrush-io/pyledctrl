@@ -329,11 +329,15 @@ def remove_duplicates(events):
         yield last(events)
 
 
-def unroll(events, fps: Decimal = Duration.FPS):
+def unroll(
+    events: Iterable[ExecutorState], fps: Decimal = Duration.FPS
+) -> Iterable[ExecutorState]:
     return remove_duplicates(_unroll(events, fps))
 
 
-def _unroll(events, fps: Union[Decimal, float]):
+def _unroll(
+    events: Iterable[ExecutorState], fps: Union[Decimal, float]
+) -> Iterable[ExecutorState]:
     start = ExecutorState()
     fps = Decimal(fps)
 

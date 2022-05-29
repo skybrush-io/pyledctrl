@@ -3,7 +3,7 @@ import csv
 from typing import IO
 
 from pyledctrl.compiler import BytecodeCompiler
-from pyledctrl.executor import Executor, unroll as unroll_sequence
+from pyledctrl.executor import Executor, ExecutorState, unroll as unroll_sequence
 
 __all__ = ("execute_and_write_tabular",)
 
@@ -20,7 +20,7 @@ def execute_and_write_tabular(filename: str, output: IO[str], unroll: bool = Fal
     """
     writer = csv.writer(output, dialect="excel-tab")
 
-    def state_to_row(state):
+    def state_to_row(state: ExecutorState):
         """Converts an ExecutorState_ object to the row that we want to
         write into the output file.
         """
