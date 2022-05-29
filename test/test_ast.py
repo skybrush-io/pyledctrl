@@ -6,7 +6,6 @@ from pyledctrl.compiler.ast import (
     Node,
     NopCommand,
     SleepCommand,
-    Varuint,
     WaitUntilCommand,
 )
 
@@ -15,7 +14,7 @@ COMMANDS = [
     (EndCommand(), b"\x00", "end()"),
     (NopCommand(), b"\x01", "nop()"),
     (SleepCommand(duration=Duration(25)), b"\x02\x19", "sleep(duration=0.5)"),
-    (WaitUntilCommand(Varuint(250)), b"\x03\xfa\x01", "wait_until(timestamp=250)"),
+    (WaitUntilCommand(Duration(250)), b"\x03\xfa\x01", "wait_until(timestamp=5)"),
 ]
 
 

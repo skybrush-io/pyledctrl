@@ -794,7 +794,7 @@ class RGBColor(Node):
 
 
 class Duration(Varuint):
-    """Node that represents a duration."""
+    """Node that represents a duration (or a timestamp)."""
 
     _fields = Varuint._fields
     _instance_cache: ClassVar[Dict[int, "Duration"]] = {}
@@ -1001,9 +1001,9 @@ class WaitUntilCommand(Command):
 
     code = CommandCode.WAIT_UNTIL
     _fields = ("timestamp",)
-    _defaults = {"timestamp": Varuint}
+    _defaults = {"timestamp": Duration}
 
-    timestamp: Varuint
+    timestamp: Duration
 
     def to_led_source(self):
         return "wait_until(timestamp={0})".format(self.timestamp.to_led_source())
