@@ -68,11 +68,9 @@ class DummyStage(CompilationStage):
     """Dummy stage that does nothing on its own."""
 
     def run(self, environment: CompilationStageExecutionEnvironment):
-        """Inherited."""
         pass
 
     def should_run(self) -> bool:
-        """Inherited."""
         return True
 
 
@@ -188,11 +186,9 @@ class ConstantOutputStage(DummyStage, ObjectTargetMixin[T]):
         return self._output
 
     def run(self, environment: CompilationStageExecutionEnvironment):
-        """Inherited."""
         pass
 
     def should_run(self) -> bool:
-        """Inherited."""
         return True
 
 
@@ -282,12 +278,10 @@ class RawBytesToASTObjectCompilationStage(ObjectToObjectCompilationStage[bytes, 
 
     @property
     def input(self) -> bytes:
-        """Inherited."""
         return self._input
 
     @property
     def output(self) -> Node:
-        """Inherited."""
         if self._output is None:
             raise RuntimeError("stage was not executed yet")
         return self._output
@@ -324,7 +318,6 @@ class BytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStage):
     def _create_output(
         self, input: bytes, environment: CompilationStageExecutionEnvironment
     ) -> Node:
-        """Inherited."""
         return BytecodeParser().parse(input)
 
 
@@ -337,7 +330,6 @@ class JSONBytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStag
     def _create_output(
         self, input: bytes, environment: CompilationStageExecutionEnvironment
     ) -> Node:
-        """Inherited."""
         from base64 import b64decode
         from json import loads
 
@@ -380,16 +372,13 @@ class ASTOptimisationStage(ObjectToObjectCompilationStage):
 
     @property
     def input(self) -> Node:
-        """Inherited."""
         return self._ast
 
     @property
     def output(self) -> Node:
-        """Inherited."""
         return self._ast
 
     def run(self, environment: CompilationStageExecutionEnvironment) -> None:
-        """Inherited."""
         self.optimiser.optimise(self.input_object)
 
 
@@ -415,12 +404,10 @@ class ASTObjectToRawBytesCompilationStage(ObjectToObjectCompilationStage[Node, b
 
     @property
     def input(self):
-        """Inherited."""
         return self._input
 
     @property
     def output(self) -> bytes:
-        """Inherited."""
         if self._output is None:
             raise RuntimeError("stage was not executed yet")
         return self._output
@@ -442,7 +429,6 @@ class ASTObjectToBytecodeCompilationStage(ASTObjectToRawBytesCompilationStage):
     def _create_output(
         self, input: Node, environment: CompilationStageExecutionEnvironment
     ):
-        """Inherited."""
         return input.to_bytecode()
 
 
@@ -455,7 +441,6 @@ class ASTObjectToJSONBytecodeCompilationStage(ASTObjectToRawBytesCompilationStag
     def _create_output(
         self, input: Node, environment: CompilationStageExecutionEnvironment
     ):
-        """Inherited."""
         from base64 import b64encode
         from json import dumps
 
@@ -475,7 +460,6 @@ class ASTObjectToLEDSourceCodeCompilationStage(ASTObjectToRawBytesCompilationSta
     def _create_output(
         self, input: Node, environment: CompilationStageExecutionEnvironment
     ):
-        """Inherited."""
         output = input.to_led_source().encode("utf-8")
         if output:
             output += b"\n"
