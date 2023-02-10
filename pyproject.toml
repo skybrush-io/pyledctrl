@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyledctrl"
-version = "4.0.1"
+version = "4.1.0"
 description = "Compiler to convert LED light show scripts to bytecode format"
 authors = ["Tamas Nepusz <tamas@collmot.com>"]
 license = "GPL-3.0-or-later"
