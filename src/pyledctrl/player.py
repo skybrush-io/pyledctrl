@@ -8,7 +8,7 @@ from math import isfinite
 from typing import Iterator, Optional, Tuple
 
 from .compiler import compile
-from .compiler.formats import InputFormat, InputFormatLike
+from .compiler.formats import InputFormat, InputFormatLike, OutputFormat
 from .executor import Color, Executor, ExecutorState
 
 __all__ = ("Player",)
@@ -36,7 +36,7 @@ class Player:
             data: the light program to play
             format: the format of the input
         """
-        ast = compile(data, input_format=format, output_format="ast")
+        ast = compile(data, input_format=format, output_format=OutputFormat.AST)
         return cls(ast=ast)
 
     @classmethod
@@ -49,7 +49,9 @@ class Player:
             format: the format of the input; `None` means autodetection from the
                 extension of the file
         """
-        return cls(ast=compile(filename, input_format=format, output_format="ast"))
+        return cls(
+            ast=compile(filename, input_format=format, output_format=OutputFormat.AST)
+        )
 
     @classmethod
     def from_json(cls, data: dict, format: InputFormatLike = InputFormat.LEDCTRL_JSON):
@@ -60,7 +62,7 @@ class Player:
             data: the light program to play
             format: the format of the input
         """
-        ast = compile(data, input_format=format, output_format="ast")
+        ast = compile(data, input_format=format, output_format=OutputFormat.AST)
         return cls(ast=ast)
 
     def __init__(self, ast=None):
