@@ -10,7 +10,7 @@ import pytest
 def load_test_data():
     data_dir = Path(__file__).parent / "data" / "executor"
 
-    result = []
+    result, ids = [], []
 
     for path in data_dir.glob("*.bin"):
         to_skip = path.name.startswith("_")
@@ -21,18 +21,20 @@ def load_test_data():
 
         expected = path.with_suffix(".tab").read_text()
         result.append((data, False, expected))
+        ids.append(f"{path.stem}-False")
 
         with gzip.open(path.with_suffix(".tab.gz"), mode="rt", encoding="utf-8") as fp:
             expected = fp.read()
         result.append((data, True, expected))
+        ids.append(f"{path.stem}-True")
 
-    return result
+    return result, ids
 
 
 class TestExecutor:
-    test_data = load_test_data()
+    test_data, test_ids = load_test_data()
 
-    @pytest.mark.parametrize("input,format,expected", test_data)
+    @pytest.mark.parametrize("input,format,expected", test_data, ids=test_ids)
     def test_executor(self, tmp_path: Path, input, format, expected):
         (tmp_path / "input.bin").write_bytes(input)
 

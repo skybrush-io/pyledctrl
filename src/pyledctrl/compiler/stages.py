@@ -238,6 +238,32 @@ class ObjectToObjectCompilationStage(
         return True
 
 
+class PassthroughStage(ObjectToObjectCompilationStage[T, T]):
+    """Compilation phase that returns its input untouched."""
+
+    _input: T
+
+    def __init__(self, input: T):
+        """Constructor.
+
+        Parameters:
+            input: the input object to return untouched
+        """
+        super().__init__()
+        self._input = input
+
+    @property
+    def input(self) -> T:
+        return self._input
+
+    @property
+    def output(self) -> T:
+        return self._input
+
+    def run(self, environment: CompilationStageExecutionEnvironment) -> None:
+        pass
+
+
 class FileToFileCompilationStage(CompilationStage, FileSourceMixin, FileTargetMixin):
     """Abstract compilation phase that turns a set of input files into a set
     of output files. The phase is not executed if all the input files are
@@ -464,3 +490,15 @@ class ASTObjectToLEDSourceCodeCompilationStage(ASTObjectToRawBytesCompilationSta
         if output:
             output += b"\n"
         return output
+
+
+class ASTObjectToPickleCompilationStage(ASTObjectToRawBytesCompilationStage):
+    """Compilation stage that turns an in-memory abstract syntax tree from a
+    file into a Python pickle that can be written directly to an output file or
+    stream.
+    """
+
+    def _create_output(
+        self, input: Node, environment: CompilationStageExecutionEnvironment
+    ):
+        return input.to_pickle()

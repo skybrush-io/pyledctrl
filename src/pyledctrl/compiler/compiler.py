@@ -5,8 +5,9 @@ from input files in various formats.
 import os
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Sequence, Tuple, Type, Union
 
+from .ast import Node
 from .errors import CompilerError, UnsupportedInputFormatError
 from .formats import InputFormat, InputFormatLike, OutputFormat, OutputFormatLike
 from .optimisation import create_optimiser_for_level
@@ -15,12 +16,14 @@ from .stages import (
     ASTObjectToBytecodeCompilationStage,
     ASTObjectToJSONBytecodeCompilationStage,
     ASTObjectToLEDSourceCodeCompilationStage,
+    ASTObjectToPickleCompilationStage,
     ASTObjectToRawBytesCompilationStage,
     ASTOptimisationStage,
     BytecodeToASTObjectCompilationStage,
     CompilationStageExecutionEnvironment,
     JSONBytecodeToASTObjectCompilationStage,
     LEDSourceCodeToASTObjectCompilationStage,
+    PassthroughStage,
     RawBytesToASTObjectCompilationStage,
 )
 
@@ -70,6 +73,7 @@ class BytecodeCompiler:
             OutputFormat.LEDCTRL_BINARY: ASTObjectToBytecodeCompilationStage,
             OutputFormat.LEDCTRL_SOURCE: ASTObjectToLEDSourceCodeCompilationStage,
             OutputFormat.LEDCTRL_JSON: ASTObjectToJSONBytecodeCompilationStage,
+            OutputFormat.AST_PICKLE: ASTObjectToPickleCompilationStage,
         }
 
         self.optimisation_level = int(optimisation_level)
@@ -82,7 +86,7 @@ class BytecodeCompiler:
     def compile(
         self,
         input: Any,
-        output_file: Optional[str] = None,
+        output_file: Optional[Union[str, Path]] = None,
         *,
         input_format: Optional[InputFormatLike] = None,
         output_format: Optional[OutputFormatLike] = None
@@ -137,6 +141,10 @@ class BytecodeCompiler:
             input = dumps(input).encode("utf-8")
             input_format = InputFormat.LEDCTRL_JSON
 
+        elif isinstance(input, Node):
+            description = "<<AST>>"
+            input_format = InputFormat.AST
+
         else:
             description = "<<unknown>>"
 
@@ -145,7 +153,7 @@ class BytecodeCompiler:
 
         if output_format is None:
             if output_file is not None:
-                output_format = OutputFormat.detect_from_filename(output_file)
+                output_format = OutputFormat.detect_from_filename(str(output_file))
             else:
                 output_format = OutputFormat.AST
 
@@ -162,7 +170,7 @@ class BytecodeCompiler:
             verbose=self.verbose,
         )
         if output_file:
-            self._write_outputs_to_file(self.output, output_file)
+            self._write_outputs_to_file(self.output, str(output_file))
 
         return self.output
 
@@ -188,7 +196,7 @@ class BytecodeCompiler:
     def _collect_stages(
         self,
         plan: Plan,
-        input_data: bytes,
+        input_data: Union[bytes, Node],
         input_format: InputFormat,
         output_format: OutputFormat,
     ) -> None:
@@ -205,14 +213,21 @@ class BytecodeCompiler:
             UnsupportedInputFormatError: when the format of the input file is
                 not known to the compiler
         """
+        if isinstance(input_data, Node) and input_format != InputFormat.AST:
+            raise ValueError(
+                "input_format must be InputFormat.AST when input_data is an AST"
+            )
+
         # Add the stages required to produce an abstract syntax tree
         # representation of the LED program based on the extension of the
         # input file
-        create_ast_stage = self._input_format_to_ast_stage_factory.get(input_format)
-        if create_ast_stage is None:
-            raise UnsupportedInputFormatError(format=input_format.value)
-
-        ast_stage = create_ast_stage(input_data)
+        if isinstance(input_data, Node):
+            ast_stage = PassthroughStage(input_data)
+        else:
+            create_ast_stage = self._input_format_to_ast_stage_factory.get(input_format)
+            if create_ast_stage is None:
+                raise UnsupportedInputFormatError(format=input_format.value)
+            ast_stage = create_ast_stage(input_data)
         plan.add_step(ast_stage)
 
         # Create a list containing our only AST stage; this may be useful later
@@ -243,7 +258,7 @@ class BytecodeCompiler:
 
             plan.mark_as_output(output_stage)
 
-    def _write_outputs_to_file(self, outputs, output_file):
+    def _write_outputs_to_file(self, outputs: Sequence[Any], output_file: str):
         if not outputs:
             return
 

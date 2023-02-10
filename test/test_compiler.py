@@ -1,4 +1,5 @@
 import json
+import pickle
 import pytest
 
 from functools import partial
@@ -10,10 +11,10 @@ from pyledctrl.compiler.plan import Plan
 from pyledctrl.compiler.stages import ConstantOutputStage, DummyStage
 
 
-def load_test_data():
+def load_led_test_data():
     data_dir = Path(__file__).parent / "data" / "compiler"
 
-    result = []
+    result, ids = [], []
 
     for path in data_dir.glob("*.led"):
         to_skip = path.name.startswith("_")
@@ -35,14 +36,15 @@ def load_test_data():
                 else:
                     expected = None
                 result.append((data, format, expected))
+            ids.append(f"{path.stem} to {format.value}")
 
-    return result
+    return result, ids
 
 
-class TestCompilation:
-    test_data = load_test_data()
+class TestCompilationFromLEDFile:
+    test_data, test_ids = load_led_test_data()
 
-    @pytest.mark.parametrize("input,format,expected", test_data)
+    @pytest.mark.parametrize("input,format,expected", test_data, ids=test_ids)
     def test_compilation(self, tmp_path: Path, input, format, expected):
         compiler = BytecodeCompiler(optimisation_level=2)
 
@@ -50,6 +52,58 @@ class TestCompilation:
         compiler.compile(
             tmp_path / "input.led", str(tmp_path / "out"), output_format=format
         )
+
+        if format is OutputFormat.LEDCTRL_JSON:
+            with (tmp_path / "out").open() as fp:
+                result = json.load(fp)
+        else:
+            result = (tmp_path / "out").read_bytes()
+
+        if expected is not None:
+            assert result == expected
+        else:
+            assert len(result) > 0
+
+
+def load_ast_test_data():
+    data_dir = Path(__file__).parent / "data" / "compiler"
+
+    result, ids = [], []
+
+    for path in data_dir.glob("*.ast"):
+        to_skip = path.name.startswith("_")
+        with path.open("rb") as fp:
+            data = pickle.load(fp)
+        for format in (
+            OutputFormat.LEDCTRL_BINARY,
+            OutputFormat.LEDCTRL_JSON,
+            OutputFormat.LEDCTRL_SOURCE,
+        ):
+            if to_skip:
+                result.append(pytest.param(data, format, None, marks=pytest.mark.xfail))
+            else:
+                if format is OutputFormat.LEDCTRL_BINARY:
+                    expected = path.with_suffix(".bin").read_bytes()
+                elif format is OutputFormat.LEDCTRL_SOURCE:
+                    expected = path.with_suffix(".oled").read_bytes()
+                elif format is OutputFormat.LEDCTRL_JSON:
+                    expected = json.loads(path.with_suffix(".json").read_text())
+                else:
+                    expected = None
+                result.append((data, format, expected))
+            ids.append(f"{path.stem} to {format.value}")
+
+    return result, ids
+
+
+class TestCompilationFromASTObject:
+    test_data, test_ids = load_ast_test_data()
+
+    @pytest.mark.parametrize("input,format,expected", test_data, ids=test_ids)
+    def test_compilation(self, tmp_path: Path, input, format, expected):
+        compiler = BytecodeCompiler(optimisation_level=2)
+
+        compiler.compile(input, str(tmp_path / "out"), output_format=format)
 
         if format is OutputFormat.LEDCTRL_JSON:
             with (tmp_path / "out").open() as fp:

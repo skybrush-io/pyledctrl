@@ -11,7 +11,7 @@ import pytest
 def load_test_data():
     data_dir = Path(__file__).parent / "data" / "executor"
 
-    result = []
+    result, ids = [], []
 
     for path in data_dir.glob("*.bin"):
         to_skip = path.name.startswith("_")
@@ -27,8 +27,9 @@ def load_test_data():
                 expected.append((items[0], items[1:]))
 
         result.append((data, expected))
+        ids.append(path.stem)
 
-    return result
+    return result, ids
 
 
 def almost_same_color(first: Tuple[float, ...], second: Tuple[float, ...]) -> bool:
@@ -38,9 +39,9 @@ def almost_same_color(first: Tuple[float, ...], second: Tuple[float, ...]) -> bo
 
 
 class TestPlayer:
-    test_data = load_test_data()
+    test_data, test_ids = load_test_data()
 
-    @pytest.mark.parametrize("input,expected", test_data)
+    @pytest.mark.parametrize("input,expected", test_data, ids=test_ids)
     def test_executor_forward(self, input, expected):
         player = Player.from_bytes(input)
 
@@ -49,7 +50,7 @@ class TestPlayer:
             color = player.get_color_at(timestamp)
             assert almost_same_color(color, expected_color)
 
-    @pytest.mark.parametrize("input,expected", test_data)
+    @pytest.mark.parametrize("input,expected", test_data, ids=test_ids)
     def test_executor_random(self, input, expected):
         player = Player.from_bytes(input)
 

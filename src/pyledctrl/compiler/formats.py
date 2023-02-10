@@ -20,6 +20,8 @@ class InputFormat(Enum):
     LEDCTRL_SOURCE = "ledctrl_source"
     LEDCTRL_BINARY = "ledctrl_binary"
     LEDCTRL_JSON = "ledctrl_json"
+    AST = "ast"
+    AST_PICKLE = "ast_pickle"
 
     @staticmethod
     def detect_from_filename(filename: str) -> "InputFormat":
@@ -44,6 +46,8 @@ class InputFormat(Enum):
             return InputFormat.LEDCTRL_BINARY
         elif ext == ".json":
             return InputFormat.LEDCTRL_JSON
+        elif ext == ".ast":
+            return InputFormat.AST_PICKLE
         else:
             raise UnsupportedInputFormatError(filename=filename)
 
@@ -57,6 +61,7 @@ class OutputFormat(Enum):
     LEDCTRL_BINARY = "ledctrl_binary"
     LEDCTRL_JSON = "ledctrl_json"
     AST = "ast"
+    AST_PICKLE = "ast_pickle"
 
     @staticmethod
     def detect_from_filename(filename: str) -> "OutputFormat":
@@ -77,6 +82,8 @@ class OutputFormat(Enum):
             return OutputFormat.LEDCTRL_BINARY
         elif ext == ".json":
             return OutputFormat.LEDCTRL_JSON
+        elif ext == ".ast":
+            return OutputFormat.AST_PICKLE
         else:
             return OutputFormat.LEDCTRL_BINARY
 

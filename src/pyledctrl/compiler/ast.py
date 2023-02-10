@@ -313,7 +313,7 @@ class _NodeMeta(type):
         return __init__
 
 
-class Node(object, metaclass=_NodeMeta):
+class Node(metaclass=_NodeMeta):
     """Base class for nodes in the abstract syntax tree."""
 
     _fields: ClassVar[Sequence[str]]
@@ -378,6 +378,16 @@ class Node(object, metaclass=_NodeMeta):
         """
         raise NotImplementedError
 
+    def to_pickle(self) -> bytes:
+        """Converts the node into a Python pickle.
+
+        Returns:
+            a Python pickle representing the node
+        """
+        from pickle import dumps
+
+        return dumps(self)
+
     def transform_child_nodes(self) -> Generator["Node", Optional["Node"], None]:
         """Returns a generator that yields all field values that are subclasses
         of nodes and allows the user to replace the nodes with transformed ones
@@ -414,7 +424,11 @@ class Node(object, metaclass=_NodeMeta):
 
     def __setstate__(self, state):
         for arg_name, value in zip(self._fields, state):
-            setattr(self, arg_name, value)
+            try:
+                setattr(self, arg_name, value)
+            except AttributeError:
+                # maybe immutable?
+                setattr(self, "_" + arg_name, value)
 
     def __repr__(self) -> str:
         kvpairs = [
@@ -455,7 +469,6 @@ class UnsignedByte(Byte):
     _defaults = {"value": 0}
 
     _value: int
-    _bytecode: bytes
 
     @classmethod
     def from_bytecode(cls, data: IO[bytes]):
@@ -479,7 +492,6 @@ class UnsignedByte(Byte):
             value: the value of the literal
         """
         self._set_value(value)
-        self._bytecode = bytes([self.value])
 
     def equals(self, other: "UnsignedByte"):
         """Compares this byte with another byte to decide whether they
@@ -488,7 +500,7 @@ class UnsignedByte(Byte):
         return self._value == other._value
 
     def to_bytecode(self):
-        return self._bytecode
+        return bytes([self.value])
 
     def to_led_source(self):
         return str(self.value)
