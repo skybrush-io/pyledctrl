@@ -246,7 +246,7 @@ class BytecodeCompiler:
         )
 
         # Create the optimization stages and the output stages for each AST
-        for index, ast_stage in enumerate(ast_stages):
+        for _index, ast_stage in enumerate(ast_stages):
             optimisation_stage = create_optimisation_stage(ast_stage)
             plan.add_step(optimisation_stage)
 

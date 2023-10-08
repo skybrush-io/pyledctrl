@@ -233,7 +233,7 @@ class Executor:
             iterator = range(num_iterations)
         else:
             iterator = count()
-        for i in iterator:
+        for _i in iterator:
             for state in self._execute(node.body):
                 yield state
 
@@ -325,8 +325,8 @@ def remove_duplicates(events):
     """Given a stream of timestamped events in ascending order, removes
     duplicate events that refer to the same time instant, except the last one.
     """
-    for _, events in groupby(events, attrgetter("timestamp")):
-        yield last(events)
+    for _, grouped_events in groupby(events, attrgetter("timestamp")):
+        yield last(grouped_events)
 
 
 def unroll(

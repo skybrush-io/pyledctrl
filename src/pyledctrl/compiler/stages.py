@@ -362,7 +362,7 @@ class JSONBytecodeToASTObjectCompilationStage(RawBytesToASTObjectCompilationStag
         try:
             input = loads(input)
         except Exception:
-            raise CompilerError("input must be a JSON object")
+            raise CompilerError("input must be a JSON object") from None
 
         if not isinstance(input, dict):
             raise CompilerError("input must be a JSON object")

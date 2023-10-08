@@ -22,7 +22,7 @@ def parse_color(string: str) -> Color:
         string = string.lower().strip()
         return known_colors[string]
     except Exception:
-        raise InvalidColorError(string)
+        raise InvalidColorError(string) from None
 
 
 known_colors: Dict[str, Color] = {

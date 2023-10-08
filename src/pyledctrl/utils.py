@@ -94,7 +94,7 @@ def last(iterable: Iterable[T]) -> T:
         ValueError: if the iterable is empty
     """
     last = _last_default
-    for last in iterable:
+    for last in iterable:  # noqa: B007
         pass
     if last is _last_default:
         raise ValueError("iterable is empty")

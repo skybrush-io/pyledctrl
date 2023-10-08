@@ -127,7 +127,7 @@ class ExecutionContext:
             "set_white": wrapper_for(bytecode.set_white),
             "sleep": wrapper_for(bytecode.sleep),
         }
-        aliases = dict(off="set_black", on="set_white", goto="jump")
+        aliases = {"off": "set_black", "on": "set_white", "goto": "jump"}
         for alias, func in aliases.items():
             result[alias] = result[func]
 

@@ -853,7 +853,8 @@ class Duration(Varuint):
                 "Cannot convert {0} seconds into an integer number of frames "
                 "at {1} FPS; this could be a problem in the ledctrl output".format(
                     seconds, cls.FPS
-                )
+                ),
+                stacklevel=1,
             )
 
         return cls.from_frames(frame_count_as_int)
