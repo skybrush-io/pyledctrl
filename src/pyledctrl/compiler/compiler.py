@@ -50,7 +50,7 @@ class BytecodeCompiler:
         *,
         optimisation_level: int = 0,
         progress: bool = False,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         """Constructor.
 
@@ -89,7 +89,7 @@ class BytecodeCompiler:
         output_file: Optional[Union[str, Path]] = None,
         *,
         input_format: Optional[InputFormatLike] = None,
-        output_format: Optional[OutputFormatLike] = None
+        output_format: Optional[OutputFormatLike] = None,
     ) -> Tuple[Any]:
         """Runs the compiler.
 
@@ -283,7 +283,7 @@ def compile(
     *,
     input_format: Optional[InputFormatLike] = None,
     output_format: Optional[OutputFormatLike] = None,
-    **kwds
+    **kwds,
 ):
     """Runs the compiler.
 

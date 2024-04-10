@@ -220,14 +220,12 @@ class Plan:
     @overload
     def when_step_is_done(
         self, step: CompilationStage, *args: Any
-    ) -> Callable[[Callable[..., None]], Callable[..., None]]:
-        ...
+    ) -> Callable[[Callable[..., None]], Callable[..., None]]: ...
 
     @overload
     def when_step_is_done(
         self, step: CompilationStage, func: Callable[..., None], *args: Any
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def when_step_is_done(self, step: CompilationStage, func=None, *args: Any) -> Any:
         """Registers a function to be called when the given compilation

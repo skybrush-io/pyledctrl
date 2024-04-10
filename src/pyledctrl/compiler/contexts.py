@@ -150,8 +150,7 @@ class ExecutionContext:
                 self._ast_stack[-1].append(node)  # type: ignore
             else:
                 raise ValueError(
-                    "unknown value returned from bytecode "
-                    "function: {0!r}".format(node)
+                    f"unknown value returned from bytecode function: {node!r}"
                 )
             if isinstance(node, LabelMarker):
                 if node.name in self._labels:

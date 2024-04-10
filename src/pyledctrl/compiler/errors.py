@@ -18,7 +18,7 @@ class UnsupportedInputFormatError(RuntimeError):
         message: Optional[str] = None,
         *,
         format: Optional[str] = None,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
     ):
         self.format = format
         self.filename = filename

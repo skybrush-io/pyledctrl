@@ -8,13 +8,11 @@ T = TypeVar("T")
 
 
 @overload
-def get_timestamp_of(obj: Any) -> Optional[float]:
-    ...
+def get_timestamp_of(obj: Any) -> Optional[float]: ...
 
 
 @overload
-def get_timestamp_of(obj: Any, default_value: T = None) -> Union[float, T]:
-    ...
+def get_timestamp_of(obj: Any, default_value: T = None) -> Union[float, T]: ...
 
 
 def get_timestamp_of(obj, default_value=None):

@@ -378,7 +378,9 @@ class LoopDetector(ASTOptimiser):
                         # would be.
                         body_length = end - index
                         iterations = self._identify_loop_iteration_count(
-                            body, index, body_length  # type: ignore
+                            body,
+                            index,
+                            body_length,
                         )
                         if iterations > 1:
                             potential_loops.append((end, iterations))

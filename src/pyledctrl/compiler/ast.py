@@ -150,19 +150,19 @@ class CommandCode:
     interval.
     """
 
-    FADE_TO_BLACK = b"\x0A"
+    FADE_TO_BLACK = b"\x0a"
     """Fade the current color to black over a specified time interval."""
 
-    FADE_TO_WHITE = b"\x0B"
+    FADE_TO_WHITE = b"\x0b"
     """Fade the current color to white over a specified time interval."""
 
-    LOOP_BEGIN = b"\x0C"
+    LOOP_BEGIN = b"\x0c"
     """Marks the beginning of a loop, followed by an iteration count."""
 
-    LOOP_END = b"\x0D"
+    LOOP_END = b"\x0d"
     """Marks the end of a loop."""
 
-    RESET_TIMER = b"\x0E"
+    RESET_TIMER = b"\x0e"
     """Resets the internal timer to zero."""
 
     SET_COLOR_FROM_CHANNELS = b"\x10"
@@ -284,8 +284,7 @@ class _NodeMeta(type):
             if args:
                 if num_fields < len(args):
                     raise TypeError(
-                        "__init__() takes at most {0} "
-                        "arguments ({1} given)".format(num_fields, len(args))
+                        f"__init__() takes at most {num_fields} arguments ({len(args)} given)"
                     )
                 for arg_name, arg in zip(fields, args):
                     setattr(self, arg_name, arg)
@@ -1547,8 +1546,7 @@ def _parse_node_from_bytecode_by_class(cls: Type[Node], data: IO[bytes]):
         defaults: Dict[str, Any] = cls._defaults  # type: ignore
         if field not in defaults:
             raise BytecodeParserError(
-                "cannot parse {0}, default value for {1!r} "
-                "is not specified".format(cls.__name__, field)
+                f"cannot parse {cls.__name__}, default value for {field!r} is not specified"
             )
 
         default_value = defaults[field]

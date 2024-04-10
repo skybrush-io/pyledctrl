@@ -27,13 +27,11 @@ def consecutive_pairs(it: Iterable[T]) -> Iterable[Tuple[T, T]]:
 
 
 @overload
-def ensure_tuple(obj: Tup) -> Tup:
-    ...
+def ensure_tuple(obj: Tup) -> Tup: ...
 
 
 @overload
-def ensure_tuple(obj: T) -> Tuple[T]:
-    ...
+def ensure_tuple(obj: T) -> Tuple[T]: ...
 
 
 def ensure_tuple(obj):
