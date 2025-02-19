@@ -30,6 +30,9 @@ exclude_lines = ["@abstractmethod", "@overload", "pragma: no cover"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyledctrl"]
 
+[tool.hatch.envs.default]
+installer = "uv"
+
 [tool.ruff]
 lint.ignore = ["B905", "C901", "E402", "E501"]
 lint.select = ["B", "C", "E", "F", "W"]
