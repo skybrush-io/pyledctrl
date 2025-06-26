@@ -1,6 +1,6 @@
 [project]
 name = "pyledctrl"
-version = "4.1.0"
+version = "4.2.0"
 description = "Compiler to convert LED light show scripts to bytecode format"
 authors = [{ name = "Tamas Nepusz", email = "tamas@collmot.com" }]
 license = "GPL-3.0-or-later"
