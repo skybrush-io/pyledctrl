@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.9"
 
 [[package]]
@@ -148,6 +148,7 @@ cli = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage", extra = ["toml"] },
+    { name = "pyledctrl", extra = ["cli"] },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -162,6 +163,7 @@ provides-extras = ["cli"]
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.1.0" },
+    { name = "pyledctrl", extras = ["cli"] },
     { name = "pytest", specifier = ">=7.2.1" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
 ]
